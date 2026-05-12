@@ -1,0 +1,13 @@
+[package]
+name = "newapiplygraoud"
+version = "0.1.0"
+authors = ["Tauri User <tauri@example.com>"]
+edition = "2021"
+license = "MIT"
+description = "Tauri wrapper for the newapiplygraoud Next.js app"
+
+[build-dependencies]
+tauri-build = { version = "2.6.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.1", features = ["wry"] }
