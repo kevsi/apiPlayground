@@ -32,9 +32,10 @@ interface ProjectCardProps {
   onSelect: () => void;
   onDelete: () => void;
   onReanalyze: () => void;
+  isReanalyzing?: boolean;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isActive = false, onSelect, onDelete, onReanalyze }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isActive = false, onSelect, onDelete, onReanalyze, isReanalyzing = false }) => {
   const fw = project.framework || "unknown"
   const colors = FRAMEWORK_COLORS[fw] ?? FRAMEWORK_COLORS.unknown
 
@@ -61,7 +62,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isActive = fa
       {/* Name */}
       <div className="min-w-0">
         <h3 className="truncate font-semibold text-foreground">{project.name}</h3>
-        <p className="truncate text-xs text-muted-foreground mt-0.5">{project.folderPath}</p>
+        <p className="truncate text-xs text-muted-foreground mt-0.5">
+          {project.folderPath}
+          {project.language ? ` · ${project.language}` : ""}
+        </p>
       </div>
 
       {/* Stats */}
@@ -86,13 +90,21 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isActive = fa
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onReanalyze}
-          title="Réanalyser"
-          className="flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          title={isReanalyzing ? "Réanalyse en cours" : "Réanalyser"}
+          disabled={isReanalyzing}
+          className={cn(
+            "flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors",
+            isReanalyzing
+              ? "cursor-not-allowed opacity-50"
+              : "hover:text-foreground hover:bg-accent"
+          )}
         >
-          <RefreshCw className="size-3.5" />
+          <RefreshCw className={cn("size-3.5", isReanalyzing ? "animate-spin" : "")} />
         </button>
         <button
+          type="button"
           onClick={onDelete}
           title="Supprimer"
           className="flex size-7 items-center justify-center rounded-md border border-border bg-background text-destructive hover:bg-destructive/10 transition-colors"

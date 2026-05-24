@@ -225,9 +225,46 @@
   --sidebar-ring: oklch(0.55 0.22 300);
 }
 
+/* Midnight Theme - Deep Dark */
+.midnight {
+  --background: oklch(0.02 0 0);
+  --foreground: oklch(0.94 0.005 0);
+  --card: oklch(0.08 0 0);
+  --card-foreground: oklch(0.94 0.005 0);
+  --popover: oklch(0.08 0 0);
+  --popover-foreground: oklch(0.94 0.005 0);
+  --primary: oklch(0.54 0.26 260);
+  --primary-foreground: oklch(0.02 0 0);
+  --secondary: oklch(0.15 0 0);
+  --secondary-foreground: oklch(0.94 0.005 0);
+  --muted: oklch(0.15 0 0);
+  --muted-foreground: oklch(0.5 0.01 0);
+  --accent: oklch(0.54 0.26 260);
+  --accent-foreground: oklch(0.02 0 0);
+  --destructive: oklch(0.5 0.2 20);
+  --destructive-foreground: oklch(0.94 0.005 0);
+  --border: oklch(0.15 0 0);
+  --input: oklch(0.15 0 0);
+  --ring: oklch(0.54 0.26 260);
+  --chart-1: oklch(0.54 0.26 260);
+  --chart-2: oklch(0.45 0.2 280);
+  --chart-3: oklch(0.6 0.22 240);
+  --chart-4: oklch(0.5 0.25 300);
+  --chart-5: oklch(0.55 0.23 200);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.05 0 0);
+  --sidebar-foreground: oklch(0.94 0.005 0);
+  --sidebar-primary: oklch(0.54 0.26 260);
+  --sidebar-primary-foreground: oklch(0.02 0 0);
+  --sidebar-accent: oklch(0.54 0.26 260);
+  --sidebar-accent-foreground: oklch(0.02 0 0);
+  --sidebar-border: oklch(0.15 0 0);
+  --sidebar-ring: oklch(0.54 0.26 260);
+}
+
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -306,4 +343,27 @@
 
 .scrollbar-discreet::-webkit-scrollbar-thumb:hover {
   background-color: rgba(148, 163, 184, 0.65);
+}
+
+/* Thin scrollbar for dashboard */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.6);
 }

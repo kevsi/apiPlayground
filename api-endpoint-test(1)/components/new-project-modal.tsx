@@ -15,7 +15,7 @@ import {
 import type { AIProvider, AnalysisMode, SavedProject } from "@/hooks/use-projects-store"
 import { loadApiKey, saveApiKey } from "@/hooks/use-projects-store"
 import { analyzeProject } from '../lib/project-analyzer'
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-toast"
 
 const PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: "anthropic", label: "Anthropic (Claude)" },
@@ -38,6 +38,7 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
   const [folderPath, setFolderPath] = useState("")
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState("")
+  const [analysisResult, setAnalysisResult] = useState<SavedProject | null>(null)
 
   const handleProviderChange = (p: AIProvider) => {
     setProvider(p)
@@ -51,47 +52,47 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
         const selected = await open({ directory: true, multiple: false })
         if (selected && typeof selected === "string") {
           setFolderPath(selected)
+          setAnalysisResult(null)
         }
       } catch {
-        toast.error("Impossible d'ouvrir le sélecteur de dossier")
+        toast({ title: "Impossible d'ouvrir le sélecteur de dossier", variant: "destructive" })
       }
     } else {
       downloadJson({ path: "" }, "dossier.json")
-      toast.info("Mode navigateur : téléchargement d'un modèle JSON. Sous Tauri, le sélecteur de dossier natif sera disponible.")
+      toast({ title: "Mode navigateur : téléchargement d'un modèle JSON. Sous Tauri, le sélecteur de dossier natif sera disponible.", meta: { event: "projectImport" } } as any)
     }
   }
 
   const analyze = async () => {
-    if (!folderPath) { toast.error("Sélectionnez un dossier"); return }
+    if (!folderPath) { toast({ title: "Sélectionnez un dossier", variant: "destructive" }); return }
     if (mode === "ai" && provider !== "ollama" && !apiKey.trim()) {
-      toast.error("Clé API requise"); return
+      toast({ title: "Clé API requise", variant: "destructive" }); return
     }
     if (mode === "ai" && provider !== "ollama") saveApiKey(provider, apiKey)
     setLoading(true)
     try {
       setStep("Analyse en cours…")
-      const result = await analyzeProject(folderPath, mode, mode === "ai" ? apiKey : undefined)
-      
-      const project: SavedProject = {
-        id: `proj-${Date.now()}`,
-        name: result.name,
-        framework: result.framework,
-        folderPath,
-        port: result.port,
-        routes: result.routes,
-        analyzedAt: new Date().toISOString(),
-        mode,
-      }
-      onAdd(project)
-      toast.success(`${result.routes.length} routes détectées`)
-      onClose()
-      setFolderPath("")
+      const result = await analyzeProject(folderPath, mode, provider, mode === "ai" ? apiKey : undefined)
+      setAnalysisResult(result)
+      toast({ title: `Langage détecté : ${result.language ?? "Inconnu"}`, meta: { event: "projectAdd" } } as any)
     } catch (err) {
-      toast.error(`Erreur : ${String(err)}`)
+      toast({ title: `Erreur : ${String(err)}`, variant: "destructive", meta: { event: "projectAdd" } } as any)
     } finally {
       setLoading(false)
       setStep("")
     }
+  }
+
+  const handlePrimaryAction = async () => {
+    if (analysisResult) {
+      onAdd(analysisResult)
+      toast({ title: `${analysisResult.routes.length} routes détectées`, meta: { event: "projectAdd" } } as any)
+      onClose()
+      setFolderPath("")
+      setAnalysisResult(null)
+      return
+    }
+    await analyze()
   }
 
   return (
@@ -171,13 +172,24 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
             </Button>
           </div>
 
+          {analysisResult && (
+            <div className="rounded-2xl border border-border/50 bg-muted/10 p-4 text-sm text-foreground">
+              <p><strong>Langage détecté :</strong> {analysisResult.language ?? "Inconnu"}</p>
+              <p><strong>Framework :</strong> {analysisResult.framework}</p>
+              <p><strong>Routes :</strong> {analysisResult.routes.length}</p>
+              {analysisResult.port && <p><strong>Port :</strong> {analysisResult.port}</p>}
+            </div>
+          )}
+
           <Button
             className="w-full gap-2"
-            onClick={analyze}
+            onClick={handlePrimaryAction}
             disabled={loading || !folderPath}
           >
             {loading ? (
               <><Loader2 className="size-4 animate-spin" /> {step || "Analyse…"}</>
+            ) : analysisResult ? (
+              <><Sparkles className="size-4" /> Ajouter le projet</>
             ) : (
               <><Sparkles className="size-4" /> Analyser</>
             )}

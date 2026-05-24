@@ -6,12 +6,13 @@ import * as React from 'react'
 import type { ToastActionElement, ToastProps } from '@/components/ui/toast'
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 6000
 
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
+  meta?: Record<string, unknown>
   action?: ToastActionElement
 }
 
@@ -139,7 +140,40 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>
 
-function toast({ ...props }: Toast) {
+function toast({ ...props }: Toast & { meta?: Record<string, unknown> }) {
+  try {
+    const pushEnabled = typeof window !== 'undefined' && localStorage.getItem('probe_push_enabled') === 'true'
+    const event = props.meta?.event as string | undefined
+
+    // Always allow collection-created toasts regardless of global push setting
+    const isCollectionEvent = event === 'collectionComplete'
+
+    if (!pushEnabled && !isCollectionEvent) {
+      return {
+        id: '',
+        dismiss: () => {},
+        update: () => {},
+      }
+    }
+
+    if (event && typeof window !== 'undefined') {
+      try {
+        const eventsRaw = localStorage.getItem('probe_push_events') || '{}'
+        const events = JSON.parse(eventsRaw)
+        if (events && events[event] === false) {
+          return {
+            id: '',
+            dismiss: () => {},
+            update: () => {},
+          }
+        }
+      } catch {
+        // intentionally empty
+      }
+    }
+  } catch {
+    // intentionally empty
+  }
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -155,6 +189,7 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
+      duration: props.duration ?? 4000,
       onOpenChange: (open) => {
         if (!open) dismiss()
       },

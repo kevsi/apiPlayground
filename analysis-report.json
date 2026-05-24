@@ -1,0 +1,201 @@
+{
+  "id": "proj-1779376201263",
+  "name": "api-endpoint-test(1)",
+  "framework": "nestjs",
+  "language": "JavaScript",
+  "folderPath": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)",
+  "routes": [
+    {
+      "name": "",
+      "method": "GET",
+      "path": "/github-auth/callback",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": false,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\github-auth\\callback\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": null,
+      "actuallyUsedByFrontend": false,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "LOW",
+      "reasonings": [
+        "Detected cookie/session usage in route file"
+      ],
+      "detectedIssues": []
+    },
+    {
+      "name": "",
+      "method": "POST",
+      "path": "/github-auth/logout",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": false,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\github-auth\\logout\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": null,
+      "actuallyUsedByFrontend": true,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "MEDIUM",
+      "reasonings": [
+        "Detected cookie/session usage in route file",
+        "Referenced by frontend call: /api/github-auth/logout"
+      ],
+      "detectedIssues": []
+    },
+    {
+      "name": "",
+      "method": "GET",
+      "path": "/github-auth/repos",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": true,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\github-auth\\repos\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": "cookie",
+      "actuallyUsedByFrontend": true,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "HIGH",
+      "reasonings": [
+        "Detected cookie/session usage in route file",
+        "Cookie token access detected (heuristic: auth required)",
+        "Referenced by frontend call: /api/github-auth/repos"
+      ],
+      "detectedIssues": []
+    },
+    {
+      "name": "",
+      "method": "GET",
+      "path": "/github-auth",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": false,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\github-auth\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": null,
+      "actuallyUsedByFrontend": true,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "MEDIUM",
+      "reasonings": [
+        "Detected cookie/session usage in route file",
+        "Referenced by frontend call: /api/github-auth/logout"
+      ],
+      "detectedIssues": []
+    },
+    {
+      "name": "",
+      "method": "GET",
+      "path": "/github-auth/status",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": true,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\github-auth\\status\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": "cookie",
+      "actuallyUsedByFrontend": true,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "HIGH",
+      "reasonings": [
+        "Detected cookie/session usage in route file",
+        "Cookie token access detected (heuristic: auth required)",
+        "Referenced by frontend call: /api/github-auth/status"
+      ],
+      "detectedIssues": []
+    },
+    {
+      "name": "",
+      "method": "POST",
+      "path": "/github-import",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": true,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\github-import\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": "cookie",
+      "actuallyUsedByFrontend": true,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "HIGH",
+      "reasonings": [
+        "Detected cookie/session usage in route file",
+        "Cookie token access detected (heuristic: auth required)",
+        "Referenced by frontend call: /api/github-import"
+      ],
+      "detectedIssues": []
+    },
+    {
+      "name": "",
+      "method": "POST",
+      "path": "/proxy",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": false,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\proxy\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": null,
+      "actuallyUsedByFrontend": true,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "MEDIUM",
+      "reasonings": [
+        "Referenced by frontend call: /api/proxy-ai"
+      ],
+      "detectedIssues": []
+    },
+    {
+      "name": "",
+      "method": "POST",
+      "path": "/proxy-ai",
+      "headers": [],
+      "body": "",
+      "bodyType": "none",
+      "authRequired": false,
+      "description": "",
+      "sourceFile": "C:\\Users\\rough\\Documents\\Workspace\\apiPlayground\\api-endpoint-test(1)\\app\\api\\proxy-ai\\route.ts",
+      "controller": null,
+      "middlewareChain": [],
+      "authType": null,
+      "actuallyUsedByFrontend": true,
+      "inferredUsageFrequency": null,
+      "reachable": true,
+      "confidence": "MEDIUM",
+      "reasonings": [
+        "Referenced by frontend call: /api/proxy-ai"
+      ],
+      "detectedIssues": []
+    }
+  ],
+  "analyzedAt": "2026-05-21T15:10:01.263Z",
+  "mode": "static",
+  "projectAuthIndicators": {
+    "hasPassport": false,
+    "hasJsonWebToken": false,
+    "hasCookieAccess": true,
+    "hasSession": true
+  }
+}

@@ -24,11 +24,10 @@ import {
   Play,
 } from "lucide-react"
 import { cn, downloadJson } from "@/lib/utils"
-import { invoke } from "@tauri-apps/api/core"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-toast"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +45,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { Collection, RequestItem, HttpMethod } from "@/hooks/use-request-store"
+import { requestItemSchema } from "@/lib/import-schemas"
+
+export type NewCollectionInput = {
+  name?: string
+  color?: string
+  icon?: string
+}
+
+export type NewRequestInput = Omit<RequestItem, "id" | "createdAt" | "updatedAt">
 
 // Pending delete confirmation state
 interface PendingDelete {
@@ -99,10 +107,12 @@ interface CollectionsPanelProps {
   collections: Collection[]
   onSelectRequest: (request: RequestItem) => void
   onSelectAndSendRequest?: (request: RequestItem) => void
-  onAddCollection: (data?: any) => string
+  onRunCollection?: (collection: Collection) => void
+  onRunCollectionBackground?: (collection: Collection) => void
+  onAddCollection: (data?: NewCollectionInput) => string
   onDeleteCollection: (id: string) => void
   onRenameCollection: (id: string, name: string) => void
-  onAddRequestToCollection: (collectionId: string, request?: any) => void
+  onAddRequestToCollection: (collectionId: string, request?: NewRequestInput) => void
   onRemoveRequestFromCollection: (collectionId: string, requestId: string) => void
 }
 
@@ -110,12 +120,21 @@ export function CollectionsPanel({
   collections,
   onSelectRequest,
   onSelectAndSendRequest,
+  onRunCollection,
+  onRunCollectionBackground,
   onAddCollection,
   onDeleteCollection,
   onRenameCollection,
   onAddRequestToCollection,
   onRemoveRequestFromCollection,
 }: CollectionsPanelProps) {
+  if (typeof window !== 'undefined') {
+    try {
+      console.log('COLLECTIONS_PANEL render: props.collections.length=', collections.length)
+    } catch {
+      // intentionally empty
+    }
+  }
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
     new Set(collections.map((c) => c.id))
   )
@@ -134,8 +153,10 @@ export function CollectionsPanel({
     try {
       const text = await file.text()
       const data = JSON.parse(text)
+    console.log('DEBUG: imported file parsed', data)
       
-      const processCollection = (colData: any) => {
+      const processCollection = (colData: { name?: string; color?: string; icon?: string; requests?: unknown[] }) => {
+        console.log('DEBUG: processing collection', colData)
         const colId = onAddCollection({
           name: colData.name || "Imported Collection",
           color: colData.color || "emerald",
@@ -143,26 +164,36 @@ export function CollectionsPanel({
         })
         
         if (colData.requests && Array.isArray(colData.requests)) {
-          colData.requests.forEach((req: any) => {
+          colData.requests.forEach((req: unknown) => {
             if (onAddRequestToCollection) {
-               onAddRequestToCollection(colId, req)
+              const parsed = requestItemSchema.safeParse(req)
+              if (parsed.success) {
+                // Strip any persisted metadata so store generates ids/timestamps consistently.
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = parsed.data
+                onAddRequestToCollection(colId, rest)
+              }
             }
           })
         }
       }
 
-      if (data.type === "collection" || data.requests) {
-        processCollection(data)
-        toast.success(`Collection importée`)
-      } else if (data.collections && Array.isArray(data.collections)) {
-        data.collections.forEach(processCollection)
-        toast.success(`${data.collections.length} collections importées`)
+      const dataObj = data as { type?: string; requests?: unknown[]; collections?: unknown[] };
+
+      if (dataObj.type === "collection" || dataObj.requests) {
+        processCollection(dataObj as Parameters<typeof processCollection>[0])
+        toast({ title: `Collection importée`, meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
+        // (reverted) previously forced reload here; UI should update reactively
+      } else if (dataObj.collections && Array.isArray(dataObj.collections)) {
+        dataObj.collections.forEach((c) => processCollection(c as Parameters<typeof processCollection>[0]))
+        toast({ title: `${dataObj.collections.length} collections importées`, meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
+        // (reverted) previously forced reload here; UI should update reactively
       } else {
-         toast.error("Format non reconnu")
+         toast({ title: "Format non reconnu", variant: "destructive", meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
       }
       
-    } catch (err) {
-      toast.error("Fichier JSON invalide")
+    } catch {
+      toast({ title: "Fichier JSON invalide", variant: "destructive", meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
     }
     
     if (fileInputRef.current) {
@@ -220,7 +251,7 @@ export function CollectionsPanel({
 
   // --- Bulk actions ---
   const bulkExport = async () => {
-    const isTauri = !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__
+    const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ || !!(window as unknown as Record<string, unknown>).__TAURI__
 
     // Gather selected collections
     const cols = collections.filter((c) => selectedCollectionIds.has(c.id))
@@ -256,20 +287,21 @@ export function CollectionsPanel({
 
     if (isTauri) {
       try {
+        const { invoke } = await import("@tauri-apps/api/core")
         const savedPath = await invoke<string>("export_json", {
           content: JSON.stringify(exportData, null, 2),
           defaultName,
         })
-        toast.success(`Exporté : ${savedPath}`)
+        toast({ title: `Exporté : ${savedPath}`, meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
         clearSelection()
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error === "cancelled") return
-        toast.error(`Erreur export : ${String(error)}`)
+        toast({ title: `Erreur export : ${String(error)}`, variant: "destructive", meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
         downloadJson(exportData, defaultName)
       }
     } else {
       downloadJson(exportData, defaultName)
-      toast.success("Export téléchargé")
+      toast({ title: "Export téléchargé", meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
       clearSelection()
     }
   }
@@ -296,7 +328,7 @@ export function CollectionsPanel({
 
   // --- Single item export ---
   const exportCollection = async (collection: Collection) => {
-    const isTauri = !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__
+    const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ || !!(window as unknown as Record<string, unknown>).__TAURI__
     const exportData = {
       name: collection.name,
       description: collection.description,
@@ -308,14 +340,15 @@ export function CollectionsPanel({
 
     if (isTauri) {
       try {
+        const { invoke } = await import("@tauri-apps/api/core")
         const savedPath = await invoke<string>("export_json", {
           content: JSON.stringify(exportData, null, 2),
           defaultName: `${safeName}_collection.json`,
         })
-        toast.success(`Sauvegardé : ${savedPath}`)
-      } catch (error: any) {
+        toast({ title: `Sauvegardé : ${savedPath}`, meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
+      } catch (error: unknown) {
         if (error === "cancelled") return
-        toast.error(`Erreur : ${String(error)}`)
+        toast({ title: `Erreur : ${String(error)}`, variant: "destructive", meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
         downloadJson(exportData, `${safeName}_collection.json`)
       }
     } else {
@@ -338,6 +371,39 @@ export function CollectionsPanel({
         collection.requests.length > 0 ||
         collection.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
+
+  if (typeof window !== 'undefined') {
+    try { 
+      console.log('COLLECTIONS_PANEL: filteredCollections.length=', filteredCollections.length, 'names=', filteredCollections.map(c=>c.name)) 
+    } catch { 
+      // intentionally empty 
+    }
+  }
+
+  // Post-render DOM check: run after React commits to verify text nodes exist
+  if (typeof window !== 'undefined') {
+    try {
+       
+      ;(function watchDOM() {
+        try {
+          const names = filteredCollections.map((c) => c.name)
+          const results = names.map((name) => {
+            try {
+              const found = Array.from(document.querySelectorAll('*')).some((el) => el.textContent && el.textContent.includes(name))
+              return { name, found }
+            } catch {
+              return { name, found: false }
+            }
+          })
+          console.log('COLLECTIONS_PANEL POST_RENDER check', JSON.stringify(results))
+        } catch {
+          // intentionally empty
+        }
+      })()
+    } catch {
+      // intentionally empty
+    }
+  }
 
   const totalSelected = selectedCollectionIds.size + selectedRequestIds.size
 
@@ -387,7 +453,7 @@ export function CollectionsPanel({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onAddCollection}
+            onClick={() => onAddCollection()}
             className="h-7 gap-1 px-2 text-xs"
           >
             <FolderPlus className="size-3.5" />
@@ -562,6 +628,16 @@ export function CollectionsPanel({
                         <DropdownMenuItem onClick={() => onAddRequestToCollection(collection.id)}>
                           <Plus className="mr-2 size-3.5" /> Add Request
                         </DropdownMenuItem>
+                        {onRunCollection && (
+                          <DropdownMenuItem onClick={() => onRunCollection(collection)}>
+                            <Play className="mr-2 size-3.5" /> Run collection
+                          </DropdownMenuItem>
+                        )}
+                        {onRunCollectionBackground && (
+                          <DropdownMenuItem onClick={() => onRunCollectionBackground(collection)}>
+                            <Play className="mr-2 size-3.5" /> Run collection (background)
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => {
                             setEditingCollectionId(collection.id)
@@ -623,6 +699,17 @@ export function CollectionsPanel({
                               </Badge>
                               <span className="truncate text-sm text-foreground">{request.name}</span>
                             </button>
+                            {onSelectAndSendRequest && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onSelectAndSendRequest(request)}
+                                className="size-6 p-0 text-emerald-500 opacity-0 group-hover:opacity-100 hover:text-emerald-600 hover:bg-emerald-50"
+                                title="Charger et exécuter"
+                              >
+                                <Play className="size-3" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -815,6 +902,37 @@ export function CollectionsPanel({
               })}
             </div>
 
+            {(onRunCollection || onRunCollectionBackground) && (
+              <div className="flex flex-col gap-2 border-t border-border px-4 py-3">
+                <div className="text-xs text-muted-foreground">Exécuter toutes les requêtes de cette collection.</div>
+                <div className="flex flex-wrap gap-2">
+                  {onRunCollection && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        onRunCollection(collectionDetail)
+                        setCollectionDetail(null)
+                      }}
+                    >
+                      Run collection
+                    </Button>
+                  )}
+                  {onRunCollectionBackground && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        onRunCollectionBackground(collectionDetail)
+                        setCollectionDetail(null)
+                      }}
+                    >
+                      Run collection (background)
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
             <AlertDialogFooter>
               <AlertDialogCancel>Fermer</AlertDialogCancel>
             </AlertDialogFooter>

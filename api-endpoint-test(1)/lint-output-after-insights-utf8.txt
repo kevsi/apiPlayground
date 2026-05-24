@@ -1,0 +1,513 @@
+﻿Already up to date
+Done in 772ms using pnpm v11.1.1
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\ai-insights\page.tsx
+    3:10   warning  'useEffect' is defined but never used                   @typescript-eslint/no-unused-vars
+   18:32   warning  'HttpMethod' is defined but never used                  @typescript-eslint/no-unused-vars
+   19:50   warning  'saveAIProvider' is defined but never used              @typescript-eslint/no-unused-vars
+  211:9    warning  'buildCurlSnippet' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  222:9    warning  'buildFetchSnippet' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  271:13   warning  Empty block statement                                   no-empty
+  338:15   warning  Empty block statement                                   no-empty
+  448:125  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  450:137  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  452:33   warning  Empty block statement                                   no-empty
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\api\github-import\route.ts
+  120:87  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  121:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:62  warning  Unnecessary escape character: \)          no-useless-escape
+  125:65  warning  Unnecessary escape character: \)          no-useless-escape
+  129:66  warning  Unnecessary escape character: \)          no-useless-escape
+  130:63  warning  Unnecessary escape character: \)          no-useless-escape
+  134:58  warning  Unnecessary escape character: \)          no-useless-escape
+  159:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  159:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\api\proxy-ai\route.ts
+  90:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\collections\page.tsx
+   42:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  127:13  warning  Empty block statement                     no-empty
+  210:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  223:16  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\dashboard\page.tsx
+   27:3   warning  'BarChart' is defined but never used                @typescript-eslint/no-unused-vars
+   28:3   warning  'Bar' is defined but never used                     @typescript-eslint/no-unused-vars
+   44:7   warning  '_statusColors' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  312:52  warning  'index' is defined but never used                   @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\my-projects\page.tsx
+  38:47  warning  'projectId' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\page.tsx
+  6:10  warning  'useState' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\settings\page.tsx
+   50:19   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\settings\page.tsx:50:19
+  48 |       | "account"
+  49 |       | ""
+> 50 |     if (fromHash) setActiveSection(fromHash || "profile")
+     |                   ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  51 |
+  52 |     const onHashChange = () => {
+  53 |       const h = window.location.hash?.replace("#", "") as                                                  react-hooks/set-state-in-effect
+   77:5    warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\app\settings\page.tsx:77:5
+  75 |   useEffect(() => {
+  76 |     const configuredProvider = loadAIProvider()
+> 77 |     setProvider(configuredProvider)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  78 |     setApiKey(loadApiKey(configuredProvider))
+  79 |     const ollamaConfig = loadOllamaConfig()
+  80 |     setOllamaHost(ollamaConfig.host || "127.0.0.1")  react-hooks/set-state-in-effect
+  407:134  error    Irregular whitespace not allowed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-irregular-whitespace
+  489:90   error    Irregular whitespace not allowed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-irregular-whitespace
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\DiffPanel.tsx
+  37:24  error  Error: Cannot call impure function during render
+
+`performance.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\DiffPanel.tsx:37:24
+  35 |     };
+  36 |
+> 37 |     const startTimeA = performance.now();
+     |                        ^^^^^^^^^^^^^^^^^ Cannot call impure function
+  38 |     const startTimeB = performance.now();
+  39 |
+  40 |     try {                                                                                react-hooks/purity
+  38:24  error  Error: Cannot call impure function during render
+
+`performance.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\DiffPanel.tsx:38:24
+  36 |
+  37 |     const startTimeA = performance.now();
+> 38 |     const startTimeB = performance.now();
+     |                        ^^^^^^^^^^^^^^^^^ Cannot call impure function
+  39 |
+  40 |     try {
+  41 |       const [resA, resB] = await Promise.all([                                        react-hooks/purity
+  46:21  error  Error: Cannot call impure function during render
+
+`performance.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\DiffPanel.tsx:46:21
+  44 |       ]);
+  45 |
+> 46 |       const timeA = performance.now() - startTimeA;
+     |                     ^^^^^^^^^^^^^^^^^ Cannot call impure function
+  47 |       const timeB = performance.now() - startTimeB;
+  48 |
+  49 |       const bodyA = await resA.json();                               react-hooks/purity
+  47:21  error  Error: Cannot call impure function during render
+
+`performance.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\DiffPanel.tsx:47:21
+  45 |
+  46 |       const timeA = performance.now() - startTimeA;
+> 47 |       const timeB = performance.now() - startTimeB;
+     |                     ^^^^^^^^^^^^^^^^^ Cannot call impure function
+  48 |
+  49 |       const bodyA = await resA.json();
+  50 |       const bodyB = await resB.json();  react-hooks/purity
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\collections-panel.tsx
+  941:0  error  Parsing error: '}' expected
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\environment-selector.tsx
+  20:0  error  Parsing error: Expression expected
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\import-export-modal.tsx
+  137:25   warning  '_id' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  137:41   warning  '_createdAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  137:64   warning  '_updatedAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  137:100  warning  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  161:27   warning  '_id' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  161:43   warning  '_createdAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  161:66   warning  '_updatedAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  161:102  warning  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  180:25   warning  '_id' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  180:41   warning  '_createdAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  180:64   warning  '_updatedAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  180:100  warning  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  200:27   warning  '_id' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  200:43   warning  '_createdAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  200:66   warning  '_updatedAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  200:102  warning  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\import-github-modal.tsx
+  80:132  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  84:147  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\new-project-modal.tsx
+  60:173  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  86:101  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  90:108  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\request-tabs-manager.tsx
+  200:14  warning  Unnecessary escape character: \[                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           no-useless-escape
+  232:67  warning  Unnecessary escape character: \[                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           no-useless-escape
+  261:13  warning  'responseData' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  276:13  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  279:15  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  296:15  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  299:17  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  304:13  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  306:13  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  312:7   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  389:12  error    Error: Cannot access variable before it is declared
+
+`buildTabFromRequest` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\request-tabs-manager.tsx:389:12
+  387 |       const requestLoaded = {
+  388 |         ...activeTab,
+> 389 |         ...buildTabFromRequest(request),
+      |            ^^^^^^^^^^^^^^^^^^^ `buildTabFromRequest` accessed before it is declared
+  390 |       } as RequestTab
+  391 |
+  392 |       setTabs((currentTabs) =>
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\request-tabs-manager.tsx:747:3
+  745 |   }
+  746 |
+> 747 |   const buildTabFromRequest = (request: RequestItem | HistoryItem | PendingCollectionRequest): Partial<RequestTab> => ({
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 748 |     name: request.name,
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+> 749 |     method: request.method as HttpMethod,
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+> 766 |     responseSize: undefined,
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+> 767 |   })
+      | ^^^^^ `buildTabFromRequest` is declared here
+  768 |
+  769 |   const loadRequestIntoActiveTab = (request: RequestItem | HistoryItem) => {
+  770 |     updateTab(activeTab.id, buildTabFromRequest(request))                                                    react-hooks/immutability
+  396:28  error    Error: Cannot access variable before it is declared
+
+`sendSpecificRequest` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\request-tabs-manager.tsx:396:28
+  394 |       )
+  395 |
+> 396 |       const result = await sendSpecificRequest(requestLoaded)
+      |                            ^^^^^^^^^^^^^^^^^^^ `sendSpecificRequest` accessed before it is declared
+  397 |       if (!result) {
+  398 |         setCollectionRunLogs((logs) => [...logs, `"${request.name}" ΓåÆ ├⌐chec`])
+  399 |         continue
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\request-tabs-manager.tsx:882:3
+  880 |   }
+  881 |
+> 882 |   const sendSpecificRequest = async (tabToSend: RequestTab) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 883 |     if (!tabToSend?.url) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 884 |
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 923 |     return result
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 924 |   }
+      | ^^^^ `sendSpecificRequest` is declared here
+  925 |
+  926 |   const loadAndSendRequest = async (request: RequestItem | HistoryItem) => {
+  927 |     const tempTab: RequestTab = {                                                                                                                                                          react-hooks/immutability
+  429:28  error    Error: Cannot access variable before it is declared
+
+`executeRequest` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\request-tabs-manager.tsx:429:28
+  427 |       } as RequestTab
+  428 |
+> 429 |       const result = await executeRequest(backgroundTab)
+      |                            ^^^^^^^^^^^^^^ `executeRequest` accessed before it is declared
+  430 |       setCollectionRunLogs((logs) => [
+  431 |         ...logs,
+  432 |         `"${request.name}" ΓåÆ ${result.responseStatus ?? 0} en ${result.responseTime ?? 0}ms`,
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\request-tabs-manager.tsx:567:3
+  565 |   }
+  566 |
+> 567 |   const executeRequest = async (tab: RequestTab) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 568 |     const { finalUrl, finalBody, headers } = buildRequestPayload(tab)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 569 |     const requestInit: RequestInit = {
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 644 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 645 |   }
+      | ^^^^ `executeRequest` is declared here
+  646 |
+  647 |   useEffect(() => {
+  648 |     // eslint-disable-next-line react-hooks/set-state-in-effect  react-hooks/immutability
+  491:7   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  499:7   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  509:6   warning  React Hook useEffect has missing dependencies: 'buildTabFromRequest', 'runCollection', 'runCollectionBackground', and 'sendSpecificRequest'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-hooks/exhaustive-deps
+  579:9   error    The value assigned to 'responseBody' is not used in subsequent statements                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-useless-assignment
+  580:9   error    The value assigned to 'responseData' is not used in subsequent statements                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-useless-assignment
+  773:9   warning  'runBackgroundRequest' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  936:9   warning  'addNewQueryParam' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  942:9   warning  'removeQueryParam' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  948:9   warning  'setQueryParam' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  955:9   warning  'addNewHeader' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  959:9   warning  'removeHeader' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  963:9   warning  'setHeader' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\response-panel.tsx
+   99:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  103:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  110:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  152:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  156:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  163:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  221:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  222:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  249:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  250:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  301:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  302:9   error    Unexpected lexical declaration in case block                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-case-declarations
+  416:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\response-panel.tsx:416:7
+  414 |   useEffect(() => {
+  415 |     if (responseBody) {
+> 416 |       setResponseFormat(getAutoFormat())
+      |       ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  417 |     }
+  418 |   }, [responseBody, responseHeaders])
+  419 |                                                                                                              react-hooks/set-state-in-effect
+  416:25  error    Error: Cannot access variable before it is declared
+
+`getAutoFormat` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\response-panel.tsx:416:25
+  414 |   useEffect(() => {
+  415 |     if (responseBody) {
+> 416 |       setResponseFormat(getAutoFormat())
+      |                         ^^^^^^^^^^^^^ `getAutoFormat` accessed before it is declared
+  417 |     }
+  418 |   }, [responseBody, responseHeaders])
+  419 |
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\response-panel.tsx:515:3
+  513 |   }
+  514 |
+> 515 |   const getAutoFormat = (): ResponseFormat => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 516 |     if (isJson()) return "json"
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 517 |     if (isXml()) return "xml"
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 524 |     return "pretty"
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 525 |   }
+      | ^^^^ `getAutoFormat` is declared here
+  526 |
+  527 |   const handleCopy = async () => {
+  528 |     try {  react-hooks/immutability
+  418:6   warning  React Hook useEffect has a missing dependency: 'getAutoFormat'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-hooks/exhaustive-deps
+  490:61  warning  Unnecessary escape character: \"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-useless-escape
+  491:11  error    The value assigned to 'cls' is not used in subsequent statements                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-useless-assignment
+  501:27  warning  Unnecessary escape character: \"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-useless-escape
+  501:35  warning  Unnecessary escape character: \"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-useless-escape
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\route-modal.tsx
+  14:39   warning  'open' is defined but never used                                                                                                @typescript-eslint/no-unused-vars
+  22:34   error    React Hook "useCallback" is called conditionally. React Hooks must be called in the exact same order in every component render  react-hooks/rules-of-hooks
+  41:35   warning  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  48:168  warning  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\theme-provider.tsx
+  34:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\theme-provider.tsx:34:5
+  32 |
+  33 |   useEffect(() => {
+> 34 |     setMounted(true)
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  35 |     const stored = localStorage.getItem(storageKey) as Theme
+  36 |     if (stored) {
+  37 |       setTheme(stored)  react-hooks/set-state-in-effect
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\theme-switcher.tsx
+  5:10  warning  'cn' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\ui\carousel.tsx
+  98:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\ui\carousel.tsx:98:5
+   96 |   React.useEffect(() => {
+   97 |     if (!api) return
+>  98 |     onSelect(api)
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+   99 |     api.on('reInit', onSelect)
+  100 |     api.on('select', onSelect)
+  101 |  react-hooks/set-state-in-effect
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\ui\sidebar.tsx
+  611:26  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\ui\sidebar.tsx:611:26
+  609 |   // Random width between 50 to 90%.
+  610 |   const width = React.useMemo(() => {
+> 611 |     return `${Math.floor(Math.random() * 40) + 50}%`
+      |                          ^^^^^^^^^^^^^ Cannot call impure function
+  612 |   }, [])
+  613 |
+  614 |   return (  react-hooks/purity
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\ui\use-mobile.tsx
+  14:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\components\ui\use-mobile.tsx:14:5
+  12 |     }
+  13 |     mql.addEventListener('change', onChange)
+> 14 |     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  15 |     return () => mql.removeEventListener('change', onChange)
+  16 |   }, [])
+  17 |  react-hooks/set-state-in-effect
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\contexts\sidebar-context.tsx
+  24:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\contexts\sidebar-context.tsx:24:7
+  22 |     const stored = localStorage.getItem("sidebar-collapsed")
+  23 |     if (stored) {
+> 24 |       setIsCollapsed(JSON.parse(stored))
+     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  25 |     }
+  26 |   }, [])
+  27 |  react-hooks/set-state-in-effect
+  31:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\contexts\sidebar-context.tsx:31:7
+  29 |   useEffect(() => {
+  30 |     if (isNarrow) {
+> 31 |       setIsCollapsed(true)
+     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  32 |     }
+  33 |   }, [isNarrow])
+  34 |                                               react-hooks/set-state-in-effect
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\hooks\use-mobile.ts
+  14:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\hooks\use-mobile.ts:14:5
+  12 |     }
+  13 |     mediaQuery.addEventListener('change', onChange)
+> 14 |     setIsMobile(mediaQuery.matches)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  15 |     return () => mediaQuery.removeEventListener('change', onChange)
+  16 |   }, [maxWidth])
+  17 |  react-hooks/set-state-in-effect
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\hooks\use-projects-store.ts
+  51:11  warning  Empty block statement  no-empty
+  67:11  warning  Empty block statement  no-empty
+  88:11  warning  Empty block statement  no-empty
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\hooks\use-request-store.ts
+  290:5  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  299:7  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  309:9  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  486:5  warning  React Hook useCallback has a missing dependency: 'addNotification'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\hooks\use-toast.ts
+  19:7  warning  'actionTypes' is assigned a value but only used as a type  @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\lib\project-analyzer.ts
+  312:61  warning  '_fp' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\lib\utils.ts
+  46:11  warning  Empty block statement                     no-empty
+  56:11  warning  Empty block statement                     no-empty
+  60:42  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  62:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\playwright.config.ts
+  1:24  warning  'devices' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\tests\e2e\debug-import.js
+   1:22   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   2:14   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  11:105  warning  Empty block statement                    no-empty
+  69:17   warning  Empty block statement                    no-empty
+
+C:\Users\rough\Documents\Workspace\apiPlayground\api-endpoint-test(1)\tests\e2e\toasts.spec.ts
+  16:11  warning  'toast' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 136 problems (29 errors, 107 warnings)
+  0 errors and 12 warnings potentially fixable with the `--fix` option.
+
+[ELIFECYCLE] Command failed with exit code 1.

@@ -217,10 +217,7 @@ ${bodyPart}})
           />
 
           <div className="space-y-2">
-            <Button
-              onClick={onSend}
-              className="w-full bg-emerald-500 text-white hover:bg-emerald-600"
-            >
+            <Button onClick={onSend} className="w-full">
               <Play className="size-4" />
               Send
             </Button>

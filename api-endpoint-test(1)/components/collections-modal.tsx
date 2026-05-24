@@ -1,7 +1,7 @@
 "use client"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { CollectionsPanel } from "@/components/collections-panel"
+import { CollectionsPanel, type NewCollectionInput, type NewRequestInput } from "@/components/collections-panel"
 import type { Collection, RequestItem } from "@/hooks/use-request-store"
 
 interface CollectionsModalProps {
@@ -10,10 +10,12 @@ interface CollectionsModalProps {
   collections: Collection[]
   onSelectRequest: (request: RequestItem) => void
   onSelectAndSendRequest?: (request: RequestItem) => void
-  onAddCollection: (data?: any) => string
+  onRunCollection?: (collection: Collection) => void
+  onRunCollectionBackground?: (collection: Collection) => void
+  onAddCollection: (data?: NewCollectionInput) => string
   onDeleteCollection: (id: string) => void
   onRenameCollection: (id: string, name: string) => void
-  onAddRequestToCollection: (collectionId: string, request: any) => void
+  onAddRequestToCollection: (collectionId: string, request?: NewRequestInput) => void
   onRemoveRequestFromCollection: (collectionId: string, requestId: string) => void
 }
 
@@ -23,6 +25,8 @@ export function CollectionsModal({
   collections,
   onSelectRequest,
   onSelectAndSendRequest,
+  onRunCollection,
+  onRunCollectionBackground,
   onAddCollection,
   onDeleteCollection,
   onRenameCollection,
@@ -44,6 +48,14 @@ export function CollectionsModal({
             }}
             onSelectAndSendRequest={onSelectAndSendRequest ? ((request) => {
               onSelectAndSendRequest(request)
+              onOpenChange(false)
+            }) : undefined}
+            onRunCollection={onRunCollection ? ((collection) => {
+              onRunCollection(collection)
+              onOpenChange(false)
+            }) : undefined}
+            onRunCollectionBackground={onRunCollectionBackground ? ((collection) => {
+              onRunCollectionBackground(collection)
               onOpenChange(false)
             }) : undefined}
             onAddCollection={onAddCollection}

@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface SidebarContextType {
   isCollapsed: boolean
@@ -14,6 +15,8 @@ const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
+  const isNarrow = useIsMobile(916)
+
   // Load from localStorage
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed")
@@ -21,6 +24,13 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       setIsCollapsed(JSON.parse(stored))
     }
   }, [])
+
+  // Close sidebar automatically on narrower desktop widths
+  useEffect(() => {
+    if (isNarrow) {
+      setIsCollapsed(true)
+    }
+  }, [isNarrow])
 
   // Save to localStorage
   useEffect(() => {

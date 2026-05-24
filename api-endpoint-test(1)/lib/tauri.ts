@@ -3,6 +3,7 @@ export interface TauriFetchResponse {
   body: string
   headers: Record<string, string>
   durationMs: number
+  encoding: string
 }
 
 declare global {
@@ -35,6 +36,7 @@ export async function invokeTauriFetch(
     body: string
     headers: Array<[string, string]>
     durationMs: number
+    encoding: string
   }>("fetch_proxy", {
     method,
     url,
@@ -47,6 +49,7 @@ export async function invokeTauriFetch(
     body: result.body,
     headers: Object.fromEntries(result.headers ?? []),
     durationMs: result.durationMs,
+    encoding: result.encoding ?? "utf8",
   }
 }
 
@@ -91,5 +94,5 @@ export async function saveTauriTabsState(state: TauriStorageState): Promise<void
   }
 
   const { invoke } = await import("@tauri-apps/api/core")
-  await invoke<void>("save_tabs_state", state)
+  await invoke<void>("save_tabs_state", state as unknown as Record<string, unknown>)
 }

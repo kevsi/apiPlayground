@@ -10,8 +10,10 @@ interface ApiResponse {
   status: number;
   time: number;
   size: string;
-  body: any;
+  body: unknown;
 }
+
+const getNow = () => Date.now();
 
 const DiffPanel: React.FC<DiffPanelProps> = ({
   defaultUrlA = "",
@@ -34,8 +36,8 @@ const DiffPanel: React.FC<DiffPanelProps> = ({
       }, {} as Record<string, string>),
     };
 
-    const startTimeA = performance.now();
-    const startTimeB = performance.now();
+    const startTimeA = getNow();
+    const startTimeB = getNow();
 
     try {
       const [resA, resB] = await Promise.all([
@@ -43,8 +45,8 @@ const DiffPanel: React.FC<DiffPanelProps> = ({
         fetch(urlB, fetchOptions),
       ]);
 
-      const timeA = performance.now() - startTimeA;
-      const timeB = performance.now() - startTimeB;
+      const timeA = getNow() - startTimeA;
+      const timeB = getNow() - startTimeB;
 
       const bodyA = await resA.json();
       const bodyB = await resB.json();
@@ -69,14 +71,16 @@ const DiffPanel: React.FC<DiffPanelProps> = ({
     }
   };
 
-  const generateDiff = (objA: any, objB: any): string => {
+  const generateDiff = (objA: unknown, objB: unknown): string => {
     const diff: string[] = [];
 
-    const compare = (a: any, b: any, path: string[] = []) => {
-      if (typeof a === "object" && typeof b === "object" && a && b) {
-        const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    const compare = (a: unknown, b: unknown, path: string[] = []) => {
+      if (typeof a === "object" && typeof b === "object" && a !== null && b !== null) {
+        const aRecord = a as Record<string, unknown>;
+        const bRecord = b as Record<string, unknown>;
+        const keys = new Set([...Object.keys(aRecord), ...Object.keys(bRecord)]);
         keys.forEach((key) => {
-          compare(a[key], b[key], [...path, key]);
+          compare(aRecord[key], bRecord[key], [...path, key]);
         });
       } else if (a !== b) {
         if (a === undefined) {

@@ -2,7 +2,6 @@
 
 import { Palette, Check } from "lucide-react"
 import { useTheme, type Theme } from "./theme-provider"
-import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +16,7 @@ const themes: { value: Theme; label: string; colors: string[] }[] = [
   { value: "ocean", label: "Ocean", colors: ["#eff6ff", "#dbeafe", "#2563eb"] },
   { value: "sunset", label: "Sunset", colors: ["#fff7ed", "#ffedd5", "#ea580c"] },
   { value: "purple", label: "Purple", colors: ["#faf5ff", "#f3e8ff", "#9333ea"] },
+  { value: "midnight", label: "Midnight", colors: ["#050505", "#131313", "#5b50db"] },
 ]
 
 export function ThemeSwitcher() {

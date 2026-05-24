@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CheckCircle, Clock, FileText, Download, Copy, Check, Play, Loader2, Eye, Code, FileImage, Music, Video, BarChart3 } from "lucide-react"
+import { CheckCircle, Clock, FileText, Download, Copy, Check, Play, Loader2, Eye, Code, FileImage, Music, Video, BarChart3, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,7 +16,7 @@ const languages = [
 
 type ResponseFormat = "pretty" | "raw" | "preview" | "visualize" | "json" | "xml" | "html" | "image" | "pdf" | "binary" | "audio" | "video"
 
-const formatOptions: Array<{ value: ResponseFormat; label: string; icon: React.ComponentType<any> }> = [
+const formatOptions: Array<{ value: ResponseFormat; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { value: "pretty", label: "Pretty", icon: Eye },
   { value: "raw", label: "Raw", icon: Code },
   { value: "preview", label: "Preview", icon: Eye },
@@ -41,6 +41,11 @@ interface ResponsePanelProps {
   responseHeaders?: Record<string, string>
   isLoading?: boolean
   onRun?: () => Promise<void>
+  onAnalyze?: () => Promise<void>
+  onGenerateTests?: () => Promise<void>
+  aiSummary?: string
+  aiError?: string
+  aiIsLoading?: boolean
   // Request data for code generation
   method?: string
   url?: string
@@ -60,6 +65,11 @@ export function ResponsePanel({
   responseHeaders,
   isLoading = false,
   onRun,
+  onAnalyze,
+  onGenerateTests,
+  aiSummary,
+  aiError,
+  aiIsLoading = false,
   method = "GET",
   url = "",
   requestHeaders = [],
@@ -71,8 +81,6 @@ export function ResponsePanel({
   const [selectedLang, setSelectedLang] = useState("python")
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState("response")
-  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false)
-  const [hasSavedFirstRequest, setHasSavedFirstRequest] = useState(false)
 
   const generateCodeSnippet = (language: string) => {
     const headersObj = requestHeaders.reduce((acc, header) => {
@@ -97,7 +105,7 @@ export function ResponsePanel({
     const baseUrl = url.split("?")[0]
 
     switch (language) {
-      case "python":
+      case "python": {
         const pythonHeaders = Object.keys(headersObj).length > 0
           ? `headers = {\n${Object.entries(headersObj).map(([k, v]) => `    "${k}": "${v}"`).join(",\n")}\n}\n\n`
           : ""
@@ -149,8 +157,9 @@ export function ResponsePanel({
             <span className="text-white">())</span>
           </>
         )
+      }
 
-      case "javascript":
+      case "javascript": {
         const jsHeaders = headersString
           ? `const headers = {\n      ${headersString}\n    };`
           : ""
@@ -218,8 +227,9 @@ export function ResponsePanel({
             <span className="text-white">(data));</span>
           </>
         )
+      }
 
-      case "curl":
+      case "curl": {
         const curlHeaders = Object.entries(headersObj).map(([k, v]) => `-H "${k}: ${v}"`).join(" \\\n  ")
         const curlBody = body && bodyType !== "none" ? `-d '${body}'` : ""
 
@@ -246,8 +256,9 @@ export function ResponsePanel({
             )}
           </>
         )
+      }
 
-      case "php":
+      case "php": {
         const phpHeaders = Object.entries(headersObj).map(([k, v]) => `    "${k}: ${v}",`).join("\n")
         const phpBody = body && bodyType !== "none" ? `$body = '${body}';\n\n` : ""
 
@@ -298,8 +309,9 @@ export function ResponsePanel({
             <span className="text-blue-400">?&gt;</span>
           </>
         )
+      }
 
-      case "go":
+      case "go": {
         const goHeaders = Object.entries(headersObj).map(([k, v]) => `    "${k}": "${v}",`).join("\n")
         const goBody = body && bodyType !== "none" ? `body := strings.NewReader(\`${body}\`)\n\n    ` : ""
 
@@ -406,18 +418,13 @@ export function ResponsePanel({
             <span className="text-white">{"}"}</span>
           </>
         )
+      }
 
       default:
         return <span className="text-white">Code generation not available for {language}</span>
     }
   }
   const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty")
-
-  useEffect(() => {
-    if (responseBody) {
-      setResponseFormat(getAutoFormat())
-    }
-  }, [responseBody, responseHeaders])
 
   const hasResponse = Boolean(responseBody)
 
@@ -466,19 +473,23 @@ export function ResponsePanel({
   }
 
   const isImage = () => {
-    return getContentType().startsWith("image/")
+    const contentType = getContentType()
+    return contentType.startsWith("image/") || (responseData instanceof Blob && responseData.type.startsWith("image/"))
   }
 
   const isPdf = () => {
-    return getContentType() === "application/pdf"
+    const contentType = getContentType()
+    return contentType === "application/pdf" || (responseData instanceof Blob && responseData.type === "application/pdf")
   }
 
   const isAudio = () => {
-    return getContentType().includes("audio/")
+    const contentType = getContentType()
+    return contentType.includes("audio/") || (responseData instanceof Blob && responseData.type.startsWith("audio/"))
   }
 
   const isVideo = () => {
-    return getContentType().includes("video/")
+    const contentType = getContentType()
+    return contentType.includes("video/") || (responseData instanceof Blob && responseData.type.startsWith("video/"))
   }
 
   const escapeHtml = (text: string) =>
@@ -490,7 +501,7 @@ export function ResponsePanel({
   const highlightJson = (jsonText: string) => {
     const escaped = escapeHtml(jsonText)
     return escaped.replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, (match) => {
-      let cls = "text-emerald-300"
+      let cls: string
       if (/^"/.test(match)) {
         cls = /:\s*$/.test(match) ? "text-sky-300" : "text-amber-300"
       } else if (/true|false/.test(match)) {
@@ -504,6 +515,77 @@ export function ResponsePanel({
     })
   }
 
+  const extractVideoUrls = (value: unknown): string[] => {
+    const results = new Set<string>()
+    const isVideoUrl = (text: string) =>
+      /^(https?:)?\/\/.*\.(mp4|webm|ogg|mov|m3u8|flv|avi)(\?.*)?$/i.test(text)
+
+    const collect = (input: unknown) => {
+      if (typeof input === "string") {
+        if (isVideoUrl(input)) {
+          results.add(input)
+        }
+        return
+      }
+
+      if (Array.isArray(input)) {
+        input.forEach(collect)
+        return
+      }
+
+      if (input && typeof input === "object") {
+        Object.values(input).forEach(collect)
+      }
+    }
+
+    collect(value)
+    return Array.from(results)
+  }
+
+  const extractImageUrls = (value: unknown): string[] => {
+    const results = new Set<string>()
+    const preferredSrcKeys = ["medium", "large", "large2x", "original", "portrait", "landscape", "small", "tiny"]
+    const isImageUrl = (text: string) =>
+      /^(https?:)?\/\/.*\.(jpeg|jpg|png|gif|webp|svg|avif)(\?.*)?$/i.test(text)
+
+    const collect = (input: unknown) => {
+      if (typeof input === "string") {
+        if (isImageUrl(input)) {
+          results.add(input)
+        }
+        return
+      }
+
+      if (Array.isArray(input)) {
+        input.forEach(collect)
+        return
+      }
+
+      if (input && typeof input === "object") {
+        const record = input as Record<string, unknown>
+        const src = record.src
+
+        if (src && typeof src === "object" && !Array.isArray(src)) {
+          for (const key of preferredSrcKeys) {
+            const candidate = (src as Record<string, unknown>)[key]
+            if (typeof candidate === "string" && isImageUrl(candidate)) {
+              results.add(candidate)
+              break
+            }
+          }
+        }
+
+        Object.entries(record).forEach(([key, child]) => {
+          if (key === "src") return
+          collect(child)
+        })
+      }
+    }
+
+    collect(value)
+    return Array.from(results)
+  }
+
   const highlightMarkup = (text: string) => {
     const escaped = escapeHtml(text)
     return escaped
@@ -514,8 +596,26 @@ export function ResponsePanel({
       })
   }
 
-  const getAutoFormat = (): ResponseFormat => {
-    if (isJson()) return "json"
+  function getAutoFormat(): ResponseFormat {
+    if (responseData instanceof Blob && responseData.type === "application/pdf") {
+      return "pdf"
+    }
+    if (isJson()) {
+      try {
+        const parsed = JSON.parse(responseBody as string)
+        const videoUrls = extractVideoUrls(parsed)
+        if (videoUrls.length > 0) {
+          return "preview"
+        }
+        const imageUrls = extractImageUrls(parsed)
+        if (imageUrls.length > 0) {
+          return "preview"
+        }
+      } catch {
+        // ignore parse error
+      }
+      return "json"
+    }
     if (isXml()) return "xml"
     if (isHtml()) return "html"
     if (isImage()) return "image"
@@ -525,6 +625,13 @@ export function ResponsePanel({
     if (isBinary()) return "binary"
     return "pretty"
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (responseBody) {
+      setResponseFormat(getAutoFormat())
+    }
+  }, [responseBody, responseHeaders])
 
   const handleCopy = async () => {
     try {
@@ -668,6 +775,33 @@ export function ResponsePanel({
         } else if (isJson()) {
           try {
             const parsed = JSON.parse(responseBody)
+            const videoUrls = extractVideoUrls(parsed)
+            if (videoUrls.length > 0) {
+              return (
+                <div className="grid gap-4 p-4 grid-cols-1 sm:grid-cols-2">
+                  {videoUrls.map((url: string, index: number) => (
+                    <div key={`${url}-${index}`} className="overflow-hidden rounded-lg border border-border bg-slate-950">
+                      <video controls className="h-48 w-full bg-black">
+                        <source src={url} type={url.endsWith('.webm') ? 'video/webm' : 'video/mp4'} />
+                        Your browser does not support the video element.
+                      </video>
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+            const imageUrls = extractImageUrls(parsed)
+            if (imageUrls.length > 0) {
+              return (
+                <div className="grid gap-4 p-4 grid-cols-1 sm:grid-cols-2">
+                  {imageUrls.map((url: string, index: number) => (
+                    <div key={`${url}-${index}`} className="overflow-hidden rounded-lg border border-border bg-slate-950">
+                      <img src={url} alt={`Preview image ${index + 1}`} className="h-48 w-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )
+            }
             return (
               <div className="bg-slate-900 p-4 h-full overflow-auto hide-scrollbar">
                 <pre className="text-sm leading-relaxed text-white whitespace-pre-wrap break-words font-mono">
@@ -710,7 +844,7 @@ export function ResponsePanel({
                     <tbody>
                       {data.slice(0, 20).map((item, index) => (
                         <tr key={index} className="border-b hover:bg-muted/30">
-                          {Object.values(item).map((value: any, i) => (
+                          {Object.values(item as Record<string, unknown>).map((value: unknown, i) => (
                             <td key={i} className="p-3 border-r last:border-r-0 max-w-xs truncate" title={String(value)}>
                               {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                             </td>
@@ -907,7 +1041,7 @@ export function ResponsePanel({
             onClick={handleRun}
             disabled={isLoading}
             size="sm"
-            className="h-8 gap-1.5 bg-emerald-600 text-xs text-white hover:bg-emerald-700"
+            className="h-8 gap-1.5 text-xs"
           >
             {isLoading ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -916,12 +1050,58 @@ export function ResponsePanel({
             )}
             {isLoading ? "Running..." : "Run"}
           </Button>
+          {onAnalyze && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAnalyze}
+              disabled={aiIsLoading}
+              className="h-8 gap-1.5 text-xs"
+            >
+              {aiIsLoading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              Analyse IA
+            </Button>
+          )}
+          {onGenerateTests && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onGenerateTests}
+              disabled={aiIsLoading}
+              className="h-8 gap-1.5 text-xs"
+            >
+              {aiIsLoading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              Générer tests
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
             <Download className="size-3.5" />
             Export
           </Button>
         </div>
       </div>
+
+      {(aiSummary || aiError) && (
+        <div className="border-b border-border px-4 py-3 text-sm">
+          {aiError ? (
+            <div className="rounded-lg bg-red-950/80 p-3 text-xs text-red-300">
+              {aiError}
+            </div>
+          ) : (
+            <div className="rounded-lg bg-slate-900/80 p-3 text-xs text-slate-200">
+              {aiSummary}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">

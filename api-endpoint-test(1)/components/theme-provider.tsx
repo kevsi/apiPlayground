@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 
-export type Theme = "light" | "dark" | "emerald" | "ocean" | "sunset" | "purple"
+export type Theme = "light" | "dark" | "emerald" | "ocean" | "sunset" | "purple" | "midnight"
 
 type ThemeProviderProps = {
   children: React.ReactNode
@@ -25,7 +25,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 export function ThemeProvider({
   children,
   defaultTheme = "light",
-  storageKey = "zendeeps-theme",
+  storageKey = "reqly-theme",
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme)
   const [mounted, setMounted] = useState(false)
@@ -42,7 +42,7 @@ export function ThemeProvider({
     if (!mounted) return
     const root = window.document.documentElement
 
-    root.classList.remove("light", "dark", "emerald", "ocean", "sunset", "purple")
+    root.classList.remove("light", "dark", "emerald", "ocean", "sunset", "purple", "midnight")
     root.classList.add(theme)
     localStorage.setItem(storageKey, theme)
   }, [theme, storageKey, mounted])

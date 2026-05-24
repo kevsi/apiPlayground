@@ -25,6 +25,39 @@ export function replaceLocalhostPort(url: string, port: number): string {
   return url.replace(/\/\/localhost:\d+/, `//localhost:${port}`)
 }
 
+const COLLECTION_LOAD_KEY = "reqly-load-collection-request"
+
+export interface PendingCollectionRequest {
+  id?: string
+  name: string
+  method: string
+  url: string
+  endpoint: string
+  headers?: Record<string, string>
+  body?: string
+  queryParams?: Array<{ key: string; value: string }>
+  sendImmediately?: boolean
+  collectionId?: string
+  background?: boolean
+}
+
+export function setPendingCollectionRequest(request: PendingCollectionRequest) {
+  try {
+    localStorage.setItem(COLLECTION_LOAD_KEY, JSON.stringify(request))
+  } catch {}
+}
+
+export function getAndClearPendingCollectionRequest(): PendingCollectionRequest | null {
+  try {
+    const raw = localStorage.getItem(COLLECTION_LOAD_KEY)
+    if (raw) {
+      localStorage.removeItem(COLLECTION_LOAD_KEY)
+      return JSON.parse(raw)
+    }
+  } catch {}
+  return null
+}
+
 export async function downloadJson(data: any, filename: string) {
   const content = JSON.stringify(data, null, 2)
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__

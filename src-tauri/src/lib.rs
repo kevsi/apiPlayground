@@ -1,3 +1,4 @@
+use base64::{Engine as _, engine::general_purpose};
 use reqwest::blocking::Client;
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,7 @@ struct TauriFetchResponse {
   body: String,
   headers: Vec<(String, String)>,
   duration_ms: u128,
+  encoding: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -90,19 +92,43 @@ fn fetch_proxy(
 
   let response = request.send().map_err(|e| e.to_string())?;
   let status = response.status().as_u16();
-  let header_pairs = response
+  let header_pairs: Vec<(String, String)> = response
     .headers()
     .iter()
     .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
     .collect();
-  let body_text = response.text().map_err(|e| e.to_string())?;
+
+  // Detect binary content types to encode as base64
+  let content_type = header_pairs
+    .iter()
+    .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
+    .map(|(_, v)| v.split(';').next().unwrap_or_default().trim().to_lowercase())
+    .unwrap_or_default();
+
+  let is_binary = content_type.starts_with("image/")
+    || content_type.starts_with("audio/")
+    || content_type.starts_with("video/")
+    || content_type.starts_with("font/")
+    || content_type == "application/pdf"
+    || content_type == "application/octet-stream"
+    || content_type == "application/zip"
+    || content_type == "application/gzip";
+
+  let (body_str, encoding) = if is_binary {
+    let bytes = response.bytes().map_err(|e| e.to_string())?;
+    (general_purpose::STANDARD.encode(&bytes), "base64".to_string())
+  } else {
+    (response.text().map_err(|e| e.to_string())?, "utf8".to_string())
+  };
+
   let duration_ms = start.elapsed().as_millis();
 
   Ok(TauriFetchResponse {
     status,
-    body: body_text,
+    body: body_str,
     headers: header_pairs,
     duration_ms,
+    encoding,
   })
 }
 

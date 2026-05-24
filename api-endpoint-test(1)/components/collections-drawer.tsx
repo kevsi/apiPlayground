@@ -1,7 +1,7 @@
 "use client"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { CollectionsPanel } from "@/components/collections-panel"
+import { CollectionsPanel, type NewCollectionInput, type NewRequestInput } from "@/components/collections-panel"
 import type { Collection, RequestItem } from "@/hooks/use-request-store"
 
 interface CollectionsModalProps {
@@ -9,10 +9,10 @@ interface CollectionsModalProps {
   onOpenChange: (open: boolean) => void
   collections: Collection[]
   onSelectRequest: (request: RequestItem) => void
-  onAddCollection: () => void
+  onAddCollection: (data?: NewCollectionInput) => string
   onDeleteCollection: (id: string) => void
   onRenameCollection: (id: string, name: string) => void
-  onAddRequestToCollection: (collectionId: string) => void
+  onAddRequestToCollection: (collectionId: string, request?: NewRequestInput) => void
   onRemoveRequestFromCollection: (collectionId: string, requestId: string) => void
 }
 

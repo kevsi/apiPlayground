@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Clock, Trash2, Search, RotateCcw, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
+import { Clock, Trash2, Search, RotateCcw, CheckCircle2, XCircle, AlertCircle, Sparkles, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,8 @@ interface HistoryPanelProps {
   onSelectRequest: (item: HistoryItem) => void
   onClearHistory: () => void
   onRemoveItem: (id: string) => void
+  onGenerateFollowUp?: (item: HistoryItem) => void
+  generatingFollowUpId?: string | null
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -58,6 +60,8 @@ export function HistoryPanel({
   onSelectRequest,
   onClearHistory,
   onRemoveItem,
+  onGenerateFollowUp,
+  generatingFollowUpId,
 }: HistoryPanelProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -162,6 +166,22 @@ export function HistoryPanel({
                     </div>
                   </button>
                   <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    {onGenerateFollowUp && item.responseBody && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onGenerateFollowUp(item)}
+                        disabled={generatingFollowUpId === item.id}
+                        className="size-6 p-0"
+                        title="Générer une requête de suivi (IA)"
+                      >
+                        {generatingFollowUpId === item.id ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="size-3 text-primary" />
+                        )}
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"

@@ -1,38 +1,102 @@
 "use client";
 
 import React, { useState, useCallback } from 'react';
+import { Github } from 'lucide-react';
 import { ApiSidebar } from '@/components/api-sidebar';
 import { ApiHeader } from '@/components/api-header';
-import { SavedProject } from '@/types';
 import { ProjectCard } from '@/components/project-card';
 import { NewProjectModal } from '@/components/new-project-modal';
 import { RouteModal } from '@/components/route-modal';
+import { ImportGithubModal } from '@/components/import-github-modal';
+import { AlertDialog, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useRequestStore } from '@/hooks/use-request-store';
+import type { SavedProject } from '@/types';
+import { analyzeProject } from '@/lib/project-analyzer';
+import { toast } from '@/hooks/use-toast';
+
+import { useSidebar } from '@/contexts/sidebar-context';
+import { cn } from '@/lib/utils';
 
 const MyProjectsPage: React.FC = () => {
-  const { projects, addProject, deleteProject, setSelectedProject, isLoaded } = useRequestStore()
+  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { projects, addProject, deleteProject, updateProject, setSelectedProject, isLoaded } = useRequestStore()
   const [selectedProject, setSelectedProjectLocal] = useState<SavedProject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGithubModalOpen, setIsGithubModalOpen] = useState(false);
+  const [pendingDeleteProject, setPendingDeleteProject] = useState<SavedProject | null>(null);
+  const [reanalyzingProjectId, setReanalyzingProjectId] = useState<string | null>(null);
 
-  const handleDeleteProject = useCallback((projectId: string) => {
-    deleteProject(projectId)
-  }, [deleteProject])
+  const handleDeleteProject = useCallback((project: SavedProject) => {
+    setPendingDeleteProject(project)
+  }, [])
 
   const handleAddProject = useCallback((newProject: SavedProject) => {
     addProject(newProject)
     setIsModalOpen(false)
   }, [addProject])
 
-  const handleReanalyzeProject = useCallback((projectId: string) => {
-    // Logic to reanalyze the project
+  const handleGithubImport = useCallback((project: SavedProject) => {
+    addProject(project)
+    setIsGithubModalOpen(false)
+  }, [addProject])
+
+  const confirmDeleteProject = useCallback(() => {
+    if (!pendingDeleteProject) return
+    deleteProject(pendingDeleteProject.id)
+    if (selectedProject?.id === pendingDeleteProject.id) {
+      setSelectedProjectLocal(null)
+      setSelectedProject(null)
+    }
+    setPendingDeleteProject(null)
+  }, [deleteProject, pendingDeleteProject, selectedProject, setSelectedProject])
+
+  const cancelDeleteProject = useCallback(() => {
+    setPendingDeleteProject(null)
   }, [])
+
+  const handleReanalyzeProject = useCallback(async (projectId: string) => {
+    const project = projects.find((item) => item.id === projectId)
+    if (!project) return
+
+    setReanalyzingProjectId(projectId)
+    try {
+      const analysisResult = await analyzeProject(project.folderPath, 'static')
+      const updatedProject: SavedProject = {
+        ...project,
+        routes: analysisResult.routes,
+        framework: analysisResult.framework,
+        language: analysisResult.language,
+        port: analysisResult.port,
+        analyzedAt: new Date().toISOString(),
+      }
+      updateProject(projectId, {
+        routes: updatedProject.routes,
+        framework: updatedProject.framework,
+        language: updatedProject.language,
+        port: updatedProject.port,
+        analyzedAt: updatedProject.analyzedAt,
+      })
+      if (selectedProject?.id === projectId) {
+        setSelectedProjectLocal(updatedProject)
+      }
+      toast({ title: `Réanalyse terminée`, description: `${updatedProject.routes.length} route(s) mises à jour`, meta: { event: 'projectReanalyze' } } as any)
+    } catch (err) {
+      toast({ title: `Échec de la réanalyse`, description: String(err), variant: 'destructive' } as any)
+    } finally {
+      setReanalyzingProjectId(null)
+    }
+  }, [projects, selectedProject, updateProject])
 
   // Wait for the store to finish loading from localStorage before rendering
   if (!isLoaded) {
     return (
       <div className="flex h-screen bg-background">
-        <ApiSidebar activePage="projects" />
-        <div className="ml-64 flex flex-1 flex-col items-center justify-center">
+        <ApiSidebar activePage="projects" collapsed={isCollapsed} onCollapse={toggleSidebar} />
+        <div className={cn(
+          "flex flex-1 flex-col items-center justify-center transition-all duration-300 ease-in-out",
+          isCollapsed ? "ml-[60px]" : "ml-64",
+          "max-[916px]:ml-[60px]"
+        )}>
           <p className="text-muted-foreground">Chargement des projets…</p>
         </div>
       </div>
@@ -41,9 +105,13 @@ const MyProjectsPage: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-background">
-      <ApiSidebar activePage="projects" />
+      <ApiSidebar activePage="projects" collapsed={isCollapsed} onCollapse={toggleSidebar} />
 
-      <div className="ml-64 flex flex-1 flex-col overflow-hidden">
+      <div className={cn(
+        "flex flex-1 flex-col overflow-hidden transition-all duration-300 ease-in-out",
+        isCollapsed ? "ml-[60px]" : "ml-64",
+        "max-[916px]:ml-[60px]"
+      )}>
         <ApiHeader />
 
         <main className="flex-1 overflow-auto p-6">
@@ -53,12 +121,21 @@ const MyProjectsPage: React.FC = () => {
                 <h1 className="text-2xl font-bold text-foreground">Mes Projets</h1>
                 <p className="text-sm text-muted-foreground">Gérez vos projets et leurs routes détectées.</p>
               </div>
-              <button
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
-                onClick={() => setIsModalOpen(true)}
-              >
-                + Nouveau projet
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className="flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+                  onClick={() => setIsGithubModalOpen(true)}
+                >
+                  <Github className="size-4" />
+                  Importer GitHub
+                </button>
+                <button
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  + Nouveau projet
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -71,8 +148,9 @@ const MyProjectsPage: React.FC = () => {
                     setSelectedProjectLocal(project)
                     setSelectedProject(project.id)
                   }}
-                  onDelete={() => handleDeleteProject(project.id)}
+                  onDelete={() => handleDeleteProject(project)}
                   onReanalyze={() => handleReanalyzeProject(project.id)}
+                  isReanalyzing={reanalyzingProjectId === project.id}
                 />
               ))}
             </div>
@@ -86,11 +164,37 @@ const MyProjectsPage: React.FC = () => {
             />
           )}
 
+          <ImportGithubModal
+            open={isGithubModalOpen}
+            onClose={() => setIsGithubModalOpen(false)}
+            onImport={handleGithubImport}
+          />
+
+          <AlertDialog open={!!pendingDeleteProject} onOpenChange={(open) => !open && setPendingDeleteProject(null)}>
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer le projet</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {pendingDeleteProject ? `Voulez-vous vraiment supprimer « ${pendingDeleteProject.name} » ? Cette action est irréversible.` : "Supprimer ce projet ?"}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={cancelDeleteProject}>Annuler</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Supprimer
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           {selectedProject && (
             <RouteModal
               project={selectedProject}
               open={!!selectedProject}
-              onClose={() => setSelectedProject(null)}
+              onClose={() => {
+                setSelectedProjectLocal(null)
+                setSelectedProject(null)
+              }}
             />
           )}
         </main>

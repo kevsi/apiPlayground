@@ -6,7 +6,7 @@ export default function DocumentationPage() {
     <EmptyPlaceholder
       title="Documentation"
       description="Generate, view, and export API documentation based on your collections."
-      icon={FileText}
+      icon={<FileText className="size-10" />}
       activePage="documentation"
     />
   )

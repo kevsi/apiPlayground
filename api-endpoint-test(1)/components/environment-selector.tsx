@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Check, ChevronsUpDown, Plus, Settings2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useRequestStore, type Environment, type EnvironmentVariable } from "@/hooks/use-request-store"
+import { useRequestStore, type EnvironmentVariable } from "@/hooks/use-request-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -17,9 +17,7 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 
