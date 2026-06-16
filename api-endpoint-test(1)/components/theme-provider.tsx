@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useMemo } from "react"
 
 export type Theme = "light" | "dark" | "emerald" | "ocean" | "sunset" | "purple" | "midnight"
 
@@ -30,34 +30,35 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(defaultTheme)
   const [mounted, setMounted] = useState(false)
 
+  // Sync React state with DOM/localStorage after hydration
   useEffect(() => {
-    setMounted(true)
-    const stored = localStorage.getItem(storageKey) as Theme
-    if (stored) {
-      setTheme(stored)
-    }
+    const t = window.setTimeout(() => {
+      setMounted(true)
+      const stored = localStorage.getItem(storageKey) as Theme | null
+      if (stored) {
+        setTheme(stored)
+      } else {
+        // Detect system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        setTheme(prefersDark ? 'dark' : 'light')
+      }
+    }, 0)
+    return () => window.clearTimeout(t)
   }, [storageKey])
 
+  // Sync DOM class & persist whenever theme changes
   useEffect(() => {
     if (!mounted) return
-    const root = window.document.documentElement
-
+    const root = document.documentElement
     root.classList.remove("light", "dark", "emerald", "ocean", "sunset", "purple", "midnight")
     root.classList.add(theme)
     localStorage.setItem(storageKey, theme)
-  }, [theme, storageKey, mounted])
+  }, [theme, mounted, storageKey])
 
-  const value = {
-    theme,
-    setTheme,
-  }
-
-  if (!mounted) {
-    return <>{children}</>
-  }
+  const ctxValue = useMemo(() => ({ theme, setTheme }), [theme, setTheme])
 
   return (
-    <ThemeProviderContext.Provider value={value}>
+    <ThemeProviderContext.Provider value={ctxValue}>
       {children}
     </ThemeProviderContext.Provider>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Check, ChevronsUpDown, Plus, Settings2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRequestStore, type EnvironmentVariable } from "@/hooks/use-request-store"
@@ -20,6 +20,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+
+const envColors: Record<string, string> = {
+  slate: "bg-slate-500",
+  emerald: "bg-emerald-500",
+  blue: "bg-blue-500",
+  amber: "bg-amber-500",
+  purple: "bg-purple-500",
+  red: "bg-red-500",
+  pink: "bg-pink-500",
+}
 
 export function EnvironmentSelector() {
   const { environments, activeEnvironmentId, setActiveEnvironment, addEnvironment, updateEnvironment, deleteEnvironment } = useRequestStore()
@@ -44,8 +54,8 @@ export function EnvironmentSelector() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8 gap-2 border-dashed font-normal">
-            <div className={cn("size-2 rounded-full", activeEnv ? `bg-${activeEnv.color}-500` : "bg-slate-500")} />
+          <Button variant="outline" size="sm" aria-label="Select environment" className="h-8 gap-2 border-dashed font-normal">
+            <div className={cn("size-2 rounded-full", activeEnv ? envColors[activeEnv.color] || "bg-slate-500" : "bg-slate-500")} />
             {activeEnv ? activeEnv.name : "No Environment"}
             <ChevronsUpDown className="size-3 text-muted-foreground" />
           </Button>
@@ -59,7 +69,7 @@ export function EnvironmentSelector() {
               onClick={() => setActiveEnvironment(env.id)}
               className="flex items-center gap-2"
             >
-              <div className={cn("size-2 rounded-full", `bg-${env.color}-500`)} />
+              <div className={cn("size-2 rounded-full", envColors[env.color] || "bg-slate-500")} />
               <span className="flex-1 truncate">{env.name}</span>
               {activeEnvironmentId === env.id && <Check className="size-3.5 text-primary" />}
             </DropdownMenuItem>
@@ -89,10 +99,11 @@ function ManageEnvironmentsDialog({ open, onOpenChange, initialEditingId }: { op
   const { environments, addEnvironment, updateEnvironment, deleteEnvironment } = useRequestStore()
   const [selectedId, setSelectedId] = useState<string | null>(initialEditingId || (environments.length > 0 ? environments[0].id : null))
 
-  // Update selected if initial changes or if deleted
-  if (open && initialEditingId && initialEditingId !== selectedId) {
-    setSelectedId(initialEditingId)
-  }
+  useEffect(() => {
+    if (!(open && initialEditingId && initialEditingId !== selectedId)) return
+    const resetTimeout = window.setTimeout(() => setSelectedId(initialEditingId), 0)
+    return () => window.clearTimeout(resetTimeout)
+  }, [open, initialEditingId, selectedId])
 
   const selectedEnv = environments.find(e => e.id === selectedId)
 
@@ -146,7 +157,7 @@ function ManageEnvironmentsDialog({ open, onOpenChange, initialEditingId }: { op
                   selectedId === env.id ? "bg-accent text-accent-foreground" : "hover:bg-muted"
                 )}
               >
-                <div className={cn("size-2 rounded-full shrink-0", `bg-${env.color}-500`)} />
+                <div className={cn("size-2 rounded-full shrink-0", envColors[env.color] || "bg-slate-500")} />
                 <span className="truncate flex-1">{env.name}</span>
               </button>
             ))}

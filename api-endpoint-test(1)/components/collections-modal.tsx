@@ -11,12 +11,18 @@ interface CollectionsModalProps {
   onSelectRequest: (request: RequestItem) => void
   onSelectAndSendRequest?: (request: RequestItem) => void
   onRunCollection?: (collection: Collection) => void
-  onRunCollectionBackground?: (collection: Collection) => void
   onAddCollection: (data?: NewCollectionInput) => string
   onDeleteCollection: (id: string) => void
+  onDuplicateCollection?: (id: string) => void
+  onReorderCollections?: (orderedIds: string[]) => void
   onRenameCollection: (id: string, name: string) => void
   onAddRequestToCollection: (collectionId: string, request?: NewRequestInput) => void
   onRemoveRequestFromCollection: (collectionId: string, requestId: string) => void
+  onAddFolder?: (collectionId: string, name: string, parentId: string | null) => string
+  onRenameFolder?: (collectionId: string, folderId: string, name: string) => void
+  onDeleteFolder?: (collectionId: string, folderId: string) => void
+  onMoveRequestToFolder?: (collectionId: string, requestId: string, folderId: string | null) => void
+  onMoveFolder?: (collectionId: string, folderId: string, newParentId: string | null) => void
 }
 
 export function CollectionsModal({
@@ -26,12 +32,18 @@ export function CollectionsModal({
   onSelectRequest,
   onSelectAndSendRequest,
   onRunCollection,
-  onRunCollectionBackground,
   onAddCollection,
   onDeleteCollection,
+  onDuplicateCollection,
+  onReorderCollections,
   onRenameCollection,
   onAddRequestToCollection,
   onRemoveRequestFromCollection,
+  onAddFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onMoveRequestToFolder,
+  onMoveFolder,
 }: CollectionsModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,15 +66,18 @@ export function CollectionsModal({
               onRunCollection(collection)
               onOpenChange(false)
             }) : undefined}
-            onRunCollectionBackground={onRunCollectionBackground ? ((collection) => {
-              onRunCollectionBackground(collection)
-              onOpenChange(false)
-            }) : undefined}
             onAddCollection={onAddCollection}
             onDeleteCollection={onDeleteCollection}
+            onDuplicateCollection={onDuplicateCollection}
+            onReorderCollections={onReorderCollections}
             onRenameCollection={onRenameCollection}
             onAddRequestToCollection={onAddRequestToCollection}
             onRemoveRequestFromCollection={onRemoveRequestFromCollection}
+            onAddFolder={onAddFolder}
+            onRenameFolder={onRenameFolder}
+            onDeleteFolder={onDeleteFolder}
+            onMoveRequestToFolder={onMoveRequestToFolder}
+            onMoveFolder={onMoveFolder}
           />
         </div>
       </DialogContent>

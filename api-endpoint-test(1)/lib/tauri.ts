@@ -4,6 +4,7 @@ export interface TauriFetchResponse {
   headers: Record<string, string>
   durationMs: number
   encoding: string
+  mocked?: boolean
 }
 
 declare global {
@@ -37,6 +38,7 @@ export async function invokeTauriFetch(
     headers: Array<[string, string]>
     durationMs: number
     encoding: string
+    mocked?: boolean
   }>("fetch_proxy", {
     method,
     url,
@@ -50,49 +52,8 @@ export async function invokeTauriFetch(
     headers: Object.fromEntries(result.headers ?? []),
     durationMs: result.durationMs,
     encoding: result.encoding ?? "utf8",
+    mocked: result.mocked ?? false,
   }
 }
 
-export type TauriTabState = {
-  id: string
-  name: string
-  method: string
-  url: string
-  endpoint: string
-  headers?: Record<string, string>
-  queryParams?: Array<{ key: string; value: string }>
-  body?: string
-  bodyType: string
-  authType: string
-  authToken: string
-  hasResponse: boolean
-  responseStatus?: number
-  responseTime?: number
-  responseSize?: string
-  responseBody?: string
-  responseHeaders?: Record<string, string>
-}
 
-export interface TauriStorageState {
-  tabs: TauriTabState[]
-  activeTabId: string
-}
-
-export async function loadTauriTabsState(): Promise<TauriStorageState | null> {
-  if (!isTauriAvailable()) {
-    return null
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core")
-  const result = await invoke<TauriStorageState | null>("load_tabs_state")
-  return result
-}
-
-export async function saveTauriTabsState(state: TauriStorageState): Promise<void> {
-  if (!isTauriAvailable()) {
-    return
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core")
-  await invoke<void>("save_tabs_state", state as unknown as Record<string, unknown>)
-}

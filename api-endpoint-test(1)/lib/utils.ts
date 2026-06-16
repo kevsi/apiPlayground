@@ -20,6 +20,23 @@ export function interpolate(text: string, variables: EnvironmentVariable[]): str
   return result
 }
 
+export function hasUnresolvedPlaceholders(text: string): boolean {
+  return /\{\{\s*[^}]+\s*\}\}/.test(text)
+}
+
+export async function parseJsonSafe(response: Response): Promise<any> {
+  try {
+    return await response.json()
+  } catch {
+    const text = await response.text().catch(() => "")
+    return {
+      error: text || `Invalid JSON response from ${response.url || 'proxy'}`,
+      status: response.status,
+      statusText: response.statusText,
+    }
+  }
+}
+
 export function replaceLocalhostPort(url: string, port: number): string {
   if (!url) return url
   return url.replace(/\/\/localhost:\d+/, `//localhost:${port}`)
@@ -39,11 +56,26 @@ export interface PendingCollectionRequest {
   sendImmediately?: boolean
   collectionId?: string
   background?: boolean
+  requestIds?: string[]
 }
 
 export function setPendingCollectionRequest(request: PendingCollectionRequest) {
   try {
     localStorage.setItem(COLLECTION_LOAD_KEY, JSON.stringify(request))
+  } catch {}
+}
+
+export function peekPendingCollectionRequest(): PendingCollectionRequest | null {
+  try {
+    const raw = localStorage.getItem(COLLECTION_LOAD_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return null
+}
+
+export function clearPendingCollectionRequest() {
+  try {
+    localStorage.removeItem(COLLECTION_LOAD_KEY)
   } catch {}
 }
 

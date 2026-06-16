@@ -11,9 +11,16 @@ interface CollectionsModalProps {
   onSelectRequest: (request: RequestItem) => void
   onAddCollection: (data?: NewCollectionInput) => string
   onDeleteCollection: (id: string) => void
+  onDuplicateCollection?: (id: string) => void
+  onReorderCollections?: (orderedIds: string[]) => void
   onRenameCollection: (id: string, name: string) => void
   onAddRequestToCollection: (collectionId: string, request?: NewRequestInput) => void
   onRemoveRequestFromCollection: (collectionId: string, requestId: string) => void
+  onAddFolder?: (collectionId: string, name: string, parentId: string | null) => string
+  onRenameFolder?: (collectionId: string, folderId: string, name: string) => void
+  onDeleteFolder?: (collectionId: string, folderId: string) => void
+  onMoveRequestToFolder?: (collectionId: string, requestId: string, folderId: string | null) => void
+  onMoveFolder?: (collectionId: string, folderId: string, newParentId: string | null) => void
 }
 
 export function CollectionsModal({
@@ -23,9 +30,16 @@ export function CollectionsModal({
   onSelectRequest,
   onAddCollection,
   onDeleteCollection,
+  onDuplicateCollection,
+  onReorderCollections,
   onRenameCollection,
   onAddRequestToCollection,
   onRemoveRequestFromCollection,
+  onAddFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onMoveRequestToFolder,
+  onMoveFolder,
 }: CollectionsModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -42,9 +56,16 @@ export function CollectionsModal({
             }}
             onAddCollection={onAddCollection}
             onDeleteCollection={onDeleteCollection}
+            onDuplicateCollection={onDuplicateCollection}
+            onReorderCollections={onReorderCollections}
             onRenameCollection={onRenameCollection}
             onAddRequestToCollection={onAddRequestToCollection}
             onRemoveRequestFromCollection={onRemoveRequestFromCollection}
+            onAddFolder={onAddFolder}
+            onRenameFolder={onRenameFolder}
+            onDeleteFolder={onDeleteFolder}
+            onMoveRequestToFolder={onMoveRequestToFolder}
+            onMoveFolder={onMoveFolder}
           />
         </div>
       </DialogContent>

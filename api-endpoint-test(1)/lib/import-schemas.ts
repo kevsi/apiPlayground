@@ -13,6 +13,7 @@ export const requestItemSchema = z.object({
   queryParams: z
     .array(z.object({ key: z.string(), value: z.string() }))
     .optional(),
+  folderId: z.string().nullable().optional(),
   createdAt: z.number().optional(),
   updatedAt: z.number().optional(),
 })
@@ -97,6 +98,7 @@ export const githubImportResponseSchema = z.object({
   name: z.string().optional(),
   framework: z.string().optional(),
   language: z.string().optional(),
+  port: z.number().optional(),
   routes: z.array(
     z.object({
       method: z.string(),
@@ -104,6 +106,13 @@ export const githubImportResponseSchema = z.object({
       name: z.string().optional(),
       description: z.string().optional(),
       sourceFile: z.string().optional(),
+      authRequired: z.boolean().optional(),
+      authType: z.string().nullable().optional(),
+      bodyType: z.string().optional(),
+      confidence: z.string().optional(),
+      controller: z.union([z.string(), z.null()]).optional(),
+      middlewareChain: z.array(z.string()).optional(),
+      reasonings: z.array(z.string()).optional(),
     }),
   ),
 })

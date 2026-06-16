@@ -12,7 +12,12 @@ export interface AuthSessionPayload {
 }
 
 const COOKIE_NAME = "auth_session"
-const SECRET = process.env.AUTH_SIGNING_SECRET || "dev-auth-signing-secret"
+const getSecret = () => {
+  const s = process.env.AUTH_SIGNING_SECRET
+  if (!s) throw new Error("AUTH_SIGNING_SECRET environment variable is not set")
+  return s
+}
+const SECRET = getSecret()
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
 function encodeBase64Url(value: string) {

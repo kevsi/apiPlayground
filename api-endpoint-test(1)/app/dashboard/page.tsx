@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Clock,
+  Play,
   Zap,
   AlertTriangle,
   CheckCircle2,
@@ -33,6 +34,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
+
+const CHART_MARGIN = { top: 10, right: 10, left: -10, bottom: 0 } as const
+const ERROR_RATE_DOMAIN = [0, 100] as const
+const CHART_DOT = { r: 3 } as const
 
 const methodColors: Record<string, string> = {
   GET: "bg-emerald-100 text-emerald-700",
@@ -113,7 +118,7 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     const totalRequests = history.length
-    const successfulRequests = history.filter((item) => item.responseStatus && item.responseStatus < 400).length
+    const successfulRequests = history.filter((item) => item.responseStatus != null && item.responseStatus < 400).length
     const avgResponseTime = history.length
       ? Math.round(history.reduce((sum, item) => sum + (item.responseTime ?? 0), 0) / history.length)
       : 0
@@ -166,7 +171,7 @@ export default function DashboardPage() {
       const bucketIndex = indexByKey[key]
       if (bucketIndex === undefined) return
       buckets[bucketIndex].count += 1
-      if (item.responseStatus && item.responseStatus >= 400) {
+      if (item.responseStatus != null && item.responseStatus >= 400) {
         buckets[bucketIndex].errors += 1
       }
       buckets[bucketIndex].avgTime += item.responseTime ?? 0
@@ -197,7 +202,7 @@ export default function DashboardPage() {
     let critical = 0
 
     latestByEndpoint.forEach((item) => {
-      if (!item.responseStatus || item.responseStatus < 400) healthy += 1
+      if (item.responseStatus == null || item.responseStatus < 400) healthy += 1
       else if (item.responseStatus < 500) warning += 1
       else critical += 1
     })
@@ -205,18 +210,20 @@ export default function DashboardPage() {
     return { healthy, warning, critical }
   }, [history])
 
+  const isEmpty = history.length === 0
+
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background bg-dot-pattern">
       <ApiSidebar activePage="dashboard" collapsed={isCollapsed} onCollapse={toggleSidebar} />
 
       <div className={cn(
-        "flex flex-1 flex-col overflow-hidden transition-all duration-300 ease-in-out",
+          "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
         isCollapsed ? "ml-[60px]" : "ml-64",
         "max-[916px]:ml-[60px]"
       )}>
         <ApiHeader />
 
-        <main className="flex-1 overflow-auto p-6 scrollbar-thin">
+        <main className="flex-1 overflow-auto p-6 scrollbar-thin bg-dot-pattern">
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
@@ -226,6 +233,24 @@ export default function DashboardPage() {
             </div>
             <ThemeSwitcher />
           </div>
+
+          {isEmpty ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <Activity className="mb-4 size-12 text-muted-foreground/40" />
+              <h2 className="text-xl font-semibold text-foreground">No data yet</h2>
+              <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                Start sending API requests to see your dashboard metrics, charts, and endpoint performance.
+              </p>
+              <a
+                href="/"
+                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Play className="size-4" />
+                Go to API Endpoints
+              </a>
+            </div>
+          ) : (
+          <>
 
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => (
@@ -264,7 +289,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={requestsByDay} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <AreaChart data={requestsByDay} margin={CHART_MARGIN}>
                       <defs>
                         <linearGradient id="requestsGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
@@ -272,9 +297,13 @@ export default function DashboardPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
                       <XAxis dataKey="label" stroke="#9ca3af" />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
                       <YAxis stroke="#9ca3af" />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
                       <Tooltip formatter={(value) => [value, "Requests"]} />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
                       <Area type="monotone" dataKey="requests" stroke="#22c55e" fill="url(#requestsGradient)" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -289,12 +318,16 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={requestsByDay} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <LineChart data={requestsByDay} margin={CHART_MARGIN}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
                       <XAxis dataKey="label" stroke="#9ca3af" />
-                      <YAxis stroke="#9ca3af" domain={[0, 100]} />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
+                      <YAxis stroke="#9ca3af" domain={ERROR_RATE_DOMAIN} />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
                       <Tooltip formatter={(value) => [`${value}%`, "Error rate"]} />
-                      <Line type="monotone" dataKey="errorRate" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
+                      {/* @ts-expect-error recharts 2.x + React 19 incompatibility */}
+                      <Line type="monotone" dataKey="errorRate" stroke="#f97316" strokeWidth={2} dot={CHART_DOT} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -310,7 +343,7 @@ export default function DashboardPage() {
                   className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setIsSlowEndpointsOpen(true)}
                 >
-                  Voir plus
+                  See more
                 </button>
               </CardHeader>
               <CardContent>
@@ -349,7 +382,7 @@ export default function DashboardPage() {
                   className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setIsRecentRequestsOpen(true)}
                 >
-                  Voir plus
+                  See more
                 </button>
               </CardHeader>
               <CardContent>
@@ -491,6 +524,8 @@ export default function DashboardPage() {
               </div>
             </DialogContent>
           </Dialog>
+          </>
+          )}
         </main>
       </div>
     </div>

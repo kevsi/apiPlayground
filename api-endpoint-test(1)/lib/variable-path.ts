@@ -20,7 +20,7 @@ export function getValueByPath(value: unknown, path: string): PathExtractionResu
   if (!isSourcePathSyntaxValid(trimmedPath)) {
     return {
       success: false,
-      error: "Format de chemin invalide : utilisez data.items[0].token ou data.user.id.",
+      error: "Invalid path format: use data.items[0].token or data.user.id.",
     }
   }
 
@@ -41,14 +41,14 @@ export function getValueByPath(value: unknown, path: string): PathExtractionResu
     }, value)
 
     if (result === undefined) {
-      return { success: false, error: `Chemin introuvable : ${trimmedPath}` }
+      return { success: false, error: `Path not found: ${trimmedPath}` }
     }
 
     return { success: true, value: result }
   } catch (err) {
     return {
       success: false,
-      error: `Erreur d'extraction : ${err instanceof Error ? err.message : String(err)}`,
+      error: `Extraction error: ${err instanceof Error ? err.message : String(err)}`,
     }
   }
 }
@@ -84,7 +84,7 @@ export function extractValueFromResponse(
   sourcePath: string,
 ): { value: string; error?: string } {
   if (responseBody instanceof Blob) {
-    return { value: "", error: "Le corps de réponse est binaire (Blob), extraction impossible." }
+    return { value: "", error: "Response body is binary (Blob), extraction not possible." }
   }
 
   if (!sourcePath.trim()) {
@@ -92,7 +92,7 @@ export function extractValueFromResponse(
   }
 
   if (!isSourcePathSyntaxValid(sourcePath)) {
-    return { value: "", error: "Format de chemin JSON invalide." }
+    return { value: "", error: "Invalid JSON path format." }
   }
 
   const { parsed, isJson, isXml } = parseResponseForExtraction(responseBody)
@@ -100,14 +100,14 @@ export function extractValueFromResponse(
   if (isXml) {
     return {
       value: "",
-      error: "Réponse XML : les chemins JSON ne s'appliquent pas. Utilisez une réponse JSON ou laissez le chemin vide.",
+      error: "XML response: JSON paths do not apply. Use a JSON response or leave the path empty.",
     }
   }
 
   if (!isJson && sourcePath.trim()) {
     return {
       value: "",
-      error: "Réponse non-JSON : laissez le chemin vide pour utiliser le corps brut, ou exécutez une requête qui renvoie du JSON.",
+      error: "Non-JSON response: leave the path empty to use the raw body, or run a request that returns JSON.",
     }
   }
 

@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"enables the default permissions","local":true,"windows":["main"],"permissions":["core:default","dialog:default","dialog:allow-save","fs:default","fs:allow-write-text-file",{"identifier":"fs:scope","allow":["**","$HOME/**","$DOWNLOAD/**","$DESKTOP/**","$DOCUMENT/**"]}]}}
+{"default":{"identifier":"default","description":"enables the default permissions","local":true,"windows":["main"],"permissions":["core:default","dialog:default","dialog:allow-save","fs:default",{"identifier":"fs:scope","allow":["$APPDATA/reqly/**"]}]}}

@@ -1,326 +1,333 @@
 /**
- * Unit tests for project-analyzer.ts
- * 
+ * Unit tests for project-analyzer.ts (detectRoutes)
+ *
  * Run with: npx tsx lib/project-analyzer.test.ts
- * Or integrate with Jest/Vitest after setup
  */
 
-// Test data structures
-interface TestRoute {
-  method: string
-  path: string
-  authRequired: boolean
-  authType: string | null
-  bodyType: string
-  sourceFile: string
+import {
+  detectRoutes,
+  detectFastAPI,
+  detectFlask,
+  detectDjango,
+  detectSpring,
+  detectExpress,
+} from "./detect-shared"
+
+interface Assertion {
+  (condition: boolean, message: string): void
 }
 
-// Mock implementations for testing
-const testCases = {
-  nextjsAppRouter: {
-    description: "Next.js App Router route detection",
-    fileContent: `
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+const assert: Assertion = (condition, message) => {
+  if (!condition) throw new Error(`FAIL: ${message}`)
+}
 
-export async function GET(request: Request) {
-  const token = cookies().get('github_token')
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+let passed = 0
+let failed = 0
+
+function test(name: string, fn: () => Promise<void> | void) {
+  const maybe = fn()
+  if (maybe instanceof Promise) {
+    maybe.then(() => { passed++; console.log(`  ✓ ${name}`) })
+      .catch((e) => { failed++; console.log(`  ✗ ${name}: ${e.message}`) })
+  } else {
+    try { fn(); passed++; console.log(`  ✓ ${name}`) } catch (e: any) { failed++; console.log(`  ✗ ${name}: ${e.message}`) }
   }
-  return NextResponse.json({ data: 'success' })
 }
 
-export async function POST(request: Request) {
-  const body = await request.json()
-  return NextResponse.json({ created: true })
-}
-`,
-    filePath: "app/api/auth/route.ts",
-    expectedRoutes: [
-      { method: "GET", path: "/auth", authRequired: true, authType: "cookie" },
-      { method: "POST", path: "/auth", authRequired: false, authType: null },
-    ],
-  },
+async function main() {
+  console.log("====================================================")
+  console.log("Project Analyzer - Functional Tests")
+  console.log("====================================================\n")
 
-  expressPassport: {
-    description: "Express with Passport.js authentication",
-    fileContent: `
-import express from 'express'
-import passport from 'passport'
+  // ── Axis 1: Tree-sitter success path ────────────────────────────
 
-const router = express.Router()
-
-router.get('/profile', passport.authenticate('jwt'), (req, res) => {
-  res.json({ user: req.user })
-})
-
-router.post('/login', (req, res) => {
-  res.json({ token: 'abc123' })
-})
-
-export default router
-`,
-    filePath: "routes/users.ts",
-    expectedRoutes: [
-      { method: "GET", path: "/profile", authRequired: true, authType: "passport" },
-      { method: "POST", path: "/login", authRequired: false, authType: null },
-    ],
-  },
-
-  nextjsBearerToken: {
-    description: "Next.js route with Bearer token verification",
-    fileContent: `
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Not Authenticated' }), { status: 401 })
-  }
-  const token = authHeader.slice(7)
-  return new Response(JSON.stringify({ data: 'authorized' }))
-}
-`,
-    filePath: "app/api/data/route.ts",
-    expectedRoutes: [
-      { method: "GET", path: "/data", authRequired: true, authType: "jwt" },
-    ],
-  },
-
-  fastapi: {
-    description: "FastAPI route detection",
-    fileContent: `
-from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
-
+  test("FastAPI via detectRoutes (tree-sitter path)", async () => {
+    const content = `
+from fastapi import FastAPI, APIRouter, Depends
 router = APIRouter()
-security = HTTPBearer()
-
 @router.get("/items")
-async def list_items():
-    return {"items": []}
-
+async def list_items(): return {"items": []}
 @router.get("/protected", dependencies=[Depends(security)])
-async def protected_route(token: str = Depends(security)):
-    return {"data": "secret"}
-
+async def protected_route(): return {"data": "secret"}
 @router.post("/create")
-async def create_item(item: dict):
-    return {"created": item}
-`,
-    filePath: "routers/items.py",
-    expectedRoutes: [
-      { method: "GET", path: "/items", authRequired: false, authType: null },
-      { method: "GET", path: "/protected", authRequired: true, authType: "jwt" },
-      { method: "POST", path: "/create", authRequired: false, authType: null },
-    ],
-  },
+async def create_item(item: dict): return {"created": item}
+`
+    const routes = await detectRoutes(content, "routers/items.py", "fastapi")
+    assert(routes.length >= 3, `expected >=3 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/items"), "GET /items")
+    assert(routes.some(r => r.method === "GET" && r.path === "/protected"), "GET /protected")
+    assert(routes.some(r => r.method === "POST" && r.path === "/create"), "POST /create")
+  })
 
-  dynamicRoutes: {
-    description: "Dynamic route segments [id], [...slug]",
-    fileContent: `
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  return new Response(JSON.stringify({ id: params.id }))
+  test("Flask via detectRoutes (tree-sitter path)", async () => {
+    const content = `
+from flask import Flask
+app = Flask(__name__)
+@app.route("/")
+def index(): return "ok"
+@app.get("/login")
+def login(): return "login"
+`
+    const routes = await detectRoutes(content, "app.py", "flask")
+    assert(routes.length >= 2, `expected >=2 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/"), "GET /")
+    assert(routes.some(r => r.method === "GET" && r.path === "/login"), "GET /login")
+  })
+
+  test("Spring via detectRoutes (tree-sitter path)", async () => {
+    const content = `
+@RestController
+@RequestMapping("/users")
+public class UserController {
+    @GetMapping
+    public List<User> getAll() { return List.of(); }
+    @PostMapping
+    public User create(@RequestBody User u) { return u; }
+    @PutMapping("/{id}")
+    public User update(@PathVariable Long id, @RequestBody User u) { return u; }
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {}
 }
+`
+    const routes = await detectRoutes(content, "UserController.java", "spring")
+    assert(routes.length >= 4, `expected >=4 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/users"), "GET /users")
+    assert(routes.some(r => r.method === "POST" && r.path === "/users"), "POST /users")
+    assert(routes.some(r => r.method === "PUT" && r.path === "/users/:id"), "PUT /users/:id")
+    assert(routes.some(r => r.method === "DELETE" && r.path === "/users/:id"), "DELETE /users/:id")
+  })
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  return new Response(JSON.stringify({ deleted: params.id }))
+  test("ASP.NET via detectRoutes (tree-sitter path, empty path)", async () => {
+    const content = `
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase {
+    [HttpGet]
+    public IActionResult GetAll() { return Ok(); }
+    [HttpGet("{id}")]
+    public IActionResult Get(int id) { return Ok(); }
+    [HttpPost]
+    public IActionResult Post() { return Ok(); }
 }
-`,
-    filePath: "app/api/items/[id]/route.ts",
-    expectedRoutes: [
-      { method: "GET", path: "/items/:id", authRequired: false, authType: null },
-      { method: "DELETE", path: "/items/:id", authRequired: false, authType: null },
-    ],
-  },
+`
+    const routes = await detectRoutes(content, "UsersController.cs", "aspnet")
+    assert(routes.length >= 3, `expected >=3 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/"), "GET /")
+    assert(routes.some(r => r.method === "GET" && r.path === "/:id"), "GET /:id")
+    assert(routes.some(r => r.method === "POST" && r.path === "/"), "POST /")
+  })
 
-  catchAllRoutes: {
-    description: "Catch-all routes [...slug]",
-    fileContent: `
-export async function GET(
-  request: Request,
-  { params }: { params: { slug: string[] } }
-) {
-  const path = '/' + params.slug.join('/')
-  return new Response(JSON.stringify({ path }))
-}
-`,
-    filePath: "app/api/proxy/[...slug]/route.ts",
-    expectedRoutes: [
-      { method: "GET", path: "/proxy/:slug", authRequired: false, authType: null },
-    ],
-  },
+  // ── Axis 2: Tree-sitter returns 0 → fallback to existing regex ──
 
-  formData: {
-    description: "Form data request handling",
-    fileContent: `
-export async function POST(request: Request) {
-  const formData = await request.formData()
-  const file = formData.get('file')
-  return new Response(JSON.stringify({ uploaded: !!file }))
-}
-`,
-    filePath: "app/api/upload/route.ts",
-    expectedRoutes: [
-      { method: "POST", path: "/upload", authRequired: false, authType: null, bodyType: "form" },
-    ],
-  },
-
-  nestjsControllers: {
-    description: "NestJS controller detection",
-    fileContent: `
-import { Controller, Get, Post, Req } from '@nestjs/common'
-import { JwtGuard } from '../auth/jwt.guard'
-
-@Controller('api/users')
-export class UsersController {
-  @Get()
-  findAll() {
-    return []
-  }
-
-  @Post('login')
-  login(@Req() req: Request) {
-    return { token: 'abc' }
-  }
-
-  @Get('profile')
-  @UseGuards(JwtGuard)
-  getProfile(@Req() req: Request) {
-    return { user: req.user }
-  }
-}
-`,
-    filePath: "src/users/users.controller.ts",
-    expectedRoutes: [
-      { method: "GET", path: "/api/users", authRequired: false, authType: null },
-      { method: "POST", path: "/api/users/login", authRequired: false, authType: null },
-      { method: "GET", path: "/api/users/profile", authRequired: true, authType: "middleware" },
-    ],
-  },
-
-  statusCodeResponses: {
-    description: "401/403 status code detection",
-    fileContent: `
-export async function GET(request: Request) {
-  const user = request.headers.get('x-user-id')
-  if (!user) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
-  return Response.json({ user })
-}
-`,
-    filePath: "app/api/secure/route.ts",
-    expectedRoutes: [
-      { method: "GET", path: "/secure", authRequired: true, authType: "middleware" },
-    ],
-  },
-
-  frontendCorrelation: {
-    description: "Frontend to backend API call correlation",
-    fileContent: `
-// Frontend file - components/UserList.tsx
-import { useState, useEffect } from 'react'
-
-export function UserList() {
-  const [users, setUsers] = useState([])
-  
-  useEffect(() => {
-    // Direct fetch call
-    fetch('/api/users')
-      .then(r => r.json())
-      .then(data => setUsers(data.users))
-    
-    // Axios call
-    axios.post('/api/auth/login', { email, password })
-      .then(res => localStorage.setItem('token', res.data.token))
-    
-    // Template literal with env var
-    ky(\`\${API_BASE}/api/data/123\`).json()
-  }, [])
-  
-  return null
-}
-`,
-    filePath: "components/UserList.tsx",
-    expectedRoutes: [
-      // Routes detected from file path and frontend calls
-      { method: "GET", path: "/users", authRequired: false, actuallyUsedByFrontend: true },
-      { method: "POST", path: "/auth/login", authRequired: false, actuallyUsedByFrontend: true },
-      { method: "GET", path: "/data/123", authRequired: false, actuallyUsedByFrontend: true },
-    ],
-  },
-
-  multipleFrameworks: {
-    description: "Mixed framework detection in same project",
-    fileContent: `
-// Express middleware
+  test("Fallback: tree-sitter returns 0 → express regex runs", async () => {
+    const content = `
 const express = require('express')
 const router = express.Router()
-
-router.get('/status', (req, res) => {
-  res.json({ status: 'ok' })
-})
-
-// Followed by a FastAPI-like comment (not actual code but in comments/docs)
-# @app.post("/process")
-# async def process_data(data: dict):
-#   return {"processed": True}
-`,
-    filePath: "mixed/routes.js",
-    expectedRoutes: [
-      { method: "GET", path: "/status", authRequired: false, authType: null },
-    ],
-  },
-}
-
-// Helper function to test a single case
-function testCase(testName: string, content: string, filePath: string, expectedRoutes: TestRoute[]) {
-  console.log(`\n✓ Testing: ${testName}`)
-  console.log(`  File: ${filePath}`)
-  console.log(`  Expected routes: ${expectedRoutes.length}`)
-
-  // This is where actual testing would happen
-  // In a real test framework, we'd:
-  // 1. Call detectNextJsRoutes(content, filePath) or similar
-  // 2. Compare results with expectedRoutes
-  // 3. Assert match or log differences
-
-  expectedRoutes.forEach((route) => {
-    console.log(`    - ${route.method.padEnd(6)} ${route.path.padEnd(25)} [${route.authRequired ? 'AUTH' : 'PUBLIC'}] (${route.authType || 'none'})`)
+router.get('/status', (req, res) => res.json({ ok: true }))
+router.post('/login', (req, res) => res.json({ token: 'x' }))
+`
+    const routes = await detectRoutes(content, "routes/api.ts", "express")
+    assert(routes.length >= 2, `expected >=2 routes from fallback, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/status"), "GET /status from fallback")
+    assert(routes.some(r => r.method === "POST" && r.path === "/login"), "POST /login from fallback")
   })
-}
 
-// Run all tests
-export function runAllTests() {
-  console.log("====================================================")
-  console.log("Project Analyzer - Unit Tests")
-  console.log("====================================================")
-
-  Object.entries(testCases).forEach(([key, testCase]) => {
-    testCase(
-      testCase.description,
-      testCase.fileContent,
-      testCase.filePath,
-      testCase.expectedRoutes as TestRoute[]
-    )
+  test("Fallback: tree-sitter not available → FastAPI subprocess/regex", async () => {
+    const content = `
+from fastapi import FastAPI
+app = FastAPI()
+@app.get("/health")
+def health(): return "ok"
+@app.post("/data")
+def data(): return {}
+`
+    // Call detectFastAPI directly (bypasses tree-sitter), proves fallback works
+    const routes = detectFastAPI(content)
+    assert(routes.length >= 2, `expected >=2 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/health"), "GET /health")
+    assert(routes.some(r => r.method === "POST" && r.path === "/data"), "POST /data")
   })
+
+  test("Fallback: tree-sitter not available → Java java-parser fallback", async () => {
+    const content = `
+import org.springframework.web.bind.annotation.*;
+@RestController
+@RequestMapping
+public class TestController {
+    @GetMapping(value = "/items")
+    public String items() { return "[]"; }
+}
+`
+    const routes = await detectSpring(content)
+    assert(routes.length >= 1, `expected >=1 routes from java-parser/regex fallback, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/items"), "GET /items from fallback")
+  })
+
+  // ── Backward compatibility: direct calls still work ──────────────
+
+  test("Direct detectFastAPI still works (sync, subprocess)", () => {
+    const routes = detectFastAPI(`
+from fastapi import FastAPI
+app = FastAPI()
+@app.get("/ping")
+def ping(): return "pong"
+`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/ping"), "GET /ping direct")
+  })
+
+  test("Direct detectFlask still works (sync, subprocess)", () => {
+    const routes = detectFlask(`
+from flask import Flask
+app = Flask(__name__)
+@app.route("/health")
+def health(): return "ok"
+`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/health"), "GET /health direct")
+  })
+
+  test("Direct detectExpress still works (sync, regex)", () => {
+    const routes = detectExpress(`
+const express = require('express')
+const router = express.Router()
+router.get('/items', (req, res) => res.json([]))
+`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/items"), "GET /items express")
+  })
+
+  // ── Edge cases ──────────────────────────────────────────────────
+
+  test("Edge: 0 routes — empty file returns []", async () => {
+    const routes = await detectRoutes("", "empty.py", "fastapi")
+    assert(routes.length === 0, `expected 0 routes, got ${routes.length}`)
+  })
+
+  test("Edge: 0 routes — source with no route annotations", async () => {
+    const routes = await detectRoutes(`
+from fastapi import FastAPI
+app = FastAPI()
+def helper():
+    return 42
+`, "no_routes.py", "fastapi")
+    assert(routes.length === 0, `expected 0 routes, got ${routes.length}`)
+  })
+
+  test("Edge: no dedup — tree-sitter returns routes, fallback should NOT run", async () => {
+    const content = `
+from fastapi import APIRouter
+router = APIRouter()
+@router.get("/items")
+async def list(): return []
+@router.post("/create")
+async def create(): return {}
+`
+    const r1 = await detectRoutes(content, "routers/items.py", "fastapi")
+    // Direct subprocess call on same content would find the same routes
+    const r2 = detectFastAPI(content)
+    assert(r1.length >= 2, `tree-sitter path should find routes, got ${r1.length}`)
+    assert(r2.length >= 2, `subprocess path should find routes, got ${r2.length}`)
+    // Count distinct routes — if fallback leaked, r1 would have duplicates
+    const seen = new Set(r1.map(r => `${r.method}|${r.path}`))
+    assert(seen.size === r1.length, `no duplicates in tree-sitter path (${seen.size} unique vs ${r1.length} total)`)
+  })
+
+  test("Edge: unknown framework — tree-sitter returns 0, regex fallback runs", async () => {
+    const routes = await detectRoutes(`
+from fastapi import FastAPI
+app = FastAPI()
+@app.get("/health")
+def health(): return "ok"
+`, "routes.py", "unknown")
+    assert(routes.length >= 1, `expected >=1 route from fallback for unknown framework, got ${routes.length}`)
+  })
+
+  // ── Remaining framework coverage ─────────────────────────────────
+
+  test("Rust Actix via detectRoutes (tree-sitter path)", async () => {
+    const content = `
+use actix_web::{web, App, HttpServer, get, post, put, delete};
+
+#[get("/ping")]
+async fn ping() -> &'static str { "pong" }
+
+#[post("/users")]
+async fn create() -> &'static str { "ok" }
+
+#[get("/protected")]
+async fn protected() -> &'static str { "secret" }
+`
+    const routes = await detectRoutes(content, "main.rs", "actix")
+    assert(routes.length >= 3, `expected >=3 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/ping"), "GET /ping")
+    assert(routes.some(r => r.method === "POST" && r.path === "/users"), "POST /users")
+    assert(routes.some(r => r.method === "GET" && r.path === "/protected"), "GET /protected")
+  })
+
+  test("Go Gin via detectRoutes (tree-sitter path)", async () => {
+    const content = `
+package main
+import "github.com/gin-gonic/gin"
+func main() {
+    r := gin.Default()
+    r.GET("/ping", func(c *gin.Context) { c.JSON(200, gin.H{"message": "pong"}) })
+    r.POST("/users", func(c *gin.Context) { c.JSON(200, gin.H{}) })
+    r.PUT("/users/:id", func(c *gin.Context) { c.JSON(200, gin.H{}) })
+    r.DELETE("/users/:id", func(c *gin.Context) { c.JSON(200, gin.H{}) })
+    r.GET("/protected", func(c *gin.Context) { c.JSON(200, gin.H{}) })
+}
+`
+    const routes = await detectRoutes(content, "main.go", "gin")
+    assert(routes.length >= 4, `expected >=4 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/ping"), "GET /ping")
+    assert(routes.some(r => r.method === "POST" && r.path === "/users"), "POST /users")
+    assert(routes.some(r => r.method === "PUT" && r.path === "/users/:id"), "PUT /users/:id")
+    assert(routes.some(r => r.method === "DELETE" && r.path === "/users/:id"), "DELETE /users/:id")
+  })
+
+  test("Ruby Rails via detectRoutes (tree-sitter path)", async () => {
+    const content = `
+Rails.application.routes.draw do
+  get "users", to: "users#index"
+  post "users", to: "users#create"
+  put "users/:id", to: "users#update"
+  delete "users/:id", to: "users#destroy"
+  resources :articles
+end
+`
+    const routes = await detectRoutes(content, "routes.rb", "rails")
+    assert(routes.length >= 5, `expected >=5 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/users"), "GET /users")
+    assert(routes.some(r => r.method === "POST" && r.path === "/users"), "POST /users")
+    assert(routes.some(r => r.method === "GET" && r.path === "/articles"), "GET /articles (resources)")
+  })
+
+  test("PHP Laravel via detectRoutes (tree-sitter path)", async () => {
+    const content = `
+<?php
+use App\\Http\\Controllers\\UserController;
+use Illuminate\\Support\\Facades\\Route;
+
+Route::get('/users', [UserController::class, 'index']);
+Route::post('/users', [UserController::class, 'store']);
+Route::put('/users/{id}', [UserController::class, 'update']);
+Route::delete('/users/{id}', [UserController::class, 'destroy']);
+Route::get('/profile', [ProfileController::class, 'show']);
+`
+    const routes = await detectRoutes(content, "web.php", "laravel")
+    assert(routes.length >= 5, `expected >=5 routes, got ${routes.length}`)
+    assert(routes.some(r => r.method === "GET" && r.path === "/users"), "GET /users")
+    assert(routes.some(r => r.method === "POST" && r.path === "/users"), "POST /users")
+    assert(routes.some(r => r.method === "PUT" && r.path === "/users/:id"), "PUT /users/:id")
+    assert(routes.some(r => r.method === "DELETE" && r.path === "/users/:id"), "DELETE /users/:id")
+    assert(routes.some(r => r.method === "GET" && r.path === "/profile"), "GET /profile")
+  })
+
+  // ── Summary ──────────────────────────────────────────────────────
 
   console.log("\n====================================================")
-  console.log("Note: This is a test specification file.")
-  console.log("Integrate with Jest/Vitest for automated testing.")
-  console.log("====================================================\n")
+  console.log(`  ${passed + failed} tests: ${passed} passed, ${failed} failed`)
+  console.log("====================================================")
+
+  if (failed > 0) process.exit(1)
 }
 
-// Export for use in other modules
-export { testCases }
-
-// Run tests if executed directly
-if (typeof window === 'undefined' && require.main === module) {
-  runAllTests()
-}
+main()

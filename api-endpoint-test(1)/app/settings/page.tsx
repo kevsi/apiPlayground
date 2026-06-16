@@ -27,10 +27,9 @@ const AI_PROVIDERS: Array<{ value: AIProvider; label: string }> = [
 
 export default function SettingsPage() {
   const { isCollapsed, toggleSidebar } = useSidebar()
-  const { systemNotificationPermission, requestSystemNotificationPermission, aiAutoApply, setAiAutoApply } =
+  const { systemNotificationPermission, requestSystemNotificationPermission, notificationPreferences, setNotificationPreference, aiAutoApply, setAiAutoApply } =
     useRequestStore()
   const [showAiConfirm, setShowAiConfirm] = useState(false)
-  const [pendingAiToggle, setPendingAiToggle] = useState<boolean | null>(null)
   const [provider, setProvider] = useState<AIProvider>(() => typeof window !== 'undefined' ? loadAIProvider() : "openai")
   const [apiKey, setApiKey] = useState(() => typeof window !== 'undefined' ? loadApiKey(loadAIProvider()) : "")
   const [aiBaseUrl, setAiBaseUrl] = useState(() => typeof window !== 'undefined' ? loadAiBaseUrl(loadAIProvider()) : "")
@@ -65,14 +64,6 @@ export default function SettingsPage() {
 
   // Sync active section with URL hash so sections are linkable and navigable
   useEffect(() => {
-    const fromHash = window.location.hash?.replace("#", "") as
-      | "profile"
-      | "ai"
-      | "notifications"
-      | "sync"
-      | "account"
-      | ""
-
     const onHashChange = () => {
       const h = window.location.hash?.replace("#", "") as
         | "profile"
@@ -335,10 +326,12 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    fetchGithubStatus()
-    fetchPostmanStatus()
-    fetchAuthStatus()
-    handleAuthErrorFromQuery()
+    const statusTimeout = window.setTimeout(() => {
+      void Promise.all([fetchGithubStatus(), fetchPostmanStatus(), fetchAuthStatus()])
+      handleAuthErrorFromQuery()
+    }, 0)
+
+    return () => window.clearTimeout(statusTimeout)
   }, [])
 
   useEffect(() => {
@@ -391,7 +384,7 @@ export default function SettingsPage() {
         title: "Postman connecté",
         description: `Bienvenue ${data.user?.name || "utilisateur"}!`,
       })
-    } catch (error) {
+    } catch {
       setPostmanStatus("error")
       toast({
         title: "Erreur",
@@ -463,7 +456,7 @@ export default function SettingsPage() {
     if (next) {
       try {
         await requestSystemNotificationPermission()
-      } catch (error) {
+      } catch {
         // Permission request failed, don't enable
         toast({
           title: "Erreur",
@@ -536,12 +529,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background bg-dot-pattern">
       <ApiSidebar activePage="settings" collapsed={isCollapsed} onCollapse={toggleSidebar} />
 
       <div
         className={cn(
-          "flex flex-1 flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out",
+          "flex flex-1 flex-col min-h-0 overflow-hidden transition-[margin] duration-200 ease-out",
           isCollapsed ? "ml-[60px]" : "ml-64",
           "max-[916px]:ml-[60px]"
         )}
@@ -764,7 +757,6 @@ export default function SettingsPage() {
                         try {
                           const confirmed = localStorage.getItem('probe_ai_autorun_confirmed') === 'true'
                           if (!confirmed) {
-                            setPendingAiToggle(true)
                             setShowAiConfirm(true)
                             return
                           }
@@ -782,12 +774,11 @@ export default function SettingsPage() {
                           <DialogDescription>Autoriser l'IA à appliquer et exécuter des actions automatiquement peut envoyer des requêtes réseau depuis votre interface. Assurez-vous de comprendre les risques et de n'activer cette option que si vous faites confiance à vos prompts.</DialogDescription>
                         </DialogHeader>
                         <div className="mt-4 flex justify-end gap-2">
-                          <Button variant="ghost" onClick={() => { setShowAiConfirm(false); setPendingAiToggle(null) }}>Annuler</Button>
+                          <Button variant="ghost" onClick={() => setShowAiConfirm(false)}>Annuler</Button>
                           <Button onClick={() => {
-                            try { localStorage.setItem('probe_ai_autorun_confirmed', 'true') } catch {}
+                            try { localStorage.setItem('probe_ai_autorun_confirmed', 'true') } catch { /* ignore */ }
                             setAiAutoApply?.(true)
                             setShowAiConfirm(false)
-                            setPendingAiToggle(null)
                           }}>Confirmer et activer</Button>
                         </div>
                       </DialogContent>
@@ -888,7 +879,25 @@ export default function SettingsPage() {
 
                   <div className="flex items-center gap-3">
                     <Button variant="secondary" onClick={handleTestPush}>Tester un toast</Button>
-                    <span className="text-sm text-muted-foreground">Permission navigateur : {systemNotificationPermission ?? "non disponible"}</span>
+                    <span className="text-sm text-muted-foreground">Browser permission: {systemNotificationPermission ?? "unavailable"}</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-muted p-4">
+                    <p className="text-sm font-medium">System notification events</p>
+                    <p className="text-xs text-muted-foreground mt-1 mb-3">Control which events trigger browser notifications.</p>
+                    <div className="space-y-2">
+                      {Object.keys(notificationPreferences).map((key) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                          </div>
+                          <Checkbox
+                            checked={notificationPreferences[key] ?? true}
+                            onCheckedChange={(checked) => setNotificationPreference(key, !!checked)}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 </section>

@@ -71,14 +71,23 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
   }
 
   useEffect(() => {
+    let cleanupTimeout: number | undefined
+
     if (!open) {
-      setGithubRepos(null)
-      setReposError(null)
-      return
+      cleanupTimeout = window.setTimeout(() => {
+        setGithubRepos(null)
+        setReposError(null)
+      }, 0)
+      return () => {
+        if (cleanupTimeout) {
+          window.clearTimeout(cleanupTimeout)
+        }
+      }
     }
 
-    fetchGithubRepos()
-  }, [open])
+    const fetchTimeout = window.setTimeout(() => fetchGithubRepos(), 0)
+    return () => window.clearTimeout(fetchTimeout)
+  }, [open, fetchGithubRepos])
 
   const handleImport = async () => {
     if (projectPreview) {

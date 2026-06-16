@@ -95,6 +95,16 @@ function getHandlers(store: AIRequestStore) {
     setDoc: (markdown: string, title?: string) => store.setDoc(markdown, title),
     notify: (message: string) => store.addNotification ? store.addNotification({ title: "Assistant IA", body: String(message), type: "info" }) : undefined,
     executeRequest: (request: Partial<CurrentRequest> | CurrentRequest) => store.executeRequest ? store.executeRequest(request) : undefined,
+    runBatch: async (requests: Array<Partial<CurrentRequest>>) => {
+      const results: any[] = []
+      for (const req of requests) {
+        if (store.executeRequest) {
+          const res = await store.executeRequest(req)
+          results.push(res)
+        }
+      }
+      return results
+    },
     audit: (entry: { actionType: string; detail?: any; result?: any }) => (store as any).addAiAuditEntry ? (store as any).addAiAuditEntry(entry) : undefined,
   }
 }

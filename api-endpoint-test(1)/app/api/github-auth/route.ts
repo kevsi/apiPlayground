@@ -22,9 +22,10 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.redirect(githubUrl)
   response.cookies.set("github_oauth_state", state, {
     httpOnly: true,
+    secure: true,
     path: "/",
     maxAge: 300,
-    sameSite: "lax",
+    sameSite: "strict",
   })
 
   return response

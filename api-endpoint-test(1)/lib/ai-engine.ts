@@ -84,13 +84,25 @@ export type ExplainAction = {
   payload: { message: string };
 };
 
+export type ExecuteRequestAction = {
+  type: "EXECUTE_REQUEST";
+  payload: Partial<CurrentRequest> & { reason?: string };
+};
+
+export type RunBatchAction = {
+  type: "RUN_BATCH";
+  payload: { requests: Array<Partial<CurrentRequest>> };
+};
+
 export type AIAction =
   | FillRequestAction
   | AddAssertionsAction
   | CreateVariableAction
   | SuggestFixAction
   | GenerateDocAction
-  | ExplainAction;
+  | ExplainAction
+  | ExecuteRequestAction
+  | RunBatchAction;
 
 export type AIResponse = {
   actions: AIAction[];
@@ -180,6 +192,34 @@ Provide method, full URL, headers, params, and a sample body if applicable. Use 
  * - Strips markdown code fences and backticks
  * - Attempts JSON.parse, falling back to substring heuristics
  */
+function isValidAIResponse(value: unknown): value is AIResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.summary !== "string") return false;
+  if (!Array.isArray(obj.actions)) return false;
+  for (const action of obj.actions) {
+    if (typeof action !== "object" || action === null) return false;
+    const a = action as Record<string, unknown>;
+    if (typeof a.type !== "string") return false;
+    if (typeof a.payload !== "object" || a.payload === null) return false;
+  }
+  return true;
+}
+
+const FETCH_TIMEOUT = 30000;
+
+async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number }): Promise<Response> {
+  const timeout = options.timeout ?? FETCH_TIMEOUT;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export function parseAIResponse(raw: string): AIResponse {
   const cleaned = raw
     .replace(/```json\s*/g, "")
@@ -188,34 +228,33 @@ export function parseAIResponse(raw: string): AIResponse {
     .trim();
 
   try {
-    const parsed = JSON.parse(cleaned) as AIResponse;
-    return parsed;
-  } catch (err) {
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      const sub = cleaned.substring(firstBrace, lastBrace + 1);
-      try {
-        const parsed = JSON.parse(sub) as AIResponse;
-        return parsed;
-      } catch (e) {
-        // fall through
-      }
-    }
-
-    return {
-      summary: "__PARSE_ERROR__ Could not parse model response as JSON.",
-      actions: [
-        {
-          type: "EXPLAIN",
-          payload: {
-            message:
-              "The AI response could not be parsed as JSON. Raw output attached to developer console.",
-          },
-        },
-      ],
-    };
+    const parsed = JSON.parse(cleaned);
+    if (isValidAIResponse(parsed)) return parsed;
+  } catch {
+    // continue to fallback
   }
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const sub = cleaned.substring(firstBrace, lastBrace + 1);
+    try {
+      const parsed = JSON.parse(sub);
+      if (isValidAIResponse(parsed)) return parsed;
+    } catch {
+      // fall through
+    }
+  }
+
+  return {
+    summary: "The AI response could not be parsed.",
+    actions: [
+      {
+        type: "EXPLAIN",
+        payload: { message: "The AI response could not be parsed as JSON. Check the developer console for details." },
+      },
+    ],
+  };
 }
 
 function resolvePath(obj: unknown, path: string): string | undefined {
@@ -260,48 +299,25 @@ export async function callAI(
   const system = SYSTEM_PROMPT;
 
   try {
-    if (provider === "anthropic") {
-      if (!config.apiKey) throw new Error("Anthropic requires apiKey in config");
-      const res = await fetch("/api/proxy-ai", {
+    if (provider === "anthropic" || provider === "openai") {
+      if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
+      const extra = provider === "openai" && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {};
+      const res = await fetchWithTimeout("/api/proxy-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: "anthropic",
+          provider,
           apiKey: config.apiKey,
           model,
           system,
           message: userPrompt,
+          ...extra,
         }),
       });
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Anthropic proxy error ${res.status}: ${text}`);
-      }
-
-      const data = await res.json();
-      const content = typeof data.content === "string" ? data.content : JSON.stringify(data);
-      return parseAIResponse(String(content));
-    }
-
-    if (provider === "openai") {
-      if (!config.apiKey) throw new Error("OpenAI requires apiKey in config");
-      const res = await fetch("/api/proxy-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: "openai",
-          apiKey: config.apiKey,
-          model,
-          openaiUrl: config.openaiUrl,
-          system,
-          message: userPrompt,
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`OpenAI proxy error ${res.status}: ${text}`);
+        throw new Error(`${provider} proxy error ${res.status}: ${text}`);
       }
 
       const data = await res.json();
@@ -311,7 +327,7 @@ export async function callAI(
 
     if (provider === "openrouter" || provider === "gemini" || provider === "deepseek") {
       if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
-      const res = await fetch("/api/proxy-ai", {
+      const res = await fetchWithTimeout("/api/proxy-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -329,20 +345,15 @@ export async function callAI(
       }
 
       const data = await res.json();
-      const content =
-        data && typeof data === "object" && data !== null && "content" in data
-          ? (data as Record<string, unknown>).content
-          : data && typeof data === "object" && data !== null && "message" in data
-          ? (data as Record<string, unknown>).message
-          : JSON.stringify(data);
+      const content = typeof data.content === "string" ? data.content : JSON.stringify(data);
       return parseAIResponse(String(content));
     }
 
     if (provider === "ollama") {
       const url = config.ollamaUrl ?? "http://localhost:11434";
-      const res = await fetch(`${url}/api/chat`, {
+      const res = await fetchWithTimeout(`${url}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Connection: "keep-alive" },
         body: JSON.stringify({ model: model ?? "llama3", stream: false, messages: [{ role: "system", content: system }, { role: "user", content: userPrompt }] }),
       });
 
@@ -360,7 +371,7 @@ export async function callAI(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
-      summary: `__ERROR__ ${message}`,
+      summary: "AI call failed.",
       actions: [
         {
           type: "EXPLAIN",
@@ -397,47 +408,25 @@ export async function callAIText(
 
   const system = config.system ?? SYSTEM_PROMPT;
 
-  if (provider === "anthropic") {
-    if (!config.apiKey) throw new Error("Anthropic requires apiKey in config");
-    const res = await fetch("/api/proxy-ai", {
+  if (provider === "anthropic" || provider === "openai") {
+    if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
+    const extra = provider === "openai" && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {};
+    const res = await fetchWithTimeout("/api/proxy-ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        provider: "anthropic",
+        provider,
         apiKey: config.apiKey,
         model,
         system,
         message: userPrompt,
+        ...extra,
       }),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Anthropic proxy error ${res.status}: ${text}`);
-    }
-
-    const data = await res.json();
-    return typeof data.content === "string" ? String(data.content) : JSON.stringify(data);
-  }
-
-  if (provider === "openai") {
-    if (!config.apiKey) throw new Error("OpenAI requires apiKey in config");
-    const res = await fetch("/api/proxy-ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        provider: "openai",
-        apiKey: config.apiKey,
-        model,
-        openaiUrl: config.openaiUrl,
-        system,
-        message: userPrompt,
-      }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`OpenAI proxy error ${res.status}: ${text}`);
+      throw new Error(`${provider} proxy error ${res.status}: ${text}`);
     }
 
     const data = await res.json();
@@ -446,7 +435,7 @@ export async function callAIText(
 
   if (provider === "openrouter" || provider === "gemini" || provider === "deepseek") {
     if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
-    const res = await fetch("/api/proxy-ai", {
+    const res = await fetchWithTimeout("/api/proxy-ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -464,20 +453,14 @@ export async function callAIText(
     }
 
     const data = await res.json();
-    if (data && typeof data === "object" && data !== null && "content" in data) {
-      return String((data as Record<string, unknown>).content);
-    }
-    if (data && typeof data === "object" && data !== null && "message" in data) {
-      return String((data as Record<string, unknown>).message);
-    }
-    return JSON.stringify(data);
+    return typeof data.content === "string" ? String(data.content) : JSON.stringify(data);
   }
 
   if (provider === "ollama") {
     const url = config.ollamaUrl ?? "http://localhost:11434";
-    const res = await fetch(`${url}/api/chat`, {
+    const res = await fetchWithTimeout(`${url}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Connection: "keep-alive" },
       body: JSON.stringify({
         model: model ?? "llama3",
         stream: false,
@@ -511,6 +494,7 @@ export async function dispatchAIActions(
     setDoc?: (markdown: string, title?: string) => Promise<void> | void;
     notify?: (message: string) => Promise<void> | void;
     executeRequest?: (request: Partial<CurrentRequest>) => Promise<any> | void;
+    runBatch?: (requests: Array<Partial<CurrentRequest>>) => Promise<any[]> | void;
     audit?: (entry: { actionType: string; detail?: any; result?: any }) => Promise<any> | void;
   },
   ctx?: AIContext,
@@ -590,6 +574,32 @@ export async function dispatchAIActions(
           await handlers.notify?.(action.payload.message);
         } catch (e) {
           // Best effort
+        }
+        break;
+      }
+
+      case "EXECUTE_REQUEST": {
+        try {
+          await handlers.setRequest?.(action.payload, action.payload.reason);
+          const res = await handlers.executeRequest?.(action.payload);
+          await handlers.audit?.({ actionType: "EXECUTE_REQUEST", detail: action.payload, result: res });
+        } catch (e) {
+          await handlers.notify?.(`EXECUTE_REQUEST handler error: ${String(e)}`);
+        }
+        break;
+      }
+
+      case "RUN_BATCH": {
+        try {
+          const results: any[] = [];
+          for (const req of action.payload.requests) {
+            const res = await handlers.executeRequest?.(req);
+            results.push({ request: req, result: res });
+          }
+          await handlers.runBatch?.(action.payload.requests);
+          await handlers.audit?.({ actionType: "RUN_BATCH", detail: action.payload, result: results });
+        } catch (e) {
+          await handlers.notify?.(`RUN_BATCH handler error: ${String(e)}`);
         }
         break;
       }

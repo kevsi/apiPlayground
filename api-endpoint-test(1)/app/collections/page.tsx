@@ -5,6 +5,7 @@ import { ApiHeader } from "@/components/api-header"
 import { CollectionsPanel } from "@/components/collections-panel"
 import { ImportPostmanModal } from "@/components/import-postman-modal"
 import { ExportPostmanModal } from "@/components/export-postman-modal"
+import { ImportOpenApiModal } from "@/components/import-openapi-modal"
 import { Button } from "@/components/ui/button"
 import { useRequestStore, type Collection, type RequestItem } from "@/hooks/use-request-store"
 import { useSidebar } from "@/contexts/sidebar-context"
@@ -25,14 +26,24 @@ export default function CollectionsPage() {
     addCollection,
     updateCollection,
     deleteCollection,
+    duplicateCollection,
+    reorderCollections,
     addRequestToCollection,
     removeRequestFromCollection,
+    addFolder,
+    renameFolder,
+    deleteFolder,
+    moveRequestToFolder,
+    moveFolder,
+    reorderRequestsInCollection,
+    reorderFolders,
   } = useRequestStore()
   
 
   const [postmanImportOpen, setPostmanImportOpen] = useState(false)
   const [postmanConnected, setPostmanConnected] = useState(false)
   const [postmanExportOpen, setPostmanExportOpen] = useState(false)
+  const [openApiImportOpen, setOpenApiImportOpen] = useState(false)
 
   // Check Postman connection status
   useEffect(() => {
@@ -129,16 +140,6 @@ export default function CollectionsPage() {
     }
   }
 
-  // Debug: log render and collections length to ensure re-renders occur
-  if (typeof window !== 'undefined') {
-    try {
-       
-      console.log('PAGE RENDER: collections.length =', collections.length)
-    } catch {
-      // intentionally empty
-    }
-  }
-
   const handleSelectRequest = (request: RequestItem) => {
     setPendingCollectionRequest({
       id: request.id,
@@ -150,7 +151,7 @@ export default function CollectionsPage() {
       body: request.body,
       queryParams: request.queryParams,
     })
-    toast({ title: `Requête "${request.name}" transférée dans l'éditeur.` })
+    toast({ title: "Requête chargée dans l'éditeur" })
     router.push("/")
   }
 
@@ -166,53 +167,95 @@ export default function CollectionsPage() {
       queryParams: request.queryParams,
       sendImmediately: true,
     })
-    toast({ title: `Requête "${request.name}" transférée et envoyée.` })
+    toast({ title: `"${request.name}" loaded and sent` })
     router.push("/")
   }
 
   const handleRunCollection = (collection: Collection) => {
     if (!collection.requests.length) {
-      toast({ title: `La collection "${collection.name}" est vide.`, variant: "destructive" })
+      toast({ title: `Collection "${collection.name}" is empty.`, variant: "destructive" })
       return
     }
 
-    const firstRequest = collection.requests[0]
     setPendingCollectionRequest({
       collectionId: collection.id,
-      name: firstRequest.name,
-      method: firstRequest.method,
-      url: firstRequest.url,
-      endpoint: firstRequest.endpoint,
-      headers: firstRequest.headers,
-      body: firstRequest.body,
-      queryParams: firstRequest.queryParams,
+      requestIds: collection.requests.map((r) => r.id),
+      name: collection.name,
+      method: "GET",
+      url: "",
+      endpoint: "",
       sendImmediately: true,
     })
-    toast({ title: `Exécution de la collection "${collection.name}" démarrée.` })
+    toast({ title: `Running collection "${collection.name}"` })
     router.push("/")
   }
 
   const handleRunCollectionBackground = (collection: Collection) => {
     if (!collection.requests.length) {
-      toast({ title: `La collection "${collection.name}" est vide.`, variant: "destructive" })
+      toast({ title: `Collection "${collection.name}" is empty.`, variant: "destructive" })
       return
     }
 
-    const firstRequest = collection.requests[0]
     setPendingCollectionRequest({
       collectionId: collection.id,
-      name: firstRequest.name,
-      method: firstRequest.method,
-      url: firstRequest.url,
-      endpoint: firstRequest.endpoint,
-      headers: firstRequest.headers,
-      body: firstRequest.body,
-      queryParams: firstRequest.queryParams,
+      requestIds: collection.requests.map((r) => r.id),
+      name: collection.name,
+      method: "GET",
+      url: "",
+      endpoint: "",
       sendImmediately: true,
       background: true,
     })
-    toast({ title: `Exécution background de la collection "${collection.name}" démarrée.` })
+    toast({ title: `Background run of collection "${collection.name}" started` })
     router.push("/")
+  }
+
+  const handleImportOpenApi = (collections: Array<{
+    name: string
+    description?: string
+    color: string
+    icon: string
+    requests: Array<{
+      name: string
+      method: string
+      url: string
+      endpoint: string
+      headers?: Record<string, string>
+      body?: string
+      queryParams?: Array<{ key: string; value: string }>
+    }>
+  }>) => {
+    let createdCount = 0
+    for (const col of collections) {
+      const uniqueName = resolveUniqueCollectionName(
+        col.name,
+        collections.map((c) => c.name),
+      )
+      const newCollectionId = addCollection({
+        name: uniqueName,
+        color: col.color || "emerald",
+        icon: col.icon || "package",
+        description: col.description,
+      })
+
+      for (const req of col.requests) {
+        addRequestToCollection(newCollectionId, {
+          name: req.name,
+          method: (req.method as any) || "GET",
+          url: req.url,
+          endpoint: req.endpoint,
+          headers: req.headers || {},
+          body: req.body || "",
+          queryParams: req.queryParams || [],
+        })
+        createdCount++
+      }
+    }
+
+    toast({
+      title: `Import OpenAPI terminé`,
+      description: `${createdCount} requête${createdCount > 1 ? "s" : ""} importée${createdCount > 1 ? "s" : ""} dans ${collections.length} collection${collections.length > 1 ? "s" : ""}.`,
+    })
   }
 
   const handleExportOpenApi = async () => {
@@ -251,11 +294,11 @@ export default function CollectionsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background bg-dot-pattern">
       <ApiSidebar activePage="collections" collapsed={isCollapsed} onCollapse={toggleSidebar} />
 
       <div className={cn(
-        "flex flex-1 flex-col overflow-hidden transition-all duration-300 ease-in-out",
+        "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
         isCollapsed ? "ml-[60px]" : "ml-64",
         "max-[916px]:ml-[60px]"
       )}>
@@ -268,17 +311,27 @@ export default function CollectionsPage() {
               <p className="text-sm text-muted-foreground">Gérez vos groupes de requêtes et exportez-les en OpenAPI.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" onClick={() => setPostmanImportOpen(true)}>
-                Importer depuis Postman
+                <Button variant="secondary" onClick={() => setOpenApiImportOpen(true)}>
+                Importer OpenAPI
+              </Button>
+              <Button variant="secondary" onClick={() => setPostmanImportOpen(true)}>
+                From Postman
               </Button>
               <Button variant="secondary" onClick={() => setPostmanExportOpen(true)} disabled={!postmanConnected}>
-                Exporter vers Postman
+                Export to Postman
               </Button>
               <Button variant="secondary" onClick={handleExportOpenApi}>
                 Exporter OpenAPI
               </Button>
             </div>
           </div>
+
+          <ImportOpenApiModal
+            open={openApiImportOpen}
+            onClose={() => setOpenApiImportOpen(false)}
+            onImport={handleImportOpenApi}
+            existingCollectionNames={collections.map((c) => c.name)}
+          />
 
           <ImportPostmanModal
             open={postmanImportOpen}
@@ -300,7 +353,6 @@ export default function CollectionsPage() {
             onSelectRequest={handleSelectRequest}
             onSelectAndSendRequest={handleSelectAndSendRequest}
             onRunCollection={handleRunCollection}
-            onRunCollectionBackground={handleRunCollectionBackground}
             onAddCollection={(data) =>
               addCollection({
                 name: data?.name ?? "New Collection",
@@ -309,6 +361,8 @@ export default function CollectionsPage() {
               })
             }
             onDeleteCollection={deleteCollection}
+            onDuplicateCollection={duplicateCollection}
+            onReorderCollections={reorderCollections}
             onRenameCollection={(id, name) => updateCollection(id, { name })}
             onAddRequestToCollection={(collectionId, request) => {
               const defaultRequest = {
@@ -323,6 +377,13 @@ export default function CollectionsPage() {
               addRequestToCollection(collectionId, request ?? defaultRequest)
             }}
             onRemoveRequestFromCollection={removeRequestFromCollection}
+            onAddFolder={addFolder}
+            onRenameFolder={renameFolder}
+            onDeleteFolder={deleteFolder}
+            onMoveRequestToFolder={moveRequestToFolder}
+            onMoveFolder={moveFolder}
+            onReorderRequestsInCollection={reorderRequestsInCollection}
+            onReorderFolders={reorderFolders}
           />
         </main>
       </div>

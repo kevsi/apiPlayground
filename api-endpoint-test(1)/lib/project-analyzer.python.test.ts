@@ -2,7 +2,7 @@
  * Python route detector smoke tests.
  * Run: npx tsx lib/project-analyzer.python.test.ts
  */
-import { detectDjango, detectFastAPI, detectFlask } from "./project-analyzer"
+import { detectDjango, detectFastAPI, detectFlask } from "./detect-shared"
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)

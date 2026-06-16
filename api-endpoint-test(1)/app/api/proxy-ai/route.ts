@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     : typeof body.port === "number"
     ? String(body.port)
     : ""
-  const ollamaPort = port || "11434"
+  const ollamaPort = port || process.env.OLLAMA_PORT || "11434"
 
   if (!provider) {
     return NextResponse.json({ error: "Missing provider" }, { status: 400 })
@@ -34,13 +34,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing message" }, { status: 400 })
   }
 
-  if (["openai", "openrouter", "anthropic", "gemini", "deepseek"].includes(provider) && !apiKey) {
+  const PROVIDERS_WITH_API_KEY = new Set(["openai", "openrouter", "anthropic", "gemini", "deepseek"])
+  if (PROVIDERS_WITH_API_KEY.has(provider) && !apiKey) {
     return NextResponse.json({ error: "Missing API key" }, { status: 400 })
   }
 
+  function tryParseGeminiError(raw: string): string {
+    try {
+      const parsed = JSON.parse(raw)
+      return parsed.error?.message ?? parsed.error ?? raw
+    } catch {
+      return raw
+    }
+  }
+
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 60000)
+
+    function abortableFetch(url: string, init: RequestInit) {
+      return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timeout))
+    }
+
     if (provider === "anthropic") {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await abortableFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,14 +75,11 @@ export async function POST(req: NextRequest) {
       if (!res.ok) {
         return NextResponse.json({ error: data.error?.message ?? data.error ?? "Anthropic error" }, { status: res.status })
       }
-      const contentArray = (Array.isArray(data.content) ? data.content : []) as Array<{
+      const content = ((Array.isArray(data.content) ? data.content : []) as Array<{
         type?: string
         text?: string
-      }>
-      const content = contentArray
-        .filter((item) => item.type === "text")
-        .map((item) => item.text || "")
-        .join("")
+      }>)
+        .reduce((acc, item) => item.type === "text" ? acc + (item.text || "") : acc, "")
       return NextResponse.json({ content })
     }
 
@@ -77,7 +91,7 @@ export async function POST(req: NextRequest) {
             : body.openaiUrl.trim().replace(/\/+$/, "") + "/chat/completions"
           : "https://api.openai.com/v1/chat/completions"
         : "https://openrouter.ai/api/v1/chat/completions"
-      const res = await fetch(url, {
+      const res = await abortableFetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -105,7 +119,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (provider === "deepseek") {
-      const res = await fetch("https://api.deepseek.com/chat/completions", {
+      const res = await abortableFetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -133,19 +147,67 @@ export async function POST(req: NextRequest) {
     }
 
     if (provider === "gemini") {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.0-flash"}:generateContent?key=${apiKey}`
-      const res = await fetch(url, {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.0-flash"}:generateContent`
+      const res = await abortableFetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: system }] },
           contents: [{ parts: [{ text: message }] }],
         }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        return NextResponse.json({ error: data.error?.message ?? data.error ?? "Gemini error" }, { status: res.status })
+
+      const contentType = res.headers.get("content-type") || ""
+
+      if (contentType.includes("text/event-stream")) {
+        const rawText = await res.text()
+        let combined = ""
+        for (const line of rawText.split("\n")) {
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6).trim()
+            if (!jsonStr || jsonStr === "[DONE]") continue
+            try {
+              const chunk = JSON.parse(jsonStr)
+              const text =
+                chunk.candidates?.[0]?.content?.parts?.[0]?.text ||
+                chunk.candidates?.[0]?.content?.text ||
+                chunk.text ||
+                ""
+              combined += text
+            } catch {
+              // skip malformed chunks
+            }
+          }
+        }
+        if (!res.ok && !combined) {
+          const errData = tryParseGeminiError(rawText)
+          return NextResponse.json({ error: errData }, { status: res.status })
+        }
+        return NextResponse.json({ content: combined })
       }
+
+      const rawText = await res.text()
+      let data: any
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        data = {}
+      }
+
+      if (!res.ok) {
+        const errMsg = data.error?.message ?? data.error ?? tryParseGeminiError(rawText) ?? "Gemini error"
+        return NextResponse.json({ error: errMsg }, { status: res.status })
+      }
+
+      const promptFeedback = data.promptFeedback?.blockReason
+      if (promptFeedback) {
+        return NextResponse.json({
+          content: "",
+          blocked: true,
+          reason: promptFeedback,
+        })
+      }
+
       const content =
         data.candidates?.[0]?.content?.parts?.[0]?.text ||
         data.candidates?.[0]?.content?.text ||
@@ -160,9 +222,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (provider === "ollama") {
-      const res = await fetch(`http://${host}:${ollamaPort}/v1/chat/completions`, {
+      const res = await abortableFetch(`http://${host}:${ollamaPort}/v1/chat/completions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Connection: "keep-alive" },
         body: JSON.stringify({
           model: model || "llama2",
           messages: [

@@ -6,12 +6,16 @@ import * as ResizablePrimitive from 'react-resizable-panels'
 
 import { cn } from '@/lib/utils'
 
-function ResizablePanelGroup({
-  className,
-  ...props
-}: React.ComponentProps<typeof ResizablePrimitive.PanelGroup>) {
-  return (
+type ResizablePanelGroupProps = React.ComponentProps<typeof ResizablePrimitive.PanelGroup>
+type ResizablePanelProps = React.ComponentProps<typeof ResizablePrimitive.Panel>
+type ResizableHandleProps = React.ComponentProps<typeof ResizablePrimitive.PanelResizeHandle> & {
+  withHandle?: boolean
+}
+
+const ResizablePanelGroup = React.forwardRef<ResizablePrimitive.ImperativePanelGroupHandle, ResizablePanelGroupProps>(
+  ({ className, ...props }, ref) => (
     <ResizablePrimitive.PanelGroup
+      ref={ref}
       data-slot="resizable-panel-group"
       className={cn(
         'flex h-full w-full data-[panel-group-direction=vertical]:flex-col',
@@ -19,23 +23,15 @@ function ResizablePanelGroup({
       )}
       {...props}
     />
-  )
-}
+  ),
+)
 
-function ResizablePanel({
-  ...props
-}: React.ComponentProps<typeof ResizablePrimitive.Panel>) {
-  return <ResizablePrimitive.Panel data-slot="resizable-panel" {...props} />
-}
+const ResizablePanel = React.forwardRef<ResizablePrimitive.ImperativePanelHandle, ResizablePanelProps>(
+  (props, ref) => <ResizablePrimitive.Panel ref={ref} data-slot="resizable-panel" {...props} />,
+)
 
-function ResizableHandle({
-  withHandle,
-  className,
-  ...props
-}: React.ComponentProps<typeof ResizablePrimitive.PanelResizeHandle> & {
-  withHandle?: boolean
-}) {
-  return (
+const ResizableHandle = React.forwardRef<HTMLDivElement, ResizableHandleProps>(
+  ({ withHandle, className, ...props }, ref) => (
     <ResizablePrimitive.PanelResizeHandle
       data-slot="resizable-handle"
       className={cn(
@@ -50,7 +46,11 @@ function ResizableHandle({
         </div>
       )}
     </ResizablePrimitive.PanelResizeHandle>
-  )
-}
+  ),
+)
+
+ResizablePanelGroup.displayName = 'ResizablePanelGroup'
+ResizablePanel.displayName = 'ResizablePanel'
+ResizableHandle.displayName = 'ResizableHandle'
 
 export { ResizablePanelGroup, ResizablePanel, ResizableHandle }

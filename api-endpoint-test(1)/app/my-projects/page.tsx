@@ -90,10 +90,10 @@ const MyProjectsPage: React.FC = () => {
   // Wait for the store to finish loading from localStorage before rendering
   if (!isLoaded) {
     return (
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen bg-background bg-dot-pattern">
         <ApiSidebar activePage="projects" collapsed={isCollapsed} onCollapse={toggleSidebar} />
         <div className={cn(
-          "flex flex-1 flex-col items-center justify-center transition-all duration-300 ease-in-out",
+          "flex flex-1 flex-col items-center justify-center transition-[margin] duration-200 ease-out",
           isCollapsed ? "ml-[60px]" : "ml-64",
           "max-[916px]:ml-[60px]"
         )}>
@@ -104,11 +104,11 @@ const MyProjectsPage: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background bg-dot-pattern">
       <ApiSidebar activePage="projects" collapsed={isCollapsed} onCollapse={toggleSidebar} />
 
       <div className={cn(
-        "flex flex-1 flex-col overflow-hidden transition-all duration-300 ease-in-out",
+        "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
         isCollapsed ? "ml-[60px]" : "ml-64",
         "max-[916px]:ml-[60px]"
       )}>

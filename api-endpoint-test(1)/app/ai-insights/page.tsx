@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState, useRef } from "react"
-import { Sparkles, Loader2, Send, Users, Bell, ChevronsUpDown, Check, Bot } from "lucide-react"
+import { useEffect, useState, useRef, useCallback } from "react"
+import { Sparkles, Loader2, Send, Bell, ChevronsUpDown, Check, Bot } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ApiSidebar } from "@/components/api-sidebar"
 import { useSidebar } from "@/contexts/sidebar-context"
@@ -70,9 +70,9 @@ export default function AiInsightsPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const currentHistory = useMemo(() => history.slice(0, 5), [history])
+  const currentHistory = history.slice(0, 5)
 
-  const routeSummary = useMemo(() => {
+  const routeSummary = (() => {
     if (!selectedProject) {
       if (projects.length === 0) return "Aucun projet disponible. Ajoute un projet dans Mes Projets."
       return "Sélectionne un projet actif pour voir les routes disponibles."
@@ -80,29 +80,24 @@ export default function AiInsightsPage() {
     const routes = selectedProject.routes.slice(0, 8)
     if (routes.length === 0) return "Aucun endpoint détecté"
     return routes.map((route) => `${route.method} ${route.path}`).join("\n")
-  }, [selectedProject, projects.length])
+  })()
 
-  const requestSummary = useMemo(() => {
-    if (currentHistory.length === 0) return "Aucun appel récent"
-    return currentHistory
+  const requestSummary = currentHistory.length === 0
+    ? "Aucun appel récent"
+    : currentHistory
       .map((item) =>
         `${item.method} ${item.endpoint} → ${item.responseStatus ?? "-"} (${item.responseTime ?? "-"}ms)`
       )
       .join("\n")
-  }, [currentHistory])
 
-  const activeSession = useMemo(
-    () => conversationHistory.find((session) => session.id === currentSessionId) ?? null,
-    [conversationHistory, currentSessionId]
-  )
 
-  const getSessionTitle = (msgs: ChatMessage[]) => {
+  const getSessionTitle = useCallback((msgs: ChatMessage[]) => {
     const firstUserMessage = msgs.find((message) => message.role === "user")?.content
     if (!firstUserMessage) return `Conversation du ${new Date().toLocaleDateString()}`
     return firstUserMessage.length > 40
       ? `${firstUserMessage.slice(0, 40)}...`
       : firstUserMessage
-  }
+  }, [])
 
   const loadConversationHistory = () => {
     if (typeof window === "undefined") return []
@@ -119,7 +114,7 @@ export default function AiInsightsPage() {
     window.localStorage.setItem("ai-conversation-history", JSON.stringify(historyData))
   }
 
-  const addMessagesToSession = (updatedMessages: ChatMessage[]) => {
+  const addMessagesToSession = useCallback((updatedMessages: ChatMessage[]) => {
     // If session already exists, just update it
     if (currentSessionId) {
       setConversationHistory((prev) =>
@@ -145,7 +140,7 @@ export default function AiInsightsPage() {
     }
     setCurrentSessionId(newSession.id)
     setConversationHistory((prev) => [newSession, ...prev])
-  }
+  }, [currentSessionId, getSessionTitle, setCurrentSessionId, setConversationHistory])
 
   const loadSession = (sessionId: string) => {
     const session = conversationHistory.find((item) => item.id === sessionId)
@@ -164,7 +159,11 @@ export default function AiInsightsPage() {
   }
 
   useEffect(() => {
-    setConversationHistory(loadConversationHistory())
+    const loadTimeout = window.setTimeout(() => {
+      setConversationHistory(loadConversationHistory())
+    }, 0)
+
+    return () => window.clearTimeout(loadTimeout)
   }, [])
 
   useEffect(() => {
@@ -209,8 +208,10 @@ export default function AiInsightsPage() {
     })
     try {
       addNotification?.({ title: "Message envoyé", body: prompt, type: "info" })
-    } catch {}
-    
+    } catch {
+      // ignore notification failures
+    }
+
     setQuery("")
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
@@ -245,7 +246,9 @@ export default function AiInsightsPage() {
       })
       try {
         addNotification?.({ title: "Réponse IA reçue", body: assistantContent, type: "info" })
-      } catch {}
+      } catch {
+        // ignore notification failures
+      }
     } catch (error) {
       toast({ title: `Erreur IA : ${String(error)}`, variant: "destructive" })
     } finally {
@@ -344,7 +347,9 @@ export default function AiInsightsPage() {
       })
       try {
         addNotification?.({ title: "Réponse IA régénérée", body: assistantContent, type: "info" })
-      } catch {}
+      } catch {
+        // ignore notification failures
+      }
     } catch (error) {
       toast({ title: `Erreur IA : ${String(error)}`, variant: "destructive" })
     } finally {
@@ -360,16 +365,22 @@ export default function AiInsightsPage() {
   }
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    const el = messagesEndRef.current?.parentElement
+    if (!el) return
+    const threshold = 80
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" })
+    }
   }, [messages])
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background bg-dot-pattern">
       <ApiSidebar activePage="ai-insights" collapsed={isCollapsed} onCollapse={toggleSidebar} />
 
       <div
         className={cn(
-          "flex flex-1 flex-col overflow-hidden transition-all duration-300 ease-in-out",
+          "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
           isCollapsed ? "ml-[60px]" : "ml-64",
           "max-[916px]:ml-[60px]"
         )}
@@ -473,7 +484,9 @@ export default function AiInsightsPage() {
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             toast({ title: "Notifications système activées", meta: { event: "notificationPermission" } } as any)
                           }
-                        } catch {}
+                        } catch {
+                          // ignore notification permission failures
+                        }
                       }}
                     >
                       Activer notifications système

@@ -45,6 +45,7 @@ export function FloatingAiChat() {
   const aiEngine = useAIEngine()
 
   const HISTORY_STORAGE_KEY = "floating-ai-chat-history"
+  const MESSAGES_STORAGE_KEY = "reqly-ai-chat-history"
 
   const getSessionTitle = (msgs: ChatMessage[]) => {
     const firstUserMessage = msgs.find((msg) => msg.role === "user")?.content || "Nouvelle conversation"
@@ -93,7 +94,10 @@ export function FloatingAiChat() {
 
   /* ── Load saved conversation history ─────────────────────────── */
   useEffect(() => {
-    setConversationHistory(loadConversationHistory())
+    const historyTimeout = window.setTimeout(() => {
+      setConversationHistory(loadConversationHistory())
+    }, 0)
+    return () => window.clearTimeout(historyTimeout)
   }, [])
 
   /* ── Persist conversation history locally ────────────────────── */
@@ -101,41 +105,82 @@ export function FloatingAiChat() {
     saveConversationHistory(conversationHistory)
   }, [conversationHistory])
 
+  /* ── Load messages from localStorage on mount ───────────────── */
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const loadTimeout = window.setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(MESSAGES_STORAGE_KEY)
+        if (raw) {
+          const parsed = JSON.parse(raw) as ChatMessage[]
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed)
+          }
+        }
+      } catch {
+        // ignore corrupt data
+      }
+    }, 0)
+
+    return () => window.clearTimeout(loadTimeout)
+  }, [])
+
+  /* ── Persist messages to localStorage, trimmed to 50 ────────── */
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const trimmed = messages.slice(-50)
+      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(trimmed))
+    } catch {
+      // quota exceeded, silently ignore
+    }
+  }, [messages])
+
   /* ── Keep the active session up to date with message changes ──── */
   useEffect(() => {
     if (messages.length === 0) return
 
-    setConversationHistory((prev) => {
-      const title = getSessionTitle(messages)
-      const timestamp = new Date().toISOString()
+    const historyTimeout = window.setTimeout(() => {
+      setConversationHistory((prev) => {
+        const title = getSessionTitle(messages)
+        const timestamp = new Date().toISOString()
 
-      if (currentSessionId) {
-        return prev.map((session) =>
-          session.id === currentSessionId
-            ? { ...session, title, messages, updatedAt: timestamp }
-            : session
-        )
-      }
+        if (currentSessionId) {
+          return prev.map((session) =>
+            session.id === currentSessionId
+              ? { ...session, title, messages, updatedAt: timestamp }
+              : session
+          )
+        }
 
-      const newSession: ConversationSession = {
-        id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : `${Date.now()}`,
-        title,
-        messages,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }
+        const newSession: ConversationSession = {
+          id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `${Date.now()}`,
+          title,
+          messages,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }
 
-      setCurrentSessionId(newSession.id)
-      return [...prev, newSession]
-    })
+        setCurrentSessionId(newSession.id)
+        return [...prev, newSession]
+      })
+    }, 0)
+
+    return () => window.clearTimeout(historyTimeout)
   }, [messages, currentSessionId])
 
   /* ── Auto-scroll to latest message ─────────────────────────────── */
   useEffect(() => {
     if (chatState === "open") {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      const el = messagesEndRef.current?.parentElement
+      if (!el) return
+      const threshold = 80
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+      if (isNearBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" })
+      }
     }
   }, [messages, chatState])
 
@@ -298,10 +343,10 @@ export function FloatingAiChat() {
           "rounded-2xl border border-white/10 bg-[#0f1117] shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
           "transition-all duration-300 origin-bottom-right",
           chatState === "open"
-            ? "w-[370px] max-h-[560px] opacity-100 scale-100 pointer-events-auto"
+            ? "w-[calc(100vw-32px)] sm:w-[370px] max-h-[560px] opacity-100 scale-100 pointer-events-auto"
             : chatState === "minimized"
-            ? "w-[280px] max-h-[52px] opacity-100 scale-100 pointer-events-auto overflow-hidden"
-            : "w-[370px] max-h-[560px] opacity-0 scale-90 pointer-events-none"
+            ? "w-[calc(100vw-32px)] sm:w-[280px] max-h-[52px] opacity-100 scale-100 pointer-events-auto overflow-hidden"
+            : "w-[calc(100vw-32px)] sm:w-[370px] max-h-[560px] opacity-0 scale-90 pointer-events-none"
         )}
       >
         {/* Header */}

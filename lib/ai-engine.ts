@@ -3,7 +3,7 @@
  * - Types for AI context, actions and responses
  * - System prompt for the LLMs
  * - Prompt templates
- * - callAI wrapper for Anthropic / OpenAI / Ollama
+ * - callAI wrapper for Anthropic / OpenAI / Ollama (routes through /api/proxy-ai)
  * - parseAIResponse helper
  * - dispatchAIActions to apply AI actions to app handlers
  *
@@ -53,7 +53,6 @@ export type TestAssertion = {
   code: string;
 };
 
-/* AI Action payload definitions */
 export type FillRequestAction = {
   type: "FILL_REQUEST";
   payload: Partial<CurrentRequest> & { reason?: string };
@@ -97,11 +96,6 @@ export type AIResponse = {
   summary: string;
 };
 
-/**
- * SYSTEM_PROMPT: Force models to return only JSON describing actions.
- * - Forbids free text replies
- * - Explains each action and provides an example JSON
- */
 export const SYSTEM_PROMPT: string = `You are an AI assistant integrated into an API request playground. You must NOT produce free-form text output under any circumstances. You must respond ONLY with valid JSON following exactly this shape: { "summary": string, "actions": [ ... ] }.
 
 Allowed actions (exact types):
@@ -131,9 +125,6 @@ Rules:
 - The top-level JSON must be the only content returned (no surrounding markdown fences, no extra commentary).
 `;
 
-/**
- * PROMPTS: functions generating user prompts for the LLM given an AIContext.
- */
 export const PROMPTS = {
   analyzeResponse: (ctx: AIContext): string => {
     const last = ctx.lastResponse;
@@ -175,11 +166,34 @@ Provide method, full URL, headers, params, and a sample body if applicable. Use 
   },
 };
 
-/**
- * Parse raw model output into AIResponse.
- * - Strips markdown code fences and backticks
- * - Attempts JSON.parse, falling back to substring heuristics
- */
+const FETCH_TIMEOUT = 30000;
+
+async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number }): Promise<Response> {
+  const timeout = options.timeout ?? FETCH_TIMEOUT;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+function isValidAIResponse(value: unknown): value is AIResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.summary !== "string") return false;
+  if (!Array.isArray(obj.actions)) return false;
+  for (const action of obj.actions) {
+    if (typeof action !== "object" || action === null) return false;
+    const a = action as Record<string, unknown>;
+    if (typeof a.type !== "string") return false;
+    if (typeof a.payload !== "object" || a.payload === null) return false;
+  }
+  return true;
+}
+
 export function parseAIResponse(raw: string): AIResponse {
   const cleaned = raw
     .replace(/```json\s*/g, "")
@@ -188,36 +202,33 @@ export function parseAIResponse(raw: string): AIResponse {
     .trim();
 
   try {
-    const parsed = JSON.parse(cleaned) as AIResponse;
-    return parsed;
-  } catch (err) {
-    // Try to extract first JSON object from string
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      const sub = cleaned.substring(firstBrace, lastBrace + 1);
-      try {
-        const parsed = JSON.parse(sub) as AIResponse;
-        return parsed;
-      } catch (e) {
-        // fall through
-      }
-    }
-
-    // As a last resort, return a minimal structured response indicating parse failure
-    return {
-      summary: "__PARSE_ERROR__ Could not parse model response as JSON.",
-      actions: [
-        {
-          type: "EXPLAIN",
-          payload: {
-            message:
-              "The AI response could not be parsed as JSON. Raw output attached to developer console.",
-          },
-        },
-      ],
-    };
+    const parsed = JSON.parse(cleaned);
+    if (isValidAIResponse(parsed)) return parsed;
+  } catch {
+    // continue to fallback
   }
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const sub = cleaned.substring(firstBrace, lastBrace + 1);
+    try {
+      const parsed = JSON.parse(sub);
+      if (isValidAIResponse(parsed)) return parsed;
+    } catch {
+      // fall through
+    }
+  }
+
+  return {
+    summary: "The AI response could not be parsed.",
+    actions: [
+      {
+        type: "EXPLAIN",
+        payload: { message: "The AI response could not be parsed as JSON. Check the developer console for details." },
+      },
+    ],
+  };
 }
 
 function resolvePath(obj: unknown, path: string): string | undefined {
@@ -233,23 +244,9 @@ function resolvePath(obj: unknown, path: string): string | undefined {
   return current != null ? String(current) : undefined;
 }
 
-/**
- * callAI: calls the selected AI provider and returns parsed AIResponse.
- * @param userPrompt - prompt string to send as user content
- * @param config - provider configuration
- */
-export async function callAI(
-  userPrompt: string,
-  config: {
-    provider: AIProvider;
-    apiKey?: string;
-    model?: string;
-    ollamaUrl?: string;
-  }
-): Promise<AIResponse> {
-  const provider = config.provider;
-  const model = config.model
-    ? config.model
+async function defaultModel(provider: AIProvider, model?: string): Promise<string> {
+  return model
+    ? model
     : provider === "anthropic"
     ? "claude-sonnet-4-20250514"
     : provider === "openai"
@@ -257,108 +254,70 @@ export async function callAI(
     : provider === "deepseek"
     ? "deepseek-chat"
     : "llama3";
+}
 
+async function callProxyAI(
+  provider: AIProvider,
+  apiKey: string,
+  model: string,
+  system: string,
+  message: string,
+  extra?: Record<string, unknown>
+): Promise<string> {
+  const res = await fetchWithTimeout("/api/proxy-ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider,
+      apiKey,
+      model,
+      system,
+      message,
+      ...extra,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${provider} proxy error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  return typeof data.content === "string" ? data.content : JSON.stringify(data);
+}
+
+export async function callAI(
+  userPrompt: string,
+  config: {
+    provider: AIProvider;
+    apiKey?: string;
+    model?: string;
+    openaiUrl?: string;
+    ollamaUrl?: string;
+  }
+): Promise<AIResponse> {
+  const provider = config.provider;
+  const model = await defaultModel(provider, config.model);
   const system = SYSTEM_PROMPT;
 
   try {
-    if (provider === "anthropic") {
-      if (!config.apiKey) throw new Error("Anthropic requires apiKey in config");
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": config.apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 1500,
-          system,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
+    if (provider === "anthropic" || provider === "openai") {
+      if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
+      const content = await callProxyAI(provider, config.apiKey, model, system, userPrompt, {
+        ...(provider === "openai" && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {}),
       });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Anthropic API error ${res.status}: ${text}`);
-      }
-
-      const data = await res.json();
-      // expected data.content[0].text
-      const raw = Array.isArray(data.content) && data.content[0] && data.content[0].text
-        ? data.content[0].text
-        : typeof data.text === "string"
-        ? data.text
-        : JSON.stringify(data);
-      return parseAIResponse(String(raw));
-    }
-
-    if (provider === "openai") {
-      if (!config.apiKey) throw new Error("OpenAI requires apiKey in config");
-      const body = {
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userPrompt },
-        ],
-        // honor the requested response format if available; may be ignored by some models
-        response_format: { type: "json_object" },
-      } as Record<string, unknown>;
-
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`OpenAI API error ${res.status}: ${text}`);
-      }
-
-      const data = await res.json();
-      const content =
-        data && data.choices && data.choices[0] && data.choices[0].message
-          ? data.choices[0].message.content
-          : JSON.stringify(data);
-      return parseAIResponse(String(content));
+      return parseAIResponse(content);
     }
 
     if (provider === "openrouter" || provider === "gemini" || provider === "deepseek") {
       if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
-      const res = await fetch("/api/proxy-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider,
-          apiKey: config.apiKey,
-          model,
-          system,
-          message: userPrompt,
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${provider} proxy error ${res.status}: ${text}`);
-      }
-
-      const data = await res.json();
-      const content =
-        data && typeof data === "object" && data !== null && "content" in data
-          ? (data as Record<string, unknown>).content
-          : data && typeof data === "object" && data !== null && "message" in data
-          ? (data as Record<string, unknown>).message
-          : JSON.stringify(data);
-      return parseAIResponse(String(content));
+      const content = await callProxyAI(provider, config.apiKey, model, system, userPrompt);
+      return parseAIResponse(content);
     }
 
     if (provider === "ollama") {
       const url = config.ollamaUrl ?? "http://localhost:11434";
-      const res = await fetch(`${url}/api/chat`, {
+      const res = await fetchWithTimeout(`${url}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: model ?? "llama3", stream: false, messages: [{ role: "system", content: system }, { role: "user", content: userPrompt }] }),
@@ -378,7 +337,7 @@ export async function callAI(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
-      summary: `__ERROR__ ${message}`,
+      summary: `AI call failed.`,
       actions: [
         { type: "EXPLAIN", payload: { message: `AI call failed: ${message}` } },
       ],
@@ -392,115 +351,30 @@ export async function callAIText(
     provider: AIProvider;
     apiKey?: string;
     model?: string;
+    openaiUrl?: string;
     ollamaUrl?: string;
     system?: string;
   }
 ): Promise<string> {
   const provider = config.provider;
-  const model = config.model
-    ? config.model
-    : provider === "anthropic"
-    ? "claude-sonnet-4-20250514"
-    : provider === "openai"
-    ? "gpt-4o"
-    : provider === "deepseek"
-    ? "deepseek-chat"
-    : "llama3";
-
+  const model = await defaultModel(provider, config.model);
   const system = config.system ?? SYSTEM_PROMPT;
 
-  if (provider === "anthropic") {
-    if (!config.apiKey) throw new Error("Anthropic requires apiKey in config");
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": config.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1500,
-        system,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
+  if (provider === "anthropic" || provider === "openai") {
+    if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
+    return callProxyAI(provider, config.apiKey, model, system, userPrompt, {
+      ...(provider === "openai" && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {}),
     });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Anthropic API error ${res.status}: ${text}`);
-    }
-
-    const data = await res.json();
-    return Array.isArray(data.content) && data.content[0] && data.content[0].text
-      ? String(data.content[0].text)
-      : typeof data.text === "string"
-      ? data.text
-      : JSON.stringify(data);
-  }
-
-  if (provider === "openai") {
-    if (!config.apiKey) throw new Error("OpenAI requires apiKey in config");
-    const body: Record<string, unknown> = {
-      model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userPrompt },
-      ],
-    };
-
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`OpenAI API error ${res.status}: ${text}`);
-    }
-
-    const data = await res.json();
-    return data && data.choices && data.choices[0] && data.choices[0].message
-      ? String(data.choices[0].message.content)
-      : JSON.stringify(data);
   }
 
   if (provider === "openrouter" || provider === "gemini" || provider === "deepseek") {
     if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
-    const res = await fetch("/api/proxy-ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        provider,
-        apiKey: config.apiKey,
-        model,
-        system,
-        message: userPrompt,
-      }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`${provider} proxy error ${res.status}: ${text}`);
-    }
-
-    const data = await res.json();
-    if (data && typeof data === "object" && data !== null && "content" in data) {
-      return String((data as Record<string, unknown>).content);
-    }
-    if (data && typeof data === "object" && data !== null && "message" in data) {
-      return String((data as Record<string, unknown>).message);
-    }
-    return JSON.stringify(data);
+    return callProxyAI(provider, config.apiKey, model, system, userPrompt);
   }
 
   if (provider === "ollama") {
     const url = config.ollamaUrl ?? "http://localhost:11434";
-    const res = await fetch(`${url}/api/chat`, {
+    const res = await fetchWithTimeout(`${url}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -522,10 +396,6 @@ export async function callAIText(
   throw new Error(`Unsupported provider: ${provider}`);
 }
 
-/**
- * dispatchAIActions: given parsed actions and handlers, call the appropriate handlers.
- * Handlers are optional; missing handlers are skipped but notify is called for SUGGEST_FIX.
- */
 export async function dispatchAIActions(
   actions: AIAction[],
   handlers: {

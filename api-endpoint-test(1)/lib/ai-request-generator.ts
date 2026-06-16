@@ -90,12 +90,13 @@ export async function callAiProxy(payload: AiProxyPayload): Promise<string> {
   })
 
   const rawText = await response.text()
-  let data: { content?: string; error?: string } = {}
-  try {
-    data = JSON.parse(rawText)
-  } catch {
-    data = { content: rawText }
-  }
+  const data: { content?: string; error?: string } = (() => {
+    try {
+      return JSON.parse(rawText)
+    } catch {
+      return { content: rawText }
+    }
+  })()
 
   if (!response.ok) {
     throw new Error(data.error || `AI request failed (${response.status})`)

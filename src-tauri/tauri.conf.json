@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "my-project",
+  "productName": "Reqly",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.reqly.app",
   "build": {
     "frontendDist": "../api-endpoint-test(1)/.next",
     "devUrl": "http://localhost:3000",
@@ -12,15 +12,17 @@
   "app": {
     "windows": [
       {
-        "title": "my-project",
-        "width": 800,
+        "title": "Reqly",
+        "width": 900,
         "height": 600,
+        "minWidth": 820,
+        "minHeight": 500,
         "resizable": true,
         "fullscreen": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:*; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none';"
     }
   },
   "bundle": {

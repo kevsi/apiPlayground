@@ -15,7 +15,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Reqly - API Testing Dashboard',
+  title: 'Reqly - API Playground',
   description: 'Professional API endpoint testing and management platform',
   generator: 'v0.app',
   icons: {
@@ -27,6 +27,8 @@ export const metadata: Metadata = {
 import { SidebarProvider } from '@/contexts/sidebar-context'
 import { Toaster } from '@/components/ui/toaster'
 import { FloatingAiChat } from '@/components/floating-ai-chat'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { MockBanner } from '@/components/mock-banner'
 
 export default function RootLayout({
   children,
@@ -34,12 +36,23 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background" suppressHydrationWarning>
-      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `(function(){try{var t=localStorage.getItem("reqly-theme");var v=["light","dark","emerald","ocean","sunset","purple","midnight"];if(!t||!v.includes(t)){t=window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}document.documentElement.classList.add(t);var c=t==="dark"||t==="midnight"?"dark":"light";document.documentElement.style.colorScheme=c;var m=document.querySelector("meta[name=theme-color]");if(m){m.content=c==="dark"?"#0d1117":"#ffffff"}}catch(e){}})()`
+        }} />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
+      </head>
+      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}>
         <ThemeProvider defaultTheme="light" storageKey="reqly-theme">
-          <SidebarProvider>
-            {children}
-          </SidebarProvider>
+          <ErrorBoundary>
+            <SidebarProvider>
+              <MockBanner />
+              {children}
+            </SidebarProvider>
+          </ErrorBoundary>
           <FloatingAiChat />
           <Toaster />
         </ThemeProvider>

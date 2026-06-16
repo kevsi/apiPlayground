@@ -64,10 +64,10 @@ export function ImportPostmanModal({
   }
 
   useEffect(() => {
-    if (open && isConnected) {
-      fetchCollections()
-    }
-  }, [open, isConnected])
+    if (!open || !isConnected) return
+    const fetchTimeout = window.setTimeout(() => fetchCollections(), 0)
+    return () => window.clearTimeout(fetchTimeout)
+  }, [open, isConnected, fetchCollections])
 
   const handleImport = async () => {
     if (!selectedCollectionId) {

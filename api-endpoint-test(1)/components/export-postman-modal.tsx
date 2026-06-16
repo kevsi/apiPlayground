@@ -26,9 +26,12 @@ export function ExportPostmanModal({
   const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      setSelectedCollectionIds(collections.map((collection) => collection.id))
-    }
+    if (!open) return
+    const selectTimeout = window.setTimeout(
+      () => setSelectedCollectionIds(collections.map((collection) => collection.id)),
+      0,
+    )
+    return () => window.clearTimeout(selectTimeout)
   }, [open, collections])
 
   const toggleCollection = (collectionId: string) => {

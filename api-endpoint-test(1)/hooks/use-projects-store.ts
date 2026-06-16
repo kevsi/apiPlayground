@@ -1,5 +1,7 @@
 "use client"
 
+import { secureKeys } from "@/lib/secure-storage"
+
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 export type AIProvider = "anthropic" | "openai" | "openrouter" | "gemini" | "deepseek" | "ollama"
 export type AnalysisMode = "static" | "ai"
@@ -35,6 +37,7 @@ export interface SavedProject {
   routes: DetectedRoute[]
   analyzedAt: string
   mode: AnalysisMode
+  workspaceId?: string
 }
 
 const API_KEYS_KEY = "probe_api_keys"
@@ -49,14 +52,7 @@ export interface GithubConfig {
 }
 
 export function loadApiKey(provider: AIProvider): string {
-  try {
-    const raw = localStorage.getItem(API_KEYS_KEY)
-    if (!raw) return ""
-    const keys = JSON.parse(raw) as Record<string, string>
-    return keys[provider] ?? ""
-  } catch {
-    return ""
-  }
+  return secureKeys.get(`${API_KEYS_KEY}_${provider}`) ?? ""
 }
 
 export function loadAiBaseUrl(provider: AIProvider): string {
@@ -100,12 +96,11 @@ export function saveAiModel(provider: AIProvider, model: string) {
 }
 
 export function saveApiKey(provider: AIProvider, key: string) {
-  try {
-    const raw = localStorage.getItem(API_KEYS_KEY)
-    const keys: Record<string, string> = raw ? JSON.parse(raw) : {}
-    keys[provider] = key
-    localStorage.setItem(API_KEYS_KEY, JSON.stringify(keys))
-  } catch {}
+  if (key) {
+    secureKeys.set(`${API_KEYS_KEY}_${provider}`, key)
+  } else {
+    secureKeys.delete(`${API_KEYS_KEY}_${provider}`)
+  }
 }
 
 export function loadAIProvider(): AIProvider {
@@ -146,16 +141,14 @@ export function saveOllamaConfig(config: OllamaConfig) {
 }
 
 export function loadGithubConfig(): GithubConfig {
-  try {
-    const raw = localStorage.getItem(GITHUB_CONFIG_KEY)
-    return raw ? (JSON.parse(raw) as GithubConfig) : {}
-  } catch {
-    return {}
-  }
+  const token = secureKeys.get(GITHUB_CONFIG_KEY)
+  return token ? { token } : {}
 }
 
 export function saveGithubConfig(config: GithubConfig) {
-  try {
-    localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify(config))
-  } catch {}
+  if (config.token) {
+    secureKeys.set(GITHUB_CONFIG_KEY, config.token)
+  } else {
+    secureKeys.delete(GITHUB_CONFIG_KEY)
+  }
 }

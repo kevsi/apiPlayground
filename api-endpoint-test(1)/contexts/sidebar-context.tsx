@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 interface SidebarContextType {
@@ -13,7 +13,7 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true)
 
   const isNarrow = useIsMobile(916)
 
@@ -21,14 +21,17 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed")
     if (stored) {
-      setIsCollapsed(JSON.parse(stored))
+      const t = window.setTimeout(() => setIsCollapsed(JSON.parse(stored)), 0)
+      return () => window.clearTimeout(t)
     }
+    return
   }, [])
 
   // Close sidebar automatically on narrower desktop widths
   useEffect(() => {
     if (isNarrow) {
-      setIsCollapsed(true)
+      const t = window.setTimeout(() => setIsCollapsed(true), 0)
+      return () => window.clearTimeout(t)
     }
   }, [isNarrow])
 
@@ -41,8 +44,13 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const collapseSidebar = () => setIsCollapsed(true)
   const expandSidebar = () => setIsCollapsed(false)
 
+  const ctxValue = useMemo(
+    () => ({ isCollapsed, toggleSidebar, collapseSidebar, expandSidebar }),
+    [isCollapsed, toggleSidebar, collapseSidebar, expandSidebar]
+  )
+
   return (
-    <SidebarContext.Provider value={{ isCollapsed, toggleSidebar, collapseSidebar, expandSidebar }}>
+    <SidebarContext.Provider value={ctxValue}>
       {children}
     </SidebarContext.Provider>
   )

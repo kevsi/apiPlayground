@@ -10,15 +10,10 @@
     "dialog:default",
     "dialog:allow-save",
     "fs:default",
-    "fs:allow-write-text-file",
     {
       "identifier": "fs:scope",
       "allow": [
-        "**",
-        "$HOME/**",
-        "$DOWNLOAD/**",
-        "$DESKTOP/**",
-        "$DOCUMENT/**"
+        "$APPDATA/reqly/**"
       ]
     }
   ]
