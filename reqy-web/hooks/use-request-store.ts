@@ -33,6 +33,7 @@ import type { CurrentRequest, LastResponse } from "@/lib/ai-engine"
 import type { SavedProject } from "@/types"
 import { runProactiveAnalysis } from "./store-analysis"
 import { withCrossTabSync } from "@/lib/store/middleware/with-cross-tab-sync"
+import { setSyncState, setRetryHandler } from "@/hooks/use-sync-state"
 import { storageAdapter } from "@/lib/storage-adapter"
 import { WORKSPACE_PERSONAL_ID } from "./store/types"
 import { createNotificationsMutations } from "./store/notifications"
@@ -244,14 +245,19 @@ let saveAttempts = 0;
 const MAX_SAVE_RETRIES = 3;
 const SAVE_DEBOUNCE_MS = 300;
 
+let lastStoreSnapshot: string | null = null;
+
 async function flushSave() {
   const store = pendingStore;
   if (!store) return;
   pendingStore = null;
+  setSyncState("syncing");
   for (let attempt = 0; attempt < MAX_SAVE_RETRIES; attempt++) {
     try {
       await storageAdapter.save(STORAGE_KEY, JSON.stringify(store))
       saveAttempts = 0;
+      lastStoreSnapshot = JSON.stringify(store);
+      setSyncState("synced");
       return
     } catch (e) {
       saveAttempts++
@@ -261,13 +267,22 @@ async function flushSave() {
       }
     }
   }
+  setSyncState("error");
 }
 
 function saveToStorageAsync(store: RequestStore) {
   pendingStore = store
+  lastStoreSnapshot = JSON.stringify(store)
   if (saveTimeout) clearTimeout(saveTimeout)
   saveTimeout = setTimeout(flushSave, SAVE_DEBOUNCE_MS)
 }
+
+setRetryHandler(() => {
+  if (lastStoreSnapshot) {
+    const store = JSON.parse(lastStoreSnapshot) as RequestStore;
+    saveToStorageAsync(store);
+  }
+});
 
 let globalStore: RequestStore = initialStore;
 let globalIsLoaded = false;
