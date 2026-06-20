@@ -32,6 +32,7 @@ import type {
 import type { CurrentRequest, LastResponse } from "@/lib/ai-engine"
 import type { SavedProject } from "@/types"
 import { runProactiveAnalysis } from "./store-analysis"
+import { withCrossTabSync } from "@/lib/store/middleware/with-cross-tab-sync"
 import { storageAdapter } from "@/lib/storage-adapter"
 import { WORKSPACE_PERSONAL_ID } from "./store/types"
 import { createNotificationsMutations } from "./store/notifications"
@@ -273,29 +274,18 @@ let globalIsLoaded = false;
 let initPromise: Promise<void> | null = null;
 const storeListeners = new Set<() => void>();
 
-let syncChannel: BroadcastChannel | null = null;
 let storeGen = 0;
 let lastSyncGen = 0;
 
-function setupSync() {
-  if (typeof window === "undefined") return;
-  try {
-    syncChannel = new BroadcastChannel("reqly-store-sync");
-    syncChannel.onmessage = async (event) => {
-      if (event.data?.type === "update" && (event.data.gen || 0) > lastSyncGen) {
-        lastSyncGen = event.data.gen;
-        const loaded = await loadFromStorageAsync();
-        globalStore = loaded;
-        notifyListeners();
-      }
-    };
-  } catch {
-    // BroadcastChannel unsupported (Firefox incognito, workers, etc.)
-    syncChannel = null;
+const syncMiddleware = withCrossTabSync("reqly-store-sync");
+syncMiddleware.onMessage(async (payload) => {
+  if (payload?.type === "update" && (payload.gen || 0) > lastSyncGen) {
+    lastSyncGen = payload.gen;
+    const loaded = await loadFromStorageAsync();
+    globalStore = loaded;
+    notifyListeners();
   }
-}
-
-setupSync();
+});
 
 function notifyListeners() {
   storeListeners.forEach((listener) => listener());
@@ -350,16 +340,11 @@ export function useRequestStore() {
     };
     storeListeners.add(listener);
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        const loaded = JSON.parse(e.newValue) as RequestStore;
-        globalStore = loaded;
-        notifyListeners();
-      }
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("storage", handleStorage);
-    }
+    const removeStorageListener = syncMiddleware.listenStorage(STORAGE_KEY, (value) => {
+      const loaded = JSON.parse(value) as RequestStore;
+      globalStore = loaded;
+      notifyListeners();
+    });
 
     if (!globalIsLoaded) {
       initStore();
@@ -369,9 +354,7 @@ export function useRequestStore() {
 
     return () => {
       storeListeners.delete(listener);
-      if (typeof window !== "undefined") {
-        window.removeEventListener("storage", handleStorage);
-      }
+      removeStorageListener();
     };
   }, []);
 
@@ -382,7 +365,7 @@ export function useRequestStore() {
       storeGen++;
       saveToStorageAsync(globalStore);
       notifyListeners();
-      if (syncChannel) syncChannel.postMessage({ type: "update", gen: storeGen });
+      syncMiddleware.broadcast({ type: "update", gen: storeGen });
     },
     []
   )
