@@ -1,0 +1,49 @@
+"use client"
+
+import type {
+  HttpMethod,
+  CollectionFolder,
+  RequestItem,
+  HistoryItem,
+  Workspace,
+  Collection,
+  EnvironmentVariable,
+  Environment,
+  VariableMapping,
+  Notification,
+} from "@/lib/types"
+
+export type {
+  HttpMethod,
+  CollectionFolder,
+  RequestItem,
+  HistoryItem,
+  Workspace,
+  Collection,
+  EnvironmentVariable,
+  Environment,
+  VariableMapping,
+  Notification,
+} from "@/lib/types"
+
+export interface RequestStore {
+  history: HistoryItem[]
+  collections: Collection[]
+  environments: Environment[]
+  notifications: Notification[]
+  variableMappings: VariableMapping[]
+  systemNotificationPermission?: string
+  activeEnvironmentId: string | null
+  projects: import("@/types").SavedProject[]
+  selectedProjectId: string | null
+  currentRequest?: import("@/lib/ai-engine").CurrentRequest | null
+  lastResponse?: import("@/lib/ai-engine").LastResponse | null
+  environmentVariables?: Record<string, string>
+  collectionHistory?: import("@/lib/ai-engine").CurrentRequest[]
+  activeCollection?: string | null
+  aiAutoApply?: boolean
+  aiAudit?: Array<{ id: string; actionType: string; detail?: any; result?: any; timestamp: number }>
+  workspaces: Workspace[]
+  activeWorkspaceId: string | null
+  notificationPreferences?: Record<string, boolean>
+}

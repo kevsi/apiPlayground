@@ -1,0 +1,248 @@
+"use client"
+
+import { ChevronLeft, ChevronRight, CheckCircle, Copy, List, Plus, Save, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
+import type { RequestTab } from "@/lib/request-executor"
+import { methodColors, getMethodDotClass } from "@/lib/request-tab-utils"
+import type { TabContextMenu } from "@/hooks/use-request-tabs-state"
+
+interface RequestTabBarProps {
+  tabs: RequestTab[]
+  activeTabId: string
+  canScrollLeft: boolean
+  canScrollRight: boolean
+  tabListRef: React.RefObject<HTMLDivElement | null>
+  contextMenu: TabContextMenu | null
+  onSelectTab: (tabId: string) => void
+  onScroll: (direction: "left" | "right") => void
+  onAddTab: () => void
+  onCloseTab: (id: string, e: React.MouseEvent) => void
+  onContextMenu: (menu: TabContextMenu) => void
+  onCloseContextMenu: () => void
+  onSaveActiveTab: () => void
+  onDuplicateTab: (tab: RequestTab) => void
+  onCloseOthers: (id: string) => void
+  onCloseToRight: (id: string) => void
+  onCloseAllTabs: () => void
+  onSaveAllTabs: () => void
+}
+
+export function RequestTabBar({
+  tabs,
+  activeTabId,
+  canScrollLeft,
+  canScrollRight,
+  tabListRef,
+  contextMenu,
+  onSelectTab,
+  onScroll,
+  onAddTab,
+  onCloseTab,
+  onContextMenu,
+  onCloseContextMenu,
+  onSaveActiveTab,
+  onDuplicateTab,
+  onCloseOthers,
+  onCloseToRight,
+  onCloseAllTabs,
+  onSaveAllTabs,
+}: RequestTabBarProps) {
+  return (
+    <>
+      <div className="flex items-center border-b border-border relative bg-muted/5">
+        <div className="ambient-bar" />
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => onScroll("left")}
+            className="shrink-0 flex items-center justify-center size-6 mx-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/30 transition-all duration-150"
+            title="Scroll left"
+          >
+            <ChevronLeft className="size-3.5" />
+          </button>
+        )}
+        <div ref={tabListRef} role="tablist" className="flex flex-1 items-center gap-1 overflow-hidden px-1.5">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              role="tab"
+              tabIndex={activeTabId === tab.id ? 0 : -1}
+              aria-selected={activeTabId === tab.id}
+              aria-controls={`tabpanel-${tab.id}`}
+              onClick={() => onSelectTab(tab.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onContextMenu({ tabId: tab.id, x: e.clientX, y: e.clientY })
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  onSelectTab(tab.id)
+                }
+              }}
+              className={cn(
+                "group relative flex shrink-0 cursor-pointer items-center gap-2.5 rounded-t-md px-5 py-3 text-sm transition-all duration-150",
+                activeTabId === tab.id
+                  ? "bg-background text-foreground"
+                  : "text-muted-foreground/60 hover:bg-muted/20 hover:text-foreground/80",
+              )}
+            >
+              {activeTabId === tab.id && <div className="tab-active-bar" />}
+              <span className={cn("size-1.5 rounded-full shrink-0", getMethodDotClass(tab.method))} />
+              <span className="max-w-[200px] truncate text-sm font-medium">{tab.name}</span>
+              {!tab.isSaved && (
+                <span title="Unsaved — Ctrl+S to save" className="size-1.5 rounded-full bg-orange-400/80 shrink-0" />
+              )}
+              {tab.isSaved && tab.hasResponse && (
+                <span className="size-1.5 rounded-full bg-emerald-500/60 shrink-0" />
+              )}
+              <button
+                type="button"
+                onClick={(e) => onCloseTab(tab.id, e)}
+                className="ml-0.5 rounded p-0.5 opacity-0 transition-all duration-150 hover:bg-muted-foreground/10 group-hover:opacity-100 hover:scale-110"
+              >
+                <X className="size-3 text-muted-foreground/50 hover:text-foreground" />
+              </button>
+            </div>
+          ))}
+        </div>
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => onScroll("right")}
+            className="shrink-0 flex items-center justify-center size-6 mx-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/30 transition-all duration-150"
+            title="Scroll right"
+          >
+            <ChevronRight className="size-3.5" />
+          </button>
+        )}
+        <div className="flex shrink-0 items-center gap-0.5 pr-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground/40 hover:text-foreground transition-all duration-200"
+                title="All tabs"
+              >
+                <List className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 max-h-72 overflow-y-auto">
+              {tabs.map((tab) => (
+                <DropdownMenuItem
+                  key={tab.id}
+                  onSelect={() => onSelectTab(tab.id)}
+                  className="gap-2 text-xs cursor-pointer"
+                >
+                  <span className={cn("method-pill shrink-0", methodColors[tab.method])}>{tab.method}</span>
+                  <span className="truncate flex-1">{tab.name}</span>
+                  {tab.id === activeTabId && <CheckCircle className="size-3 text-primary shrink-0" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onAddTab}
+            className="size-7 text-muted-foreground/50 hover:text-foreground transition-all duration-200"
+            title="New tab"
+          >
+            <Plus className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-44 rounded-lg border border-border bg-popover p-1 shadow-lg shadow-black/10"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              onSaveActiveTab()
+              onCloseContextMenu()
+            }}
+          >
+            <Save className="size-3.5" />
+            Save
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              const tab = tabs.find((t) => t.id === contextMenu.tabId)
+              if (tab) onDuplicateTab(tab)
+              onCloseContextMenu()
+            }}
+          >
+            <Copy className="size-3.5" />
+            Duplicate
+          </button>
+          <div className="my-1 border-t border-border" />
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              onCloseTab(contextMenu.tabId, { stopPropagation: () => {} } as React.MouseEvent)
+              onCloseContextMenu()
+            }}
+          >
+            <X className="size-3.5" />
+            Close
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              onCloseOthers(contextMenu.tabId)
+              onCloseContextMenu()
+            }}
+          >
+            <X className="size-3.5" />
+            Close Others
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              onCloseToRight(contextMenu.tabId)
+              onCloseContextMenu()
+            }}
+          >
+            <X className="size-3.5" />
+            Close to the Right
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              onCloseAllTabs()
+              onCloseContextMenu()
+            }}
+          >
+            <X className="size-3.5" />
+            Close All
+          </button>
+          <div className="my-1 border-t border-border" />
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              onSaveAllTabs()
+              onCloseContextMenu()
+            }}
+          >
+            <Save className="size-3.5" />
+            Save All
+          </button>
+        </div>
+      )}
+    </>
+  )
+}

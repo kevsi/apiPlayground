@@ -1,0 +1,207 @@
+"use client"
+
+import { useState } from "react"
+import { Loader2, FolderOpen, Sparkles, Code2, ChevronDown, Eye, EyeOff, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
+import { isTauriAvailable } from "@/lib/tauri"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import type { AIProvider, AnalysisMode, SavedProject } from "@/lib/projects-store"
+import { loadApiKey, saveApiKey } from "@/lib/projects-store"
+import { analyzeProject } from '../lib/project-analyzer'
+import { toast } from "@/hooks/use-toast"
+
+const PROVIDERS: { value: AIProvider; label: string }[] = [
+  { value: "anthropic", label: "Anthropic (Claude)" },
+  { value: "openai", label: "OpenAI (GPT-4o)" },
+  { value: "gemini", label: "Gemini 2.0 Flash" },
+  { value: "ollama", label: "Ollama (local)" },
+]
+
+interface NewProjectModalProps {
+  open: boolean
+  onClose: () => void
+  onAdd: (p: SavedProject) => void
+}
+
+export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) {
+  const [mode, setMode] = useState<AnalysisMode>("static")
+  const [provider, setProvider] = useState<AIProvider>("anthropic")
+  const [apiKey, setApiKey] = useState(() => loadApiKey("anthropic"))
+  const [showKey, setShowKey] = useState(false)
+  const [folderPath, setFolderPath] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState("")
+  const [analysisResult, setAnalysisResult] = useState<SavedProject | null>(null)
+
+  const handleProviderChange = (p: AIProvider) => {
+    setProvider(p)
+    setApiKey(loadApiKey(p))
+  }
+
+  const pickFolder = async () => {
+    if (isTauriAvailable()) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog")
+        const selected = await open({ directory: true, multiple: false })
+        if (selected && typeof selected === "string") {
+          setFolderPath(selected)
+          setAnalysisResult(null)
+        }
+      } catch {
+        toast({ title: "Impossible d'ouvrir le sélecteur de dossier", variant: "destructive" })
+      }
+    } else {
+      toast({ title: "Saisissez le chemin du dossier manuellement", description: "Le sélecteur natif est disponible via l'application de bureau." })
+    }
+  }
+
+  const analyze = async () => {
+    if (!folderPath) { toast({ title: "Sélectionnez un dossier", variant: "destructive" }); return }
+    if (mode === "ai" && provider !== "ollama" && !apiKey.trim()) {
+      toast({ title: "Clé API requise", variant: "destructive" }); return
+    }
+    if (mode === "ai" && provider !== "ollama") saveApiKey(provider, apiKey)
+    setLoading(true)
+    try {
+      setStep("Analyse en cours…")
+      const result = await analyzeProject(folderPath, mode, provider, mode === "ai" ? apiKey : undefined)
+      setAnalysisResult(result)
+      toast({ title: `Langage détecté : ${result.language ?? "Inconnu"}`, meta: { event: "projectAdd" } } as any)
+    } catch (err) {
+      toast({ title: `Erreur : ${String(err)}`, variant: "destructive", meta: { event: "projectAdd" } } as any)
+    } finally {
+      setLoading(false)
+      setStep("")
+    }
+  }
+
+  const handlePrimaryAction = async () => {
+    if (analysisResult) {
+      onAdd(analysisResult)
+      toast({ title: `${analysisResult.routes.length} routes détectées`, meta: { event: "projectAdd" } } as any)
+      onClose()
+      setFolderPath("")
+      setAnalysisResult(null)
+      return
+    }
+    await analyze()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FolderOpen className="size-5 text-primary" /> Nouveau projet
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          {/* Mode toggle */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            <button
+              onClick={() => setMode("static")}
+              className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors",
+                mode === "static" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}
+            >
+              <Code2 className="size-4" /> Parser statique
+            </button>
+            <button
+              onClick={() => setMode("ai")}
+              className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors",
+                mode === "ai" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}
+            >
+              <Sparkles className="size-4" /> Analyse IA
+            </button>
+          </div>
+
+          {/* AI options */}
+          {mode === "ai" && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="relative">
+                <select
+                  value={provider}
+                  onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
+                  className="w-full appearance-none rounded-md border border-border bg-background px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
+              {provider !== "ollama" && (
+                <div className="relative">
+                  <Input
+                    type={showKey ? "text" : "password"}
+                    placeholder="Clé API…"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="pr-9 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Folder picker */}
+          <div className="flex gap-2">
+            <Input
+              value={folderPath}
+              onChange={(e) => { setFolderPath(e.target.value); setAnalysisResult(null) }}
+              readOnly={isTauriAvailable()}
+              placeholder="Chemin du dossier…"
+              className="flex-1 text-sm"
+            />
+            <Button variant="outline" size="sm" onClick={pickFolder} className="shrink-0 gap-1.5">
+              <FolderOpen className="size-4" /> Parcourir
+            </Button>
+          </div>
+          {!isTauriAvailable() && (
+            <p className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+              <AlertCircle className="size-3" />
+              Mode navigateur : entrez le chemin manuellement ou installez l'app de bureau
+            </p>
+          )}
+
+          {analysisResult && (
+            <div className="rounded-2xl border border-border/50 bg-muted/10 p-4 text-sm text-foreground">
+              <p><strong>Langage détecté :</strong> {analysisResult.language ?? "Inconnu"}</p>
+              <p><strong>Framework :</strong> {analysisResult.framework}</p>
+              <p><strong>Routes :</strong> {analysisResult.routes.length}</p>
+              {analysisResult.port && <p><strong>Port :</strong> {analysisResult.port}</p>}
+            </div>
+          )}
+
+          <Button
+            className="w-full gap-2"
+            onClick={handlePrimaryAction}
+            disabled={loading || !folderPath}
+          >
+            {loading ? (
+              <><Loader2 className="size-4 animate-spin" /> {step || "Analyse…"}</>
+            ) : analysisResult ? (
+              <><Sparkles className="size-4" /> Ajouter le projet</>
+            ) : (
+              <><Sparkles className="size-4" /> Analyser</>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

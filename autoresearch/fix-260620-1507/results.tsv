@@ -1,0 +1,5 @@
+# metric_direction: lower_is_better
+iteration	timestamp	error_type	error_fixed	commit	metric	delta	guard	status	description
+0	2026-06-20T15:07:00Z	baseline	-	initial state	57	0	pass	baseline	initial state: 56 lint errors + 1 TS error
+1	2026-06-20T15:09:00Z	type	rateLimit/variants schemas	experiment: fix TS error — proper rateLimit and variants zod schemas	56	-1	pass	keep	Fixed rateLimit and variants zod schemas in mock-config.ts
+2	2026-06-20T15:15:30Z	lint	rules-of-hooks (47) + prefer-const/preserve-caught-error/purity (9)	experiment: fix lint errors — remove useCallback from non-hook factories, etc.	0	-56	pass	keep	Removed useCallback from 7 store files, fixed prefer-const(4), preserve-caught-error(3), purity(1), no-useless-assignment(1)

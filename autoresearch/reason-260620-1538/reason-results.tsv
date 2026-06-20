@@ -1,0 +1,6 @@
+round	timestamp	candidate_label	judge_verdict	convergence_count	description
+1	2026-06-20T15:38:00Z	AB (Shared Infrastructure)	Unanimous (3/3)	1	Shared Infrastructure, Independent Instances, Optional Federation — createStoreFactory with per-instance middleware. Unanimous judge victory over Keep Separate (A) and Unify (B).
+2	2026-06-20T15:38:00Z	AB (Synthesized Hybrid)	Majority (2/3)	2	Synthesized Hybrid — pure factory + middleware, commit as sole primitive with typed commitCreators, shallowEqual memoization, flush() for async drains. Defeated A (refined - over-engineered) and B (decoupled - too bare). convergence_count=2.
+3	2026-06-20T15:38:00Z	AB (Factory + adapter)	Unanimous (3/3)	1	Factory for useRequestStore only + ~30-line mock adapter (getMockState, useMockSelector, CommitFn bridge). Rejected full unification (Beta) and no-adapter (Alpha). Substantive refinement ? convergence_count reset to 1.
+4	2026-06-20T15:38:00Z	A (Extract withCrossTabSync)	Unanimous (3/3)	1	Cross-tab sync extracted to composable middleware (consistent with pure factory + middleware pattern). Rejected keep-as-is. convergence_count=1.
+5	2026-06-20T15:38:00Z	CONVERGED	–	3	All 14 architectural decisions locked. Factory + middleware + adapter + migration pattern is complete and consistent. Declared converged.

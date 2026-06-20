@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Test Mock Server</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #f1f5f9;
+  margin: 0;
+  padding: 24px;
+  color: #1e293b;
+}
+.container { max-width: 800px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.subtitle { color: #64748b; font-size: 13px; margin-bottom: 20px; }
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.card-title { font-size: 14px; font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: 80px 1fr; gap: 8px; margin-bottom: 12px; }
+.grid label { font-size: 12px; color: #64748b; align-self: center; }
+.grid input, .grid select {
+  font-size: 13px; padding: 6px 10px; border: 1px solid #e2e8f0;
+  border-radius: 6px; background: #fff; font-family: monospace;
+}
+.grid select { cursor: pointer; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px; border: none;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  background: #6366f1; color: #fff; transition: .15s;
+}
+.btn:hover { background: #4f46e5; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-outline { background: transparent; border: 1px solid #e2e8f0; color: #1e293b; }
+.btn-outline:hover { background: #f8fafc; }
+
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 700;
+}
+.badge-get { background: #d1fae5; color: #065f46; }
+.badge-post { background: #dbeafe; color: #1e40af; }
+.badge-put { background: #fef3c7; color: #92400e; }
+.badge-patch { background: #ede9fe; color: #5b21b6; }
+.badge-delete { background: #fee2e2; color: #991b1b; }
+
+.response-area {
+  background: #1e293b; color: #e2e8f0; border-radius: 8px;
+  padding: 16px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px; line-height: 1.6; overflow: auto; max-height: 400px;
+  white-space: pre-wrap; word-break: break-all;
+  margin-top: 12px;
+}
+.response-area .status-line { color: #34d399; margin-bottom: 8px; }
+.response-area .header-line { color: #94a3b8; }
+.response-area .body-sep { color: #475569; margin: 8px 0; border: none; border-top: 1px solid #334155; }
+.response-area .json-body { color: #a5b4fc; }
+
+.route-list { display: flex; flex-direction: column; gap: 6px; }
+.route-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid #e2e8f0; cursor: pointer;
+  transition: .15s; font-size: 13px;
+}
+.route-item:hover { border-color: #6366f1; background: #f8fafc; }
+.route-item .name { flex: 1; }
+.route-item .path { font-family: monospace; font-size: 12px; color: #64748b; }
+.route-empty { color: #94a3b8; font-size: 13px; padding: 24px; text-align: center; }
+
+.loader {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid #e2e8f0; border-top-color: #6366f1;
+  border-radius: 50%; animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.mt-2 { margin-top: 8px; }
+.mb-2 { margin-bottom: 8px; }
+.text-sm { font-size: 13px; }
+.text-muted { color: #64748b; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧪 Test Mock Server</h1>
+  <p class="subtitle">Petit client de test pour les routes mock de l'API Playground</p>
+
+  <!-- Quick request -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Requête rapide</span>
+      <button id="btnRefresh" class="btn btn-sm btn-outline">↻ Recharger les routes</button>
+    </div>
+    <div class="grid">
+      <label>Méthode</label>
+      <select id="inputMethod">
+        <option>GET</option><option>POST</option><option>PUT</option>
+        <option>PATCH</option><option>DELETE</option>
+      </select>
+      <label>URL</label>
+      <input id="inputUrl" value="/api/mock/" placeholder="/api/mock/chemin" />
+    </div>
+    <div class="flex gap-2">
+      <button id="btnSend" class="btn">➜ Envoyer</button>
+    </div>
+    <div id="responseArea" class="response-area" style="display:none"></div>
+  </div>
+
+  <!-- Routes mock enregistrées -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Routes mock enregistrées</span>
+      <span id="routeCount" class="text-sm text-muted"></span>
+    </div>
+    <div id="routeList" class="route-list">
+      <div class="route-empty">Chargement...</div>
+    </div>
+  </div>
+
+  <!-- Pre-built tests -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Tests rapides</span>
+    </div>
+    <div class="flex gap-2 flex-wrap" id="quickTests"></div>
+  </div>
+</div>
+
+<script>
+const BASE = ''
+const inputMethod = document.getElementById('inputMethod')
+const inputUrl = document.getElementById('inputUrl')
+const btnSend = document.getElementById('btnSend')
+const responseArea = document.getElementById('responseArea')
+const routeList = document.getElementById('routeList')
+const routeCount = document.getElementById('routeCount')
+const quickTests = document.getElementById('quickTests')
+
+async function loadRoutes() {
+  routeList.innerHTML = '<div class="route-empty">Chargement...</div>'
+  try {
+    const res = await fetch(`${BASE}/api/mock/config`)
+    const data = await res.json()
+    const routes = data.routes || []
+    routeCount.textContent = `${routes.length} route(s)`
+
+    if (routes.length === 0) {
+      routeList.innerHTML = '<div class="route-empty">Aucune route mock. Va sur <strong>/mocks</strong> pour en créer.</div>'
+      return
+    }
+
+    routeList.innerHTML = routes.map(r => `
+      <div class="route-item" onclick="quickTest('${r.method}','/api/mock${r.pathPattern}')">
+        <span class="badge badge-${r.method.toLowerCase()}">${r.method}</span>
+        <span class="path">${r.pathPattern}</span>
+        <span class="name">${r.name}</span>
+        <span class="text-sm text-muted">${r.responseStatus}</span>
+      </div>
+    `).join('')
+  } catch (err) {
+    routeList.innerHTML = `<div class="route-empty">❌ Erreur : ${err.message}</div>`
+  }
+}
+
+async function sendRequest(method, url) {
+  responseArea.style.display = 'block'
+  responseArea.innerHTML = '<span class="loader"></span> Envoi en cours...'
+
+  try {
+    const start = Date.now()
+    const res = await fetch(url, { method })
+    const body = await res.text()
+    const elapsed = Date.now() - start
+    const statusColor = res.ok ? '#34d399' : res.status >= 500 ? '#f87171' : '#fbbf24'
+
+    let headersHtml = ''
+    res.headers.forEach((v, k) => {
+      if (!k.startsWith('x-mock')) {
+        headersHtml += `<span class="header-line">${k}: ${v}</span>\n`
+      }
+    })
+
+    // Try to format JSON body
+    let bodyHtml = ''
+    try {
+      const parsed = JSON.parse(body)
+      bodyHtml = `<span class="json-body">${JSON.stringify(parsed, null, 2)}</span>`
+    } catch {
+      bodyHtml = body
+    }
+
+    responseArea.innerHTML = `
+      <span class="status-line" style="color:${statusColor}">
+        ${res.status} ${res.statusText}  —  ${elapsed}ms
+      </span>
+      <span class="header-line">${res.method} ${url}</span>
+      ${headersHtml}
+      <hr class="body-sep">
+      ${bodyHtml}
+    `
+  } catch (err) {
+    responseArea.innerHTML = `<span style="color:#f87171">❌ Erreur : ${err.message}</span>`
+  }
+}
+
+function quickTest(method, url) {
+  inputMethod.value = method
+  inputUrl.value = url
+  sendRequest(method, url)
+}
+
+// Render quick test buttons
+const TEST_PATTERNS = [
+  { label: 'GET /hello', method: 'GET', url: '/api/mock/hello' },
+  { label: 'GET /api/users', method: 'GET', url: '/api/mock/api/users' },
+  { label: 'POST /api/users', method: 'POST', url: '/api/mock/api/users' },
+  { label: 'GET 404', method: 'GET', url: '/api/mock/api/users/not-found' },
+  { label: 'GET /api/dashboard', method: 'GET', url: '/api/mock/api/dashboard/stats' },
+]
+
+quickTests.innerHTML = TEST_PATTERNS.map(t => `
+  <button class="btn btn-sm btn-outline" onclick="quickTest('${t.method}','${t.url}')">
+    ${t.label}
+  </button>
+`).join('')
+
+btnSend.addEventListener('click', () => {
+  sendRequest(inputMethod.value, inputUrl.value)
+})
+
+document.getElementById('btnRefresh').addEventListener('click', loadRoutes)
+
+// Enter key to send
+inputUrl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') btnSend.click()
+})
+
+loadRoutes()
+</script>
+</body>
+</html>
