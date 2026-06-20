@@ -14,7 +14,8 @@
 
 import { get, set } from "idb-keyval"
 import { isTauriAvailable } from "@/lib/tauri"
-import { StorageError, IndexedDbError, TauriError } from "@/lib/storage-error"
+import { StorageError, IndexedDbError } from "@/lib/storage-error"
+import { TauriFsAdapter } from "@/lib/store/adapters/tauri-fs-adapter"
 
 export interface StorageAdapter {
   load(key: string): Promise<string | null>
@@ -66,52 +67,6 @@ const IndexedDbAdapter: StorageAdapter = {
       await retryWithBackoff(() => set(key, value), 3, 100)
     } catch (error) {
       throw IndexedDbError.fromUnknown(error, { operation: 'save', key, size: value.length })
-    }
-  },
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-async function ensureAppDataDir(): Promise<void> {
-  const [{ appDataDir }, { mkdir }] = await Promise.all([
-    import("@tauri-apps/api/path"),
-    import("@tauri-apps/plugin-fs"),
-  ])
-  const dir = await appDataDir()
-  await mkdir(dir, { recursive: true })
-}
-
-// ── Tauri FS adapter (Desktop) ───────────────────────────────────────────────
-
-const TauriFsAdapter: StorageAdapter = {
-  name: 'Tauri FS',
-
-  async load(key: string) {
-    try {
-      const { BaseDirectory, readTextFile } = await import("@tauri-apps/plugin-fs")
-      const filename = `${key}.json`
-      const text = await readTextFile(filename, { baseDir: BaseDirectory.AppData })
-      return text
-    } catch (error) {
-      // File doesn't exist yet — first run, not an error
-      const err = error as Error
-      if (err.message?.includes?.('No such file')) {
-        return null
-      }
-      throw TauriError.fromUnknown(error, { operation: 'load', key })
-    }
-  },
-
-  async save(key: string, value: string) {
-    try {
-      await retryWithBackoff(async () => {
-        const { BaseDirectory, writeTextFile } = await import("@tauri-apps/plugin-fs")
-        await ensureAppDataDir()
-        const filename = `${key}.json`
-        await writeTextFile(filename, value, { baseDir: BaseDirectory.AppData })
-      }, 3, 100)
-    } catch (error) {
-      throw TauriError.fromUnknown(error, { operation: 'save', key, size: value.length })
     }
   },
 }
