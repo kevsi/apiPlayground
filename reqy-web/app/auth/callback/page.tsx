@@ -23,7 +23,8 @@ function AuthCallbackHandler() {
         const errorCode = searchParams.get("error_code")
         const hashParams = new URLSearchParams(hash.slice(1))
         const accessToken = hashParams.get("access_token")
-        const debug = `URL: ${fullUrl}\nSearch: ${search}\nHash: ${hash}\nuseSearchParams code: ${code ?? "(absent)"}\nHash access_token: ${accessToken ? "(présent)" : "(absent)"}`
+        const refreshToken = hashParams.get("refresh_token")
+        const debug = `URL: ${fullUrl}\nSearch: ${search}\nHash: ${hash}\nuseSearchParams code: ${code ?? "(absent)"}\nHash access_token: ${accessToken ? "(présent)" : "(absent)"}\nHash refresh_token: ${refreshToken ? "(présent)" : "(absent)"}`
         setDebugInfo(debug)
 
         if (errorParam || errorCode) {
@@ -45,14 +46,29 @@ function AuthCallbackHandler() {
           session = data.session
           user = data.user
         } else {
-          // 2. Fallback : flux Implicit (token dans le hash) — getSession lit automatiquement le hash
+          // 2. Fallback : flux Implicit (token dans le hash)
+          // getSession lit automatiquement le hash si detectSessionInUrl est activé
           const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-          if (sessionError || !sessionData.session) {
+
+          if (!sessionError && sessionData.session) {
+            session = sessionData.session
+            user = sessionData.session.user
+          } else if (accessToken && refreshToken) {
+            // Fallback manuel : extraire le hash et définir la session explicitement
+            const { data: setData, error: setSessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            })
+            if (setSessionError || !setData.session) {
+              setError(`${setSessionError?.message || "Échec de la définition de la session depuis le hash"}\n\nDebug:\n${debug}`)
+              return
+            }
+            session = setData.session
+            user = setData.session.user
+          } else {
             setError(`Code ou session manquant.\n\nDebug:\n${debug}`)
             return
           }
-          session = sessionData.session
-          user = sessionData.session.user
         }
 
         if (!session || !user) {
