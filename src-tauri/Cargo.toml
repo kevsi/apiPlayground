@@ -23,10 +23,11 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 dirs = "6.0"
 log = "0.4"
-reqwest = { version = "0.11", features = ["rustls-tls"] }
+reqwest = { version = "0.11", features = ["rustls-tls", "gzip", "brotli", "deflate"] }
 tauri = { version = "2.11.1", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-fs = "2.5.1"
+open = "5.3"
 rfd = "0.15"
 base64 = "0.22"

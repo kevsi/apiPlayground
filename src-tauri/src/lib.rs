@@ -9,6 +9,25 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Instant;
 
+/// Decode common HTML entities in response bodies.
+/// Some upstream servers/frameworks encode characters like ' → &#x27; in JSON.
+fn decode_html_entities(text: &str) -> String {
+  if !text.contains("&#") && !text.contains("&amp;") && !text.contains("&lt;")
+    && !text.contains("&gt;") && !text.contains("&quot;") && !text.contains("&apos;")
+  {
+    return text.to_string();
+  }
+  text
+    .replace("&#x27;", "'")
+    .replace("&#39;", "'")
+    .replace("&apos;", "'")
+    .replace("&quot;", "\"")
+    .replace("&#x22;", "\"")
+    .replace("&lt;", "<")
+    .replace("&gt;", ">")
+    .replace("&amp;", "&")
+}
+
 mod mock_matcher;
 mod mock_store;
 mod mock_types;
@@ -55,6 +74,11 @@ fn export_json(content: String, default_name: String) -> Result<String, String> 
     }
     None => Err("cancelled".to_string()),
   }
+}
+
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+  open::that(&url).map_err(|e| e.to_string())
 }
 
 // ── Mock Tauri commands ──
@@ -215,6 +239,9 @@ async fn fetch_proxy(
   let start = Instant::now();
   let client = Client::builder()
     .timeout(std::time::Duration::from_secs(30))
+    .gzip(true)
+    .brotli(true)
+    .deflate(true)
     .build()
     .map_err(|e| e.to_string())?;
 
@@ -267,7 +294,8 @@ async fn fetch_proxy(
     let bytes = response.bytes().await.map_err(|e| e.to_string())?;
     (general_purpose::STANDARD.encode(&bytes), "base64".to_string())
   } else {
-    (response.text().await.map_err(|e| e.to_string())?, "utf8".to_string())
+    let text = response.text().await.map_err(|e| e.to_string())?;
+    (decode_html_entities(&text), "utf8".to_string())
   };
 
   let duration_ms = start.elapsed().as_millis();
@@ -288,6 +316,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       fetch_proxy,
       export_json,
+      open_external,
       get_mock_routes,
       set_mock_routes,
       add_mock_route,

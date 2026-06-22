@@ -15,6 +15,7 @@ import { useSidebar } from "@/contexts/sidebar-context"
 import { ImportExportModal } from "@/components/import-export-modal"
 import { toast } from '@/hooks/use-toast'
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { isTauriAvailable } from "@/lib/tauri"
 
 const ProfileSection = dynamic(() => import("@/components/settings/profile-section"), { ssr: false })
 const AISection = dynamic(() => import("@/components/settings/ai-section"), { ssr: false })
@@ -282,10 +283,22 @@ export default function SettingsPage() {
     setAuthConnecting(true); setAuthStatus("loading")
     try {
       const supabase = getSupabaseBrowserClient()
-      await supabase.auth.signInWithOAuth({
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          skipBrowserRedirect: true,
+        },
       })
+      if (oauthError || !data?.url) {
+        throw oauthError || new Error("URL OAuth manquante")
+      }
+      if (isTauriAvailable()) {
+        const { invoke } = await import("@tauri-apps/api/core")
+        await invoke("open_external", { url: data.url })
+      } else {
+        window.location.href = data.url
+      }
     } catch {
       setAuthStatus("error"); setAuthConnecting(false)
       toast({ title: "Erreur OAuth", description: "Impossible de lancer la connexion Google", variant: "destructive" })
@@ -296,10 +309,22 @@ export default function SettingsPage() {
     setAuthConnecting(true); setAuthStatus("loading")
     try {
       const supabase = getSupabaseBrowserClient()
-      await supabase.auth.signInWithOAuth({
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          skipBrowserRedirect: true,
+        },
       })
+      if (oauthError || !data?.url) {
+        throw oauthError || new Error("URL OAuth manquante")
+      }
+      if (isTauriAvailable()) {
+        const { invoke } = await import("@tauri-apps/api/core")
+        await invoke("open_external", { url: data.url })
+      } else {
+        window.location.href = data.url
+      }
     } catch {
       setAuthStatus("error"); setAuthConnecting(false)
       toast({ title: "Erreur OAuth", description: "Impossible de lancer la connexion GitHub", variant: "destructive" })
