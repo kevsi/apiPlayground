@@ -17,35 +17,48 @@ function AuthCallbackHandler() {
         const fullUrl = typeof window !== "undefined" ? window.location.href : ""
         const search = typeof window !== "undefined" ? window.location.search : ""
         const hash = typeof window !== "undefined" ? window.location.hash : ""
-        const debug = `URL: ${fullUrl}\nSearch: ${search}\nHash: ${hash}\nuseSearchParams code: ${searchParams.get("code") ?? "(absent)"}`
-        setDebugInfo(debug)
-
-        // Utilise useSearchParams pour lire les paramètres (plus robuste avec App Router)
         const code = searchParams.get("code")
         const errorParam = searchParams.get("error")
         const errorDesc = searchParams.get("error_description")
         const errorCode = searchParams.get("error_code")
+        const hashParams = new URLSearchParams(hash.slice(1))
+        const accessToken = hashParams.get("access_token")
+        const debug = `URL: ${fullUrl}\nSearch: ${search}\nHash: ${hash}\nuseSearchParams code: ${code ?? "(absent)"}\nHash access_token: ${accessToken ? "(présent)" : "(absent)"}`
+        setDebugInfo(debug)
 
         if (errorParam || errorCode) {
           setError(`${errorDesc || errorParam || errorCode || "Erreur OAuth inconnue"}\n\nDebug:\n${debug}`)
           return
         }
 
-        if (!code) {
-          setError(`Code d'authentification manquant.\n\nDebug:\n${debug}`)
-          return
-        }
-
         const supabase = getSupabaseBrowserClient()
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        let session: { access_token: string; refresh_token?: string; expires_at?: number } | null = null
+        let user: { id: string; email?: string | null; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> } | null = null
 
-        if (exchangeError || !data.session || !data.user) {
-          setError(`${exchangeError?.message || "Échec de l'échange du code"}\n\nDebug:\n${debug}`)
-          return
+        // 1. Essayer d'abord le flux PKCE (code dans la query string)
+        if (code) {
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          if (exchangeError || !data.session || !data.user) {
+            setError(`${exchangeError?.message || "Échec de l'échange du code"}\n\nDebug:\n${debug}`)
+            return
+          }
+          session = data.session
+          user = data.user
+        } else {
+          // 2. Fallback : flux Implicit (token dans le hash) — getSession lit automatiquement le hash
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+          if (sessionError || !sessionData.session) {
+            setError(`Code ou session manquant.\n\nDebug:\n${debug}`)
+            return
+          }
+          session = sessionData.session
+          user = sessionData.session.user
         }
 
-        const user = data.user
-        const session = data.session
+        if (!session || !user) {
+          setError(`Session ou utilisateur manquant après authentification.\n\nDebug:\n${debug}`)
+          return
+        }
 
         const res = await fetch("/api/auth/exchange", {
           method: "POST",
