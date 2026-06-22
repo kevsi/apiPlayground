@@ -25,6 +25,13 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:*; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none';"
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["reqly"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

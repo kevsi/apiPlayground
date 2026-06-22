@@ -283,10 +283,13 @@ export default function SettingsPage() {
     setAuthConnecting(true); setAuthStatus("loading")
     try {
       const supabase = getSupabaseBrowserClient()
+      const redirectTo = isTauriAvailable()
+        ? "reqly://auth/callback"
+        : `${window.location.origin}/auth/callback`
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo,
           skipBrowserRedirect: true,
         },
       })
@@ -309,10 +312,13 @@ export default function SettingsPage() {
     setAuthConnecting(true); setAuthStatus("loading")
     try {
       const supabase = getSupabaseBrowserClient()
+      const redirectTo = isTauriAvailable()
+        ? "reqly://auth/callback"
+        : `${window.location.origin}/auth/callback`
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo,
           skipBrowserRedirect: true,
         },
       })

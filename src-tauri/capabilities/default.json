@@ -19,6 +19,7 @@
       "allow": [
         "$APPDATA/**"
       ]
-    }
+    },
+    "deep-link:default"
   ]
 }

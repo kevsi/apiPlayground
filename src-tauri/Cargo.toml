@@ -28,6 +28,8 @@ tauri = { version = "2.11.1", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-fs = "2.5.1"
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 open = "5.3"
 rfd = "0.15"
 base64 = "0.22"

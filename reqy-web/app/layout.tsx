@@ -28,6 +28,7 @@ import { SidebarProvider } from '@/contexts/sidebar-context'
 import { Toaster } from '@/components/ui/toaster'
 import { FloatingAiChat } from '@/components/floating-ai-chat'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { DeepLinkHandler } from '@/components/deep-link-handler'
 
 export default function RootLayout({
   children,
@@ -48,7 +49,7 @@ export default function RootLayout({
         <ThemeProvider defaultTheme="light" storageKey="reqly-theme">
           <ErrorBoundary>
             <SidebarProvider>
-
+              <DeepLinkHandler />
               {children}
             </SidebarProvider>
           </ErrorBoundary>
