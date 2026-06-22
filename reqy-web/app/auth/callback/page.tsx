@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { isTauriAvailable } from "@/lib/tauri"
 
 function AuthCallbackHandler() {
   const router = useRouter()
@@ -24,8 +25,14 @@ function AuthCallbackHandler() {
         const hashParams = new URLSearchParams(hash.slice(1))
         const accessToken = hashParams.get("access_token")
         const refreshToken = hashParams.get("refresh_token")
+        const source = searchParams.get("source")
         const debug = `URL: ${fullUrl}\nSearch: ${search}\nHash: ${hash}\nuseSearchParams code: ${code ?? "(absent)"}\nHash access_token: ${accessToken ? "(présent)" : "(absent)"}\nHash refresh_token: ${refreshToken ? "(présent)" : "(absent)"}`
         setDebugInfo(debug)
+
+        if (typeof window !== "undefined" && !isTauriAvailable() && source === "desktop" && window.location.hash.includes("access_token")) {
+          window.location.href = "reqly://auth/callback" + window.location.hash
+          return
+        }
 
         if (errorParam || errorCode) {
           setError(`${errorDesc || errorParam || errorCode || "Erreur OAuth inconnue"}\n\nDebug:\n${debug}`)
@@ -97,7 +104,10 @@ function AuthCallbackHandler() {
           return
         }
 
-        router.push("/settings#account")
+        // Rechargement complet pour que la page settings lise le cookie frais
+        if (typeof window !== "undefined") {
+          window.location.replace("/settings#account")
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur inattendue")
       }

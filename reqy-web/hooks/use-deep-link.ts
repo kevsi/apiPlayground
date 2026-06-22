@@ -57,12 +57,12 @@ export function useDeepLink() {
 
 function redirectToCallback(url: string) {
   try {
-    // Extraire le hash du custom scheme (ex: reqly://auth/callback#access_token=...)
-    const hashIndex = url.indexOf("#")
-    const hash = hashIndex >= 0 ? url.slice(hashIndex) : ""
-    // Next.js router ignore le hash — on utilise window.location directement
+    // Préserver les éventuels query params et le hash du custom scheme
+    const urlObj = new URL(url)
+    const search = urlObj.search
+    const hash = urlObj.hash
     if (typeof window !== "undefined") {
-      window.location.replace(`/auth/callback${hash}`)
+      window.location.replace(`/auth/callback${search}${hash}`)
     }
   } catch {
     // Ignorer les erreurs de parsing

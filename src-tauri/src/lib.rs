@@ -8,6 +8,7 @@ use std::net::{IpAddr, Ipv6Addr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Instant;
+use tauri_plugin_deep_link::DeepLinkExt;
 
 /// Decode common HTML entities in response bodies.
 /// Some upstream servers/frameworks encode characters like ' → &#x27; in JSON.
@@ -351,6 +352,8 @@ pub fn run() {
       }
       app.handle().plugin(tauri_plugin_dialog::init())?;
       app.handle().plugin(tauri_plugin_fs::init())?;
+      // Enregistrer le schéma de deep-link pour que le navigateur externe puisse rediriger vers reqly://
+      app.deep_link().register("reqly").ok();
       Ok(())
     })
     .run(tauri::generate_context!())

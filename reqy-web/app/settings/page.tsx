@@ -289,7 +289,9 @@ export default function SettingsPage() {
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo,
+          redirectTo: isTauriAvailable()
+            ? `${window.location.origin}/auth/callback?source=desktop`
+            : `${window.location.origin}/auth/callback`,
           skipBrowserRedirect: true,
         },
       })
@@ -318,7 +320,9 @@ export default function SettingsPage() {
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo,
+          redirectTo: isTauriAvailable()
+            ? `${window.location.origin}/auth/callback?source=desktop`
+            : `${window.location.origin}/auth/callback`,
           skipBrowserRedirect: true,
         },
       })
