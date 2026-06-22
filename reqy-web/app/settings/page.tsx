@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Bell, Sparkles, Loader2 } from "lucide-react"
+import { Bell, Sparkles, Loader2, User, Plug, ShieldAlert, Cloud } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { ApiHeader } from "@/components/api-header"
 import { ApiSidebar } from "@/components/api-sidebar"
 import { Button } from "@/components/ui/button"
@@ -32,13 +33,20 @@ const AI_PROVIDERS: Array<{ value: AIProvider; label: string }> = [
   { value: "ollama", label: "Ollama" },
 ]
 
-const SECTION_ITEMS: { key: string; label: string; destructive?: boolean }[] = [
-  { key: "profile", label: "Profil & Sécurité" },
-  { key: "ai", label: "Assistant IA" },
-  { key: "notifications", label: "Notifications" },
-  { key: "sync", label: "Import / Export" },
-  { key: "integrations", label: "Outils connectés" },
-  { key: "account", label: "Actions du compte", destructive: true },
+type SectionItem = {
+  key: string
+  label: string
+  icon: LucideIcon
+  destructive?: true
+}
+
+const SECTION_ITEMS: SectionItem[] = [
+  { key: "profile", label: "Profil & Sécurité", icon: User },
+  { key: "ai", label: "Assistant IA", icon: Sparkles },
+  { key: "notifications", label: "Notifications", icon: Bell },
+  { key: "sync", label: "Import / Export", icon: Cloud },
+  { key: "integrations", label: "Outils connectés", icon: Plug },
+  { key: "account", label: "Actions du compte", destructive: true, icon: ShieldAlert },
 ]
 
 type SectionKey = (typeof SECTION_ITEMS)[number]["key"]
@@ -91,7 +99,7 @@ export default function SettingsPage() {
       if (typeof window === 'undefined') {
         return { requestComplete: true, collectionComplete: true, aiResponse: true, aiError: true, importExport: true }
       }
-      const raw = persistence.getItem<any>("probe_push_events")
+      const raw = persistence.getItem<Record<string, boolean>>("probe_push_events")
       if (!raw) return { requestComplete: true, collectionComplete: true, aiResponse: true, aiError: true, importExport: true }
       if (typeof raw === 'string') return JSON.parse(raw)
       return raw as Record<string, boolean>
@@ -125,10 +133,13 @@ export default function SettingsPage() {
     } catch { /* ignore */ }
   }, [activeSection])
 
-  // Auto-dismiss save status
+  // Auto-dismiss save status + toast notification
   useEffect(() => {
-    const timer = saveStatus ? window.setTimeout(() => setSaveStatus(null), 3000) : undefined
-    return () => { if (timer) window.clearTimeout(timer) }
+    if (saveStatus) {
+      toast({ title: "Succès", description: saveStatus })
+      const timer = window.setTimeout(() => setSaveStatus(null), 3000)
+      return () => window.clearTimeout(timer)
+    }
   }, [saveStatus])
 
   // AI handlers
@@ -283,9 +294,6 @@ export default function SettingsPage() {
     setAuthConnecting(true); setAuthStatus("loading")
     try {
       const supabase = getSupabaseBrowserClient()
-      const redirectTo = isTauriAvailable()
-        ? "reqly://auth/callback"
-        : `${window.location.origin}/auth/callback`
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -314,9 +322,6 @@ export default function SettingsPage() {
     setAuthConnecting(true); setAuthStatus("loading")
     try {
       const supabase = getSupabaseBrowserClient()
-      const redirectTo = isTauriAvailable()
-        ? "reqly://auth/callback"
-        : `${window.location.origin}/auth/callback`
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
@@ -447,38 +452,32 @@ export default function SettingsPage() {
         <ApiHeader />
 
         <div className="flex-1 min-h-0 overflow-y-auto space-y-6 p-6">
-          {/* Page header */}
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Paramètres</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Configuration de l'application</h1>
-                <p className="max-w-2xl pt-2 text-sm text-muted-foreground">Gérez l'assistant IA, les notifications et la synchronisation d'équipe.</p>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2 md:mt-0">
-                <Button variant="secondary" onClick={handleSaveAIConfig}>Enregistrer les paramètres</Button>
-                <Button variant="ghost" onClick={() => window.location.reload()}>Recharger</Button>
-              </div>
-            </div>
-            {saveStatus ? (
-              <div className="mt-4 rounded-xl bg-emerald-100 px-4 py-3 text-sm text-emerald-900">{saveStatus}</div>
-            ) : null}
-          </div>
-
           <div className="flex gap-6">
             {/* Navigation sidebar */}
             <aside className="w-56 shrink-0 rounded-2xl border border-border bg-card p-4">
-              <nav className="flex flex-col gap-2">
-                {SECTION_ITEMS.map(({ key, label, destructive }) => (
-                  <button
-                    key={key}
-                    className={cn("w-full text-left p-2 rounded-md",
-                      activeSection === key ? "bg-primary/10 font-semibold" : "hover:bg-muted",
-                      destructive && "text-destructive"
-                    )}
-                    onClick={() => setActiveSection(key)}
-                  >{label}</button>
-                ))}
+              <nav className="flex flex-col gap-1">
+                {SECTION_ITEMS.map(({ key, label, destructive, icon: Icon }) => {
+                  const isActive = activeSection === key
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setActiveSection(key)}
+                      className={cn(
+                        "relative flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-all duration-150",
+                        isActive
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-foreground hover:bg-muted",
+                        destructive && !isActive && "text-destructive"
+                      )}
+                    >
+                      {isActive && (
+                        <div className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+                      )}
+                      <Icon className="size-4 shrink-0" />
+                      <span>{label}</span>
+                    </button>
+                  )
+                })}
               </nav>
             </aside>
 
@@ -523,7 +522,8 @@ export default function SettingsPage() {
                   postmanApiKey={postmanApiKey} postmanConnecting={postmanConnecting}
                   onConnectGithub={connectGithub} onDisconnectGithub={disconnectGithub}
                   setPostmanApiKey={setPostmanApiKey}
-                  onConnectPostman={connectPostman} onDisconnectPostman={disconnectPostman}
+                  onConnectPostman={connectPostman}
+                  onDisconnectPostman={disconnectPostman}
                 />
               ) : null}
               {activeSection === "account" ? (

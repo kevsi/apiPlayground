@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { isTauriAvailable } from "@/lib/tauri"
@@ -10,27 +10,35 @@ function AuthCallbackHandler() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string>("")
+  const hasRun = useRef(false)
 
   useEffect(() => {
+    if (hasRun.current) return
+    hasRun.current = true
+
     async function handleCallback() {
       try {
         // Capture l'URL complète pour le debug (window.location est la source de vérité)
         const fullUrl = typeof window !== "undefined" ? window.location.href : ""
         const search = typeof window !== "undefined" ? window.location.search : ""
         const hash = typeof window !== "undefined" ? window.location.hash : ""
-        const code = searchParams.get("code")
-        const errorParam = searchParams.get("error")
-        const errorDesc = searchParams.get("error_description")
-        const errorCode = searchParams.get("error_code")
+        const urlSearch = new URLSearchParams(search)
+        const code = urlSearch.get("code")
+        const errorParam = urlSearch.get("error")
+        const errorDesc = urlSearch.get("error_description")
+        const errorCode = urlSearch.get("error_code")
+        const source = urlSearch.get("source")
+
         const hashParams = new URLSearchParams(hash.slice(1))
         const accessToken = hashParams.get("access_token")
         const refreshToken = hashParams.get("refresh_token")
-        const source = searchParams.get("source")
-        const debug = `URL: ${fullUrl}\nSearch: ${search}\nHash: ${hash}\nuseSearchParams code: ${code ?? "(absent)"}\nHash access_token: ${accessToken ? "(présent)" : "(absent)"}\nHash refresh_token: ${refreshToken ? "(présent)" : "(absent)"}`
+
+        const debug = `URL: ${fullUrl}\nSearch: ${search}\nHash: ${hash}\ncode: ${code ?? "(absent)"}\nHash access_token: ${accessToken ? "(présent)" : "(absent)"}\nHash refresh_token: ${refreshToken ? "(présent)" : "(absent)"}\nsource: ${source ?? "(absent)"}`
         setDebugInfo(debug)
 
+        // Redirection navigateur externe → app desktop (deep link)
         if (typeof window !== "undefined" && !isTauriAvailable() && source === "desktop" && window.location.hash.includes("access_token")) {
-          window.location.href = "reqly://auth/callback" + window.location.hash
+          window.location.replace("reqly://auth/callback" + window.location.hash)
           return
         }
 
@@ -39,29 +47,29 @@ function AuthCallbackHandler() {
           return
         }
 
-        const supabase = getSupabaseBrowserClient()
         let session: { access_token: string; refresh_token?: string; expires_at?: number } | null = null
         let user: { id: string; email?: string | null; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> } | null = null
 
-        // 1. Essayer d'abord le flux PKCE (code dans la query string)
+        // 1. Flux PKCE (code dans la query string)
         if (code) {
+          const supabase = getSupabaseBrowserClient()
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
           if (exchangeError || !data.session || !data.user) {
-            setError(`${exchangeError?.message || "Échec de l'échange du code"}\n\nDebug:\n${debug}`)
+            setError(`${exchangeError?.message || "Échec de l'échange du code PKCE"}\n\nDebug:\n${debug}`)
             return
           }
           session = data.session
           user = data.user
         } else {
-          // 2. Fallback : flux Implicit (token dans le hash)
-          // getSession lit automatiquement le hash si detectSessionInUrl est activé
+          // 2. Flux Implicit / Desktop — getSession consomme le hash si detectSessionInUrl est true
+          const supabase = getSupabaseBrowserClient()
           const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
 
           if (!sessionError && sessionData.session) {
             session = sessionData.session
             user = sessionData.session.user
           } else if (accessToken && refreshToken) {
-            // Fallback manuel : extraire le hash et définir la session explicitement
+            // Fallback manuel si le hash n'a pas été consommé par Supabase
             const { data: setData, error: setSessionError } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,

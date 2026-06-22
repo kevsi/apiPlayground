@@ -4,6 +4,7 @@ import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface NotificationsSectionProps {
   pushEnabled: boolean
@@ -23,16 +24,19 @@ export default function NotificationsSection({
   setNotificationPreference,
 }: NotificationsSectionProps) {
   return (
-    <section className="rounded-3xl border border-border bg-card p-6">
-      <div className="mb-4 flex items-center gap-3 text-foreground">
-        <Bell className="size-5 text-secondary" />
-        <div>
-          <h2 className="text-lg font-semibold">Notifications</h2>
-          <p className="text-sm text-muted-foreground">Gérez l'accès aux notifications système de votre navigateur.</p>
+    <Card>
+      <CardHeader>
+        <div className="flex items-start gap-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Bell className="size-5 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="text-base">Notifications</CardTitle>
+            <CardDescription>Gérez l'accès aux notifications système de votre navigateur.</CardDescription>
+          </div>
         </div>
-      </div>
-
-      <div className="space-y-4">
+      </CardHeader>
+      <CardContent className="space-y-5">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm">Activer les notifications (toasts)</p>
@@ -41,7 +45,7 @@ export default function NotificationsSection({
           <Switch checked={pushEnabled} onCheckedChange={() => onTogglePush()} />
         </div>
 
-        <div className="rounded-2xl bg-muted p-4">
+        <div className="rounded-xl border border-border bg-muted/40 p-4">
           <p className="text-sm font-medium">Événements déclenchant des toasts</p>
           <div className="mt-3 space-y-2">
             {[
@@ -62,12 +66,7 @@ export default function NotificationsSection({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" onClick={onTestPush}>Tester un toast</Button>
-          <span className="text-sm text-muted-foreground">Browser permission: {systemNotificationPermission ?? "unavailable"}</span>
-        </div>
-
-        <div className="rounded-2xl bg-muted p-4">
+        <div className="rounded-xl border border-border bg-muted/40 p-4">
           <p className="text-sm font-medium">System notification events</p>
           <p className="text-xs text-muted-foreground mt-1 mb-3">Control which events trigger browser notifications.</p>
           <div className="space-y-2">
@@ -84,7 +83,13 @@ export default function NotificationsSection({
             ))}
           </div>
         </div>
-      </div>
-    </section>
+      </CardContent>
+      <CardFooter className="border-t pt-5">
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" onClick={onTestPush}>Tester un toast</Button>
+          <span className="text-sm text-muted-foreground">Browser permission: {systemNotificationPermission ?? "unavailable"}</span>
+        </div>
+      </CardFooter>
+    </Card>
   )
 }
