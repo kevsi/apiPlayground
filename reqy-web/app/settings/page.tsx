@@ -14,6 +14,7 @@ import { AIProvider, loadAIProvider, loadApiKey, saveAIProvider, saveApiKey, loa
 import { useSidebar } from "@/contexts/sidebar-context"
 import { ImportExportModal } from "@/components/import-export-modal"
 import { toast } from '@/hooks/use-toast'
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 
 const ProfileSection = dynamic(() => import("@/components/settings/profile-section"), { ssr: false })
 const AISection = dynamic(() => import("@/components/settings/ai-section"), { ssr: false })
@@ -232,10 +233,14 @@ export default function SettingsPage() {
   }, [fetchGithubStatus, fetchPostmanStatus, fetchAuthStatus, handleAuthErrorFromQuery])
 
   useEffect(() => {
-    const onFocus = () => { fetchGithubStatus(); fetchAuthStatus() }
+    const onFocus = () => {
+      fetchGithubStatus()
+      fetchPostmanStatus()
+      fetchAuthStatus()
+    }
     window.addEventListener("focus", onFocus)
     return () => window.removeEventListener("focus", onFocus)
-  }, [fetchGithubStatus, fetchAuthStatus])
+  }, [fetchGithubStatus, fetchPostmanStatus, fetchAuthStatus])
 
   // Postman handlers
   const connectPostman = useCallback(async () => {
@@ -273,16 +278,32 @@ export default function SettingsPage() {
   }, [])
 
   // Auth handlers
-  const connectGoogle = useCallback(() => {
+  const connectGoogle = useCallback(async () => {
     setAuthConnecting(true); setAuthStatus("loading")
-    const w = window.open("/api/auth/google", "_blank", "noopener,noreferrer")
-    if (!w) window.location.href = "/api/auth/google"
+    try {
+      const supabase = getSupabaseBrowserClient()
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      })
+    } catch {
+      setAuthStatus("error"); setAuthConnecting(false)
+      toast({ title: "Erreur OAuth", description: "Impossible de lancer la connexion Google", variant: "destructive" })
+    }
   }, [])
 
-  const connectGithubAuth = useCallback(() => {
+  const connectGithubAuth = useCallback(async () => {
     setAuthConnecting(true); setAuthStatus("loading")
-    const w = window.open("/api/auth/github", "_blank", "noopener,noreferrer")
-    if (!w) window.location.href = "/api/auth/github"
+    try {
+      const supabase = getSupabaseBrowserClient()
+      await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      })
+    } catch {
+      setAuthStatus("error"); setAuthConnecting(false)
+      toast({ title: "Erreur OAuth", description: "Impossible de lancer la connexion GitHub", variant: "destructive" })
+    }
   }, [])
 
   const signupWithEmail = useCallback(async () => {
