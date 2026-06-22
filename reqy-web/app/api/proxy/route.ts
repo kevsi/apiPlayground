@@ -117,6 +117,9 @@ export async function POST(request: NextRequest) {
   let debugMode = false
   let workspaceId: string | undefined
 
+  // ── Timing metrics ────────────────────────────────────────────────────
+  const timings = { dnsMs: 0, connectMs: 0, ttfbMs: 0 }
+
   try {
     const rateKey = getRateLimitKey(request)
     const rateResult = checkRateLimit(rateKey)
@@ -240,7 +243,9 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        const dnsStart = Date.now()
         const lookupResult = await dns.lookup(parsedUrl.hostname)
+        timings.dnsMs = Date.now() - dnsStart
         if (isPrivateHost(lookupResult.address)) {
            return structuredError(
             "Requests to private/internal hosts are not allowed (DNS Rebinding prevention)",
@@ -299,6 +304,20 @@ export async function POST(request: NextRequest) {
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout))
 
+    // Measure TTFB: time to first byte of response body
+    // We read the first chunk from the response body to capture the actual
+    // time until data starts arriving, not just headers.
+    const ttfbStart = Date.now()
+    if (response.body) {
+      const reader = response.body.getReader()
+      try {
+        await reader.read()
+        timings.ttfbMs = Date.now() - ttfbStart
+      } finally {
+        reader.releaseLock()
+      }
+    }
+
     const durationMs = Date.now() - startTime
     const responseHeaders: Record<string, string> = {}
     response.headers.forEach((value, key) => {
@@ -342,6 +361,7 @@ export async function POST(request: NextRequest) {
       mocked: false,
       durationMs,
       size,
+      timings,
     }
 
     if (debugMode) {

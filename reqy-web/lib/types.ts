@@ -23,6 +23,7 @@ export interface RequestItem {
   authToken?: string
   queryParams?: Array<{ key: string; value: string }>
   folderId?: string | null
+  assertions?: RequestTestAssertion[]
   createdAt: number
   updatedAt: number
 }
@@ -94,6 +95,25 @@ export interface Notification {
   event?: string
   read: boolean
   createdAt: number
+}
+
+export type AssertionType = "status" | "bodyContains" | "headerExists" | "jsonPath"
+
+export interface RequestTestAssertion {
+  id: string
+  type: AssertionType
+  target: string
+  expected?: string
+  enabled: boolean
+}
+
+export interface TestResult {
+  assertionId: string
+  type: AssertionType
+  target: string
+  expected?: string
+  passed: boolean
+  message: string
 }
 
 export type AIProvider = "anthropic" | "openai" | "openrouter" | "gemini" | "deepseek" | "ollama"

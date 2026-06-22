@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   ChevronDown,
   ChevronRight,
@@ -175,6 +176,7 @@ export function CollectionsPanel({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [collectionDetail, setCollectionDetail] = useState<Collection | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const listContainerRef = useRef<HTMLDivElement>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -434,7 +436,13 @@ export function CollectionsPanel({
       }
     )
 
-
+  // Virtualizer for the list view — fixed row height ~88px
+  const rowVirtualizer = useVirtualizer({
+    count: filteredCollections.length,
+    getScrollElement: () => listContainerRef.current,
+    estimateSize: () => 88,
+    overscan: 5,
+  })
 
   const totalSelected = selectedCollectionIds.size + selectedRequestIds.size
 
@@ -581,11 +589,15 @@ export function CollectionsPanel({
       )}
 
       {/* Collections content */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar p-2">
+      <div ref={listContainerRef} className="flex-1 overflow-y-auto hide-scrollbar p-2" style={{ maxHeight: "60vh" }}>
         {viewMode === "list" ? (
           // ── LIST VIEW ──────────────────────────────────────────────────
-          <div className="space-y-1">
-            {filteredCollections.map((collection) => {
+          <div
+            className="space-y-1 relative"
+            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+              const collection = filteredCollections[virtualItem.index]
               const isExpanded = expandedCollections.has(collection.id)
               const isSelected = selectedCollectionIds.has(collection.id)
               const accentColor = collectionBorderColors[collection.color]?.replace("border-", "bg-").replace("/40", "") || "bg-muted-foreground/20"
@@ -593,11 +605,16 @@ export function CollectionsPanel({
               return (
                 <div
                   key={collection.id}
+                  data-index={virtualItem.index}
+                  ref={rowVirtualizer.measureElement}
                   className={cn(
-                    "rounded-xl transition-all duration-200",
+                    "rounded-xl transition-all duration-200 absolute top-0 left-0 w-full",
                     isSelected && "bg-primary/[0.04] ring-1 ring-primary/20",
                     dragId === collection.id && "opacity-40 scale-[0.98]"
                   )}
+                  style={{
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
                   draggable={!!onReorderCollections}
                   onDragStart={(e) => {
                     setDragId(collection.id)

@@ -167,6 +167,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
       bodyType: (request as RequestItem).bodyType ?? "json",
       authType: (request as RequestItem).authType ?? "none",
       authToken: (request as RequestItem).authToken ?? "",
+      assertions: (request as RequestItem).assertions ?? [],
       hasResponse: false,
       isSaved: true,
       savedRequestId:
@@ -179,6 +180,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
       responseStatus: undefined,
       responseTime: undefined,
       responseSize: undefined,
+      testResults: undefined,
     }),
     [activeProject, activeProjectPort],
   )
@@ -458,6 +460,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
         authType: activeTab.authType,
         authToken: activeTab.authToken,
         queryParams: activeTab.queryParams,
+        assertions: activeTab.assertions,
       })
       flashSavedIndicator()
       toast({ title: `"${activeTab.name}" saved` })
@@ -498,6 +501,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
         authType: activeTab.authType,
         authToken: activeTab.authToken,
         queryParams: activeTab.queryParams,
+        assertions: activeTab.assertions,
       })
       const targetCollection = collections.find((c) => c.id === targetCollectionId)
       toast({ title: `"${saveModalName}" saved in ${targetCollection?.name || "la collection"}` })
@@ -636,6 +640,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
       bodyType: activeTab.bodyType,
       authType: activeTab.authType,
       authToken: activeTab.authToken,
+      assertions: activeTab.assertions,
     }
 
     if (isTauri) {
@@ -668,6 +673,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
         headers: {},
         body: "",
         queryParams: [],
+        assertions: [],
       })
 
       const newTab = createEmptyTab({

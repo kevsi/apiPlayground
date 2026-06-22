@@ -187,6 +187,7 @@ export function RequestTabsManager() {
                 bodyType={activeTab.bodyType}
                 authType={activeTab.authType}
                 authToken={activeTab.authToken}
+                assertions={activeTab.assertions}
                 onMethodChange={(method) => updateTab(activeTab.id, { method })}
                 onUrlChange={(url) => {
                   const endpoint = url.replace(/^https?:\/\/[^/]+/, "") || "/"
@@ -197,6 +198,8 @@ export function RequestTabsManager() {
                 onBodyChange={(body) => updateTab(activeTab.id, { body })}
                 onBodyTypeChange={(bodyType) => updateTab(activeTab.id, { bodyType })}
                 onAuthChange={(authType, authToken) => updateTab(activeTab.id, { authType, authToken })}
+                onAssertionsChange={(assertions) => updateTab(activeTab.id, { assertions })}
+                onRunTests={sendRequest}
                 onSend={sendRequest}
                 isLoading={isLoading}
                 variableNames={variableMappings.filter((m) => m.enabled && m.name.trim()).map((m) => m.name.trim())}
@@ -227,6 +230,7 @@ export function RequestTabsManager() {
                 responseSize={activeTab.responseSize}
                 responseHeaders={activeTab.responseHeaders}
                 mocked={activeTab.mocked}
+                testResults={activeTab.testResults}
                 isLoading={isLoading || aiEngine.isLoading}
                 aiIsLoading={aiEngine.isLoading}
                 onRun={sendRequest}

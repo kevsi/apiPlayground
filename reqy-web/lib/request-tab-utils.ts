@@ -36,8 +36,9 @@ export function recordToHeaderArray(headers?: Record<string, string>): Header[] 
 }
 
 export function sanitizeTabForStorage(tab: RequestTab) {
-  const { responseData: _responseData, ...rest } = tab
+  const { responseData: _responseData, testResults: _testResults, ...rest } = tab
   void _responseData
+  void _testResults
   return rest
 }
 

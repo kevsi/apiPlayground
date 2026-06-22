@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { Play, Loader2 } from "lucide-react"
+import { Play, Loader2, FlaskConical, CheckCircle, XCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,6 +11,7 @@ import { ResponseAiSummary } from "@/components/response-ai-summary"
 import { ResponseHeadersTab } from "@/components/response-headers-tab"
 import { CodeSnippet } from "@/components/response-code-snippet"
 import { type ResponseFormat, isJson, isXml, isHtml, isImage, isPdf, isAudio, isVideo, isBinary, extractVideoUrls, extractImageUrls, getContentType } from "@/components/response-utils"
+import type { TestResult } from "@/lib/types"
 
 interface ResponsePanelProps {
   responseBody?: string
@@ -38,6 +39,7 @@ interface ResponsePanelProps {
   bodyType?: string
   authType?: string
   authToken?: string
+  testResults?: TestResult[]
 }
 
 export function ResponsePanel({
@@ -48,6 +50,7 @@ export function ResponsePanel({
   responseSize,
   responseHeaders,
   mocked,
+  testResults,
   isLoading = false,
   onRun,
   onRunAndSave,
@@ -275,6 +278,22 @@ export function ResponsePanel({
             >
               Code
             </TabsTrigger>
+            <TabsTrigger
+              value="tests"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:border-muted-foreground/20"
+            >
+              Tests
+              {testResults && testResults.length > 0 && (
+                <span className={cn(
+                  "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-mono",
+                  testResults.every((r) => r.passed)
+                    ? "bg-emerald-500/10 text-emerald-500"
+                    : "bg-red-500/10 text-red-500"
+                )}>
+                  {testResults.filter((r) => r.passed).length}/{testResults.length}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -355,6 +374,55 @@ export function ResponsePanel({
             authType={authType}
             authToken={authToken}
           />
+        </TabsContent>
+
+        <TabsContent value="tests" className="m-0 min-h-0 flex-1 animate-fade-in overflow-auto">
+          {testResults && testResults.length > 0 ? (
+            <div className="space-y-1 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className={cn(
+                  "text-xs font-semibold",
+                  testResults.every((r) => r.passed) ? "text-emerald-500" : "text-red-500"
+                )}>
+                  {testResults.filter((r) => r.passed).length}/{testResults.length} passed
+                </span>
+              </div>
+              {testResults.map((result) => (
+                <div
+                  key={result.assertionId}
+                  className={cn(
+                    "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs",
+                    result.passed
+                      ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600"
+                      : "border-red-500/20 bg-red-500/5 text-red-600"
+                  )}
+                >
+                  {result.passed ? (
+                    <CheckCircle className="size-3.5 shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="size-3.5 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-medium truncate">
+                      {result.type}: {result.target}
+                      {result.expected ? ` = ${result.expected}` : ""}
+                    </span>
+                    <span className="text-muted-foreground/80">{result.message}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center text-center px-4">
+              <div className="rounded-2xl bg-muted/40 border border-border p-5 mb-4">
+                <FlaskConical className="size-10 text-muted-foreground/30" />
+              </div>
+              <p className="text-sm font-semibold text-foreground/80">No test results</p>
+              <p className="mt-1 text-xs text-muted-foreground/60 max-w-[200px]">
+                Add assertions in the Tests panel and send a request to see results
+              </p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
