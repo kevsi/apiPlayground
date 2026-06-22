@@ -8,6 +8,7 @@ import { EnvironmentSelector } from "@/components/environment-selector"
 import { VariablesPanel } from "@/components/variables-panel"
 import { WorkspaceSelector } from "@/components/workspace-selector"
 import { ThemeSwitcher } from "@/components/theme-switcher"
+import { SyncStatus } from "@/components/sync-status"
 
 import {
   DropdownMenu,
@@ -94,6 +95,7 @@ export function ApiHeader() {
         <EnvironmentSelector />
         <VariablesPanel />
         <ThemeSwitcher />
+        <SyncStatus />
 
         <div className="flex items-center gap-1.5">
           <DropdownMenu>

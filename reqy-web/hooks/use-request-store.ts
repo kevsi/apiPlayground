@@ -284,10 +284,19 @@ setRetryHandler(() => {
   }
 });
 
-let globalStore: RequestStore = initialStore;
+export let globalStore: RequestStore = initialStore;
 let globalIsLoaded = false;
 let initPromise: Promise<void> | null = null;
 const storeListeners = new Set<() => void>();
+const storeChangeListeners = new Set<(store: RequestStore) => void>();
+
+/** Register a callback invoked after every store mutation. Used by cloud sync. */
+export function addStoreChangeListener(fn: (store: RequestStore) => void): () => void {
+  storeChangeListeners.add(fn);
+  return () => {
+    storeChangeListeners.delete(fn);
+  };
+}
 
 let storeGen = 0;
 let lastSyncGen = 0;
@@ -301,6 +310,21 @@ syncMiddleware.onMessage(async (payload) => {
     notifyListeners();
   }
 });
+
+function moduleLevelCommit(updater: (prev: RequestStore) => RequestStore) {
+  globalStore = updater(globalStore);
+  storeGen++;
+  saveToStorageAsync(globalStore);
+  notifyListeners();
+  storeChangeListeners.forEach((fn) => fn(globalStore));
+  syncMiddleware.broadcast({ type: "update", gen: storeGen });
+}
+
+export { moduleLevelCommit as forceCommit };
+
+export function getGlobalStore(): RequestStore {
+  return globalStore;
+}
 
 function notifyListeners() {
   storeListeners.forEach((listener) => listener());
@@ -374,16 +398,7 @@ export function useRequestStore() {
   }, []);
 
   // ── commit: core mutation helper ────────────────────────────────────
-  const commit = useCallback(
-    (updater: (prev: RequestStore) => RequestStore) => {
-      globalStore = updater(globalStore);
-      storeGen++;
-      saveToStorageAsync(globalStore);
-      notifyListeners();
-      syncMiddleware.broadcast({ type: "update", gen: storeGen });
-    },
-    []
-  )
+  const commit = moduleLevelCommit;
 
   // ── Domain mutations (extracted to store/ files) ─────────────────────
   const notificationsMutations = createNotificationsMutations(commit)
