@@ -6,9 +6,22 @@ import sync from "./routes/sync.js"
 
 const app = new Hono()
 
+function parseOrigins(): string[] | "*" {
+  const env = process.env.ALLOWED_ORIGIN
+  if (!env) return ["http://localhost:3000"]
+  if (env === "*") return "*"
+  return env.split(",").map((o) => o.trim()).filter(Boolean)
+}
+
+const allowedOrigins = parseOrigins()
+
 app.use("*", cors({
-  origin: process.env.ALLOWED_ORIGIN ?? "http://localhost:3000",
-  credentials: true,
+  origin: (origin) => {
+    if (!origin) return allowedOrigins === "*" ? "*" : allowedOrigins[0]
+    if (allowedOrigins === "*") return "*"
+    return allowedOrigins.includes(origin) ? origin : null
+  },
+  credentials: allowedOrigins !== "*",
 }))
 
 app.get("/health", (c) => c.json({ status: "ok" }))

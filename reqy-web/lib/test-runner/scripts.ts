@@ -89,7 +89,10 @@ export function runScript(
   try {
     const wrapped = `(function() { return (${code}); })()`
     const script = new vm.Script(wrapped)
-    const vmContext = vm.createContext(sandbox)
+    const vmContext = vm.createContext(sandbox, {
+      codeGeneration: { strings: false, wasm: false },
+      microtaskMode: "afterEvaluate",
+    })
     const result = script.runInContext(vmContext, { timeout: options.timeoutMs ?? 5000 })
     return { result, consoleLines }
   } catch (err) {
