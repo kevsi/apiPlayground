@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ResponseStatusBar } from "@/components/response-status-bar"
+import { ResponseTimeline } from "@/components/response-timeline"
 import { ResponseContentRenderer } from "@/components/response-content-renderer"
 import { ResponseAiSummary } from "@/components/response-ai-summary"
 import { ResponseHeadersTab } from "@/components/response-headers-tab"
@@ -19,6 +20,11 @@ interface ResponsePanelProps {
   responseData?: string | Blob
   responseStatus?: number
   responseTime?: number
+  responseTimings?: {
+    dnsMs?: number
+    connectMs?: number
+    ttfbMs?: number
+  }
   responseSize?: string
   responseHeaders?: Record<string, string>
   mocked?: boolean
@@ -49,6 +55,7 @@ export function ResponsePanel({
   responseData,
   responseStatus,
   responseTime,
+  responseTimings,
   responseSize,
   responseHeaders,
   mocked,
@@ -245,6 +252,15 @@ export function ResponsePanel({
           />
         </div>
       )}
+
+      <ResponseTimeline
+        timings={{
+          dnsMs: responseTimings?.dnsMs,
+          connectMs: responseTimings?.connectMs,
+          ttfbMs: responseTimings?.ttfbMs,
+          totalMs: responseTime ?? 0,
+        }}
+      />
 
       <ResponseAiSummary
         aiSummary={aiSummary}

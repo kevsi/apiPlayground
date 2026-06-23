@@ -1,5 +1,6 @@
 packages:
   - 'reqy-web'
+  - 'reqy-cli'
 allowBuilds:
   sharp: true
   tree-sitter-c-sharp: true
