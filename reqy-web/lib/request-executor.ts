@@ -1,5 +1,6 @@
 import type { HttpMethod, RequestTestAssertion, TestResult } from "@/lib/types"
 export type { HttpMethod, RequestTestAssertion, TestResult } from "@/lib/types"
+import type { Assertion } from "@/lib/test-runner/types"
 import { interpolate, replaceLocalhostPort, parseJsonSafe } from "@/lib/utils"
 import { invokeTauriFetch } from "@/lib/tauri"
 export type BodyType = "json" | "form-data" | "x-www-form" | "raw" | "binary"
@@ -40,6 +41,15 @@ export interface RequestTab {
   responseHeaders?: Record<string, string>
   mocked?: boolean
   assertions?: RequestTestAssertion[]
+  runnerAssertions?: Assertion[]
+  preRequestScript?: string
+  postResponseScript?: string
+  protocol?: "rest" | "graphql"
+  graphql?: {
+    query: string
+    variables: string
+    operationName?: string
+  }
   testResults?: TestResult[]
 }
 
