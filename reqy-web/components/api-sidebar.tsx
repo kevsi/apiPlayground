@@ -18,6 +18,8 @@ import { AppIcon } from "@/components/app-icon"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
+import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
+import { useSyncState } from "@/hooks/store/sync-state"
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", key: "dashboard" },
@@ -43,6 +45,8 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
     setInternalCollapsed(v)
     onCollapse?.(v)
   }
+  const syncWorkspaceId = useSyncState((s) => s.workspaceId)
+  const syncEnabled = useSyncState((s) => s.enabled)
 
   return (
     <aside
@@ -113,6 +117,18 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
           })}
         </ul>
       </nav>
+
+      {/* Sync section */}
+      {!collapsed && (
+        <div className="flex items-center gap-1 border-t border-sidebar-border px-2 py-2">
+          <WorkspaceJoinDialog />
+          {syncWorkspaceId && syncEnabled && (
+            <span className="text-[10px] text-muted-foreground truncate" title={syncWorkspaceId}>
+              ws: {syncWorkspaceId.slice(0, 8)}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* AI Assistant */}
       <div className={cn("py-2", collapsed ? "px-2" : "px-3")}>
