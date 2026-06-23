@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react"
 import { Play, Loader2, FlaskConical, CheckCircle, XCircle } from "lucide-react"
+import { DiffDialog } from "@/components/diff-dialog"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,7 +12,7 @@ import { ResponseAiSummary } from "@/components/response-ai-summary"
 import { ResponseHeadersTab } from "@/components/response-headers-tab"
 import { CodeSnippet } from "@/components/response-code-snippet"
 import { type ResponseFormat, isJson, isXml, isHtml, isImage, isPdf, isAudio, isVideo, isBinary, extractVideoUrls, extractImageUrls, getContentType } from "@/components/response-utils"
-import type { TestResult } from "@/lib/types"
+import type { HistoryItem, TestResult } from "@/lib/types"
 
 interface ResponsePanelProps {
   responseBody?: string
@@ -40,6 +41,7 @@ interface ResponsePanelProps {
   authType?: string
   authToken?: string
   testResults?: TestResult[]
+  history?: HistoryItem[]
 }
 
 export function ResponsePanel({
@@ -69,9 +71,11 @@ export function ResponsePanel({
   bodyType = "none",
   authType = "none",
   authToken = "",
+  history = [],
 }: ResponsePanelProps) {
   const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty")
   const [activeTab, setActiveTab] = useState("response")
+  const [diffDialogOpen, setDiffDialogOpen] = useState(false)
 
   const mediaUrl = useMemo(() => {
     if (responseData instanceof Blob) {
@@ -226,6 +230,7 @@ export function ResponsePanel({
         onGenerateTests={onGenerateTests}
         onExport={handleExport}
         onCreateMock={onCreateMock}
+        onDiff={() => setDiffDialogOpen(true)}
       />
 
       {/* Response Timing Gauge — full-width animation bar */}
@@ -425,6 +430,14 @@ export function ResponsePanel({
           )}
         </TabsContent>
       </Tabs>
+
+      <DiffDialog
+        open={diffDialogOpen}
+        onOpenChange={setDiffDialogOpen}
+        history={history}
+        currentResponse={responseBody}
+        currentResponseStatus={responseStatus}
+      />
     </div>
   )
 }

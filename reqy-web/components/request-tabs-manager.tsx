@@ -249,6 +249,7 @@ export function RequestTabsManager() {
                 bodyType={activeTab.bodyType}
                 authType={activeTab.authType}
                 authToken={activeTab.authToken}
+                history={history}
               />
             </div>
           </ResizablePanel>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CheckCircle, Clock, FileText, Download, Play, Loader2, Sparkles, XCircle, AlertTriangle, ChevronDown, FlaskConical, Plus } from "lucide-react"
+import { CheckCircle, Clock, FileText, Download, Play, Loader2, Sparkles, XCircle, AlertTriangle, ChevronDown, FlaskConical, Plus, GitCompare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +27,7 @@ interface ResponseStatusBarProps {
   onGenerateTests?: () => Promise<void>
   onExport?: () => void
   onCreateMock?: () => void
+  onDiff?: () => void
 }
 
 export function ResponseStatusBar({
@@ -44,6 +45,7 @@ export function ResponseStatusBar({
   onGenerateTests,
   onExport,
   onCreateMock,
+  onDiff,
 }: ResponseStatusBarProps) {
   const getStatusColor = (status?: number) => {
     if (status == null) return "bg-muted text-muted-foreground"
@@ -252,6 +254,18 @@ export function ResponseStatusBar({
           <Download className="size-3.5" />
           Export
         </Button>
+        {onDiff && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDiff}
+            disabled={!hasResponse}
+            className="h-8 gap-1.5 text-xs font-medium transition-all duration-200"
+          >
+            <GitCompare className="size-3.5" />
+            Diff
+          </Button>
+        )}
       </div>
     </div>
   )

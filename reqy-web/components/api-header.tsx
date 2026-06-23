@@ -31,6 +31,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
+import { Wifi } from "lucide-react"
+import { WebSocketPanel } from "@/components/websocket-panel"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { useRouter } from "next/navigation"
 
@@ -38,6 +40,7 @@ export function ApiHeader() {
   const { notifications, markNotificationRead, clearNotifications, requestSystemNotificationPermission, systemNotificationPermission, history } = useRequestStore()
   const router = useRouter()
   const [searchOpen, setSearchOpen] = useState(false)
+  const [wsOpen, setWsOpen] = useState(false)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -82,6 +85,12 @@ export function ApiHeader() {
           <CommandInput placeholder="Search open tabs, history, pages..." />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
+            <CommandGroup heading="Tools">
+              <CommandItem onSelect={() => { setWsOpen(true); setSearchOpen(false) }}>
+                <Wifi className="mr-2 size-4" />
+                <span>Open WebSocket Panel</span>
+              </CommandItem>
+            </CommandGroup>
             <CommandGroup heading="History">
               {history.slice(0, 10).map((item) => (
                 <CommandItem key={item.id} onSelect={() => setSearchOpen(false)}>
@@ -92,6 +101,11 @@ export function ApiHeader() {
             </CommandGroup>
           </CommandList>
         </CommandDialog>
+        <Dialog open={wsOpen} onOpenChange={setWsOpen}>
+          <DialogContent className="max-w-3xl h-[80vh]">
+            <WebSocketPanel />
+          </DialogContent>
+        </Dialog>
         <EnvironmentSelector />
         <VariablesPanel />
         <ThemeSwitcher />

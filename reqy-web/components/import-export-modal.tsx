@@ -1,11 +1,13 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { Upload, Download, FileJson, X, AlertTriangle, CheckCircle2, Loader2, Users } from "lucide-react"
+import { Upload, Download, FileJson, X, AlertTriangle, CheckCircle2, Loader2, Users, Terminal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRequestStore, type Collection, type Environment, type VariableMapping } from "@/hooks/use-request-store"
+import type { HttpMethod } from "@/lib/types"
 import { exportBundleSchema, formatZodError } from "@/lib/import-schemas"
+import { parseCurlCommand } from "@/lib/curl-parser"
 
 /* ─────────────────────────────────────────────────────────────────────
    Types
@@ -78,6 +80,42 @@ export function ImportExportModal({ open, onClose }: ImportExportModalProps) {
   const [pendingBundle, setPendingBundle] = useState<ExportBundle | null>(null)
   const [conflictStrategy, setConflictStrategy] = useState<ConflictStrategy>("rename")
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  /* cURL import state */
+  const [curlCommand, setCurlCommand] = useState("")
+  const [curlResult, setCurlResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  const handleCurlImport = useCallback(() => {
+    const parsed = parseCurlCommand(curlCommand.trim())
+    if (!parsed) {
+      setCurlResult({ success: false, message: "Commande cURL invalide ou non reconnue." })
+      return
+    }
+    const targetCollection = collections[0]
+    if (!targetCollection) {
+      setCurlResult({ success: false, message: "Aucune collection disponible. Créez-en une d'abord." })
+      return
+    }
+    try {
+      addRequestToCollection(targetCollection.id, {
+        name: parsed.url.split("/").pop() || "curl request",
+        method: parsed.method as HttpMethod,
+        url: parsed.url,
+        endpoint: parsed.url,
+        headers: parsed.headers,
+        body: parsed.body ?? "",
+        bodyType: "json",
+        authType: parsed.auth ? "basic" : "none",
+        authToken: parsed.auth ? btoa(`${parsed.auth.username}:${parsed.auth.password}`) : "",
+        queryParams: [],
+        folderId: null,
+      })
+      setCurlCommand("")
+      setCurlResult({ success: true, message: `Requête ${parsed.method} ${parsed.url} importée dans "${targetCollection.name}".` })
+    } catch {
+      setCurlResult({ success: false, message: "Erreur lors de l'import." })
+    }
+  }, [curlCommand, collections, addRequestToCollection])
 
   /* ── Export ──────────────────────────────────────────────────────── */
   const handleExport = () => {
@@ -439,6 +477,35 @@ export function ImportExportModal({ open, onClose }: ImportExportModalProps) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ── Import depuis cURL ──────────────────────────────── */}
+          <div className="mt-6">
+            <p className="mb-2 text-sm font-medium text-foreground">Importer depuis cURL</p>
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/40 p-4">
+              <textarea
+                value={curlCommand}
+                onChange={(e) => { setCurlCommand(e.target.value); setCurlResult(null) }}
+                placeholder={`curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -d '{"name":"test"}'`}
+                className="w-full h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 [&]::placeholder:text-muted-foreground/40"
+              />
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={handleCurlImport} disabled={!curlCommand.trim()} className="flex items-center gap-2">
+                  <Terminal className="size-3.5" />
+                  Importer
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setCurlCommand(""); setCurlResult(null) }}>
+                  Effacer
+                </Button>
+              </div>
+              {curlResult && (
+                <div className={cn("rounded-lg border px-3 py-2 text-xs",
+                  curlResult.success ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"
+                )}>
+                  {curlResult.message}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Conflict resolution UI ───────────────────────────── */}
