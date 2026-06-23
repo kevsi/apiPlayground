@@ -9,6 +9,8 @@
 
 import type { RequestItem } from "@/lib/types"
 import yaml from "js-yaml"
+import { mergeImport } from "@/lib/import-merge/merge"
+import type { ImportSummary } from "@/lib/import-merge/types"
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -587,4 +589,24 @@ function endpointToRequest(
   }
 
   return request
+}
+
+// ─── LWW merge helpers ─────────────────────────────────────────────────────
+
+/**
+ * Merge incoming OpenAPI collections against the local store using last-write-wins.
+ * Returns the entities to upsert and a conflict summary for the UI banner.
+ *
+ * Usage:
+ *   const { toUpsert, summary } = mergeImportedCollections({
+ *     local: store.collections,
+ *     imported: parsedCollections,
+ *   })
+ *   for (const c of toUpsert) store.upsertCollection(c)
+ */
+export function mergeImportedCollections<T extends { id: string; updatedAt?: number; name?: string }>(args: {
+  local: T[]
+  imported: T[]
+}): { toUpsert: T[]; summary: ImportSummary } {
+  return mergeImport({ local: args.local, imported: args.imported, entityType: "collection" })
 }

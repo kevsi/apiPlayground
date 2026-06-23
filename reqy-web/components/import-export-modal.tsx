@@ -8,6 +8,8 @@ import { useRequestStore, type Collection, type Environment, type VariableMappin
 import type { HttpMethod } from "@/lib/types"
 import { exportBundleSchema, formatZodError } from "@/lib/import-schemas"
 import { parseCurlCommand } from "@/lib/curl-parser"
+import { mergeImport, emptySummary } from "@/lib/import-merge/merge"
+import type { ImportSummary } from "@/lib/import-merge/types"
 
 /* ─────────────────────────────────────────────────────────────────────
    Types
@@ -76,6 +78,7 @@ export function ImportExportModal({ open, onClose }: ImportExportModalProps) {
     skipped: number
     errors: string[]
   } | null>(null)
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null)
   const [conflicts, setConflicts] = useState<Conflict[]>([])
   const [pendingBundle, setPendingBundle] = useState<ExportBundle | null>(null)
   const [conflictStrategy, setConflictStrategy] = useState<ConflictStrategy>("rename")
@@ -175,6 +178,34 @@ export function ImportExportModal({ open, onClose }: ImportExportModalProps) {
       let updated = 0
       let skipped = 0
       const errors: string[] = []
+
+      // Compute LWW summary before upsert loop (for the UI banner)
+      const lwwSummary: ImportSummary = emptySummary()
+      try {
+        const collectionMerge = mergeImport({
+          local: collections as unknown as { id: string; updatedAt?: number; name?: string }[],
+          imported: bundle.collections as unknown as { id: string; updatedAt?: number; name?: string }[],
+          entityType: "collection",
+        })
+        lwwSummary.added += collectionMerge.summary.added
+        lwwSummary.updated += collectionMerge.summary.updated
+        lwwSummary.skipped += collectionMerge.summary.skipped
+        lwwSummary.conflicts.push(...collectionMerge.summary.conflicts)
+
+        const envMerge = mergeImport({
+          local: environments as unknown as { id: string; updatedAt?: number; name?: string }[],
+          imported: bundle.environments as unknown as { id: string; updatedAt?: number; name?: string }[],
+          entityType: "environment",
+        })
+        lwwSummary.added += envMerge.summary.added
+        lwwSummary.updated += envMerge.summary.updated
+        lwwSummary.skipped += envMerge.summary.skipped
+        lwwSummary.conflicts.push(...envMerge.summary.conflicts)
+      } catch {
+        // Non-fatal: fall back to zeros if merge fails
+      }
+      setImportSummary(lwwSummary)
+
 
       try {
         /* Collections */
