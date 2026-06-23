@@ -4,15 +4,15 @@ use rfd::FileDialog;
 use serde::Serialize;
 use serde::Deserialize;
 use dirs::data_dir;
-use std::collections::HashMap;
+
 use std::fs;
 use std::io::Read;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, Mutex};
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, Window};
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tiny_http::{Header, Response, Server};
 
@@ -436,7 +436,7 @@ fn forward_request_sync(
       .map_err(|e| e.to_string())?;
 
     let mut request = client
-      .request(method.parse().map_err(|e| e.to_string())?, url);
+      .request(method.parse::<reqwest::Method>().map_err(|e| e.to_string())?, url);
 
     for (key, value) in headers {
       request = request.header(key, value);
@@ -504,11 +504,10 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
       let mut body_bytes: Option<Vec<u8>> = None;
       if method != "GET" && method != "HEAD" {
         let mut buf = Vec::new();
-        if let Ok(mut reader) = request.as_reader().cloned() {
-          let _ = reader.read_to_end(&mut buf);
-          if !buf.is_empty() {
-            body_bytes = Some(buf);
-          }
+        let mut reader = request.as_reader();
+        let _ = reader.read_to_end(&mut buf);
+        if !buf.is_empty() {
+          body_bytes = Some(buf);
         }
       }
 
@@ -541,13 +540,13 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
           let _ = request.respond(
             Response::from_string(format!("Proxy error: {}", e))
               .with_status_code(502)
-              .with_header("Content-Type: text/plain"),
+              .with_header(tiny_http::Header::from_bytes("Content-Type".as_bytes(), "text/plain".as_bytes()).unwrap()),
           );
           continue;
         }
       };
 
-      captured.status = status;
+      captured.status = Some(status);
       captured.response_headers = resp_headers.clone();
       captured.response_body = resp_body.clone();
       captured.duration_ms = Some(start.elapsed().as_millis());
@@ -561,16 +560,21 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
         .filter(|(k, _)| !k.eq_ignore_ascii_case("transfer-encoding"))
         .filter(|(k, _)| !k.eq_ignore_ascii_case("content-encoding"))
         .map(|(k, v)| {
-          Header::from_bytes(&k.as_bytes(), &v.as_bytes()).unwrap_or_else(|_| {
-            Header::from_bytes(&k.as_bytes(), v.as_bytes()).unwrap()
+          Header::from_bytes(k.as_bytes(), v.as_bytes()).unwrap_or_else(|_| {
+            Header::from_bytes(k.as_bytes(), b"").unwrap()
           })
         })
         .collect();
 
       let _ = request.respond(
-        Response::from_string(resp_body.unwrap_or_default())
-          .with_status_code(status.unwrap_or(500))
-          .with_headers(http_resp_headers),
+        {
+          let mut response = Response::from_string(resp_body.unwrap_or_default())
+            .with_status_code(status);
+          for header in http_resp_headers {
+            response = response.with_header(header);
+          }
+          response
+        },
       );
     }
   });
