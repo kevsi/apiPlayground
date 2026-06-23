@@ -6,7 +6,7 @@ use serde::Deserialize;
 use dirs::data_dir;
 
 use std::fs;
-use std::io::Read;
+
 use std::net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -469,7 +469,7 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
   // Spawn the blocking proxy loop in a tokio task
   let handle = app_handle.clone();
   std::thread::spawn(move || {
-    for request in server.incoming_requests() {
+    for mut request in server.incoming_requests() {
       if flag_for_server.load(Ordering::Relaxed) {
         break;
       }
@@ -504,8 +504,7 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
       let mut body_bytes: Option<Vec<u8>> = None;
       if method != "GET" && method != "HEAD" {
         let mut buf = Vec::new();
-        let mut reader = request.as_reader();
-        let _ = reader.read_to_end(&mut buf);
+        let _ = request.as_reader().read_to_end(&mut buf);
         if !buf.is_empty() {
           body_bytes = Some(buf);
         }
@@ -515,7 +514,7 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
 
       // Emit "captured" event (before forwarding)
       let mut captured = CapturedRequest::from_http_request(&method, &full_url, &req_headers, body_str.clone());
-      let captured_id = captured.id.clone();
+      let _captured_id = captured.id.clone();
 
       let emit_result = handle.emit("captured-request", &captured);
       if emit_result.is_err() {
