@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, Bell, FileJson, Clock, Command } from "lucide-react"
+import { Search, Bell, FileJson, Clock, Command, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { EnvironmentSelector } from "@/components/environment-selector"
@@ -36,17 +36,19 @@ import { WebSocketPanel } from "@/components/websocket-panel"
 import { SSEPanel } from "@/components/sse-panel"
 import { CaptureProxyPanel } from "@/components/capture-proxy-panel"
 import { GraphQLPanel } from "@/components/graphql-panel"
+import { GitPanel } from "@/components/git-panel"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { useRouter } from "next/navigation"
 
 export function ApiHeader() {
-  const { notifications, markNotificationRead, clearNotifications, requestSystemNotificationPermission, systemNotificationPermission, history } = useRequestStore()
+  const { notifications, markNotificationRead, clearNotifications, requestSystemNotificationPermission, systemNotificationPermission, history, collections } = useRequestStore()
   const router = useRouter()
   const [searchOpen, setSearchOpen] = useState(false)
   const [wsOpen, setWsOpen] = useState(false)
   const [sseOpen, setSseOpen] = useState(false)
   const [proxyOpen, setProxyOpen] = useState(false)
   const [graphqlOpen, setGraphqlOpen] = useState(false)
+  const [gitOpen, setGitOpen] = useState(false)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -108,6 +110,10 @@ export function ApiHeader() {
                 <Braces className="mr-2 size-4" />
                 <span>Open GraphQL Playground</span>
               </CommandItem>
+              <CommandItem onSelect={() => { setGitOpen(true); setSearchOpen(false) }}>
+                <GitBranch className="mr-2 size-4" />
+                <span>Open Git Panel</span>
+              </CommandItem>
             </CommandGroup>
             <CommandGroup heading="History">
               {history.slice(0, 10).map((item) => (
@@ -137,6 +143,11 @@ export function ApiHeader() {
         <Dialog open={graphqlOpen} onOpenChange={setGraphqlOpen}>
           <DialogContent className="max-w-4xl h-[85vh]">
             <GraphQLPanel />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={gitOpen} onOpenChange={setGitOpen}>
+          <DialogContent className="max-w-3xl h-[75vh]">
+            <GitPanel collections={collections} />
           </DialogContent>
         </Dialog>
         <EnvironmentSelector />

@@ -57,6 +57,8 @@
     "dompurify": "^3.4.7",
     "embla-carousel-react": "8.6.0",
     "idb": "^8.0.3",
+    "isomorphic-git": "^1.27.0",
+    "@isomorphic-git/lightning-fs": "^4.6.0",
     "idb-keyval": "^6.2.5",
     "input-otp": "1.4.2",
     "java-parser": "^3.0.1",
