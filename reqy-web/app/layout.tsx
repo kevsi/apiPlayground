@@ -29,6 +29,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { FloatingAiChat } from '@/components/floating-ai-chat'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { DeepLinkHandler } from '@/components/deep-link-handler'
+import { ClientLayoutShell } from '@/components/client-layout-shell'
 
 export default function RootLayout({
   children,
@@ -50,7 +51,7 @@ export default function RootLayout({
           <ErrorBoundary>
             <SidebarProvider>
               <DeepLinkHandler />
-              {children}
+              <ClientLayoutShell>{children}</ClientLayoutShell>
             </SidebarProvider>
           </ErrorBoundary>
           <FloatingAiChat />
