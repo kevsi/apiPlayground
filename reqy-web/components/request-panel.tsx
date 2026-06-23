@@ -236,6 +236,7 @@ ${bodyPart}})
     DELETE: "bg-red-500/25 text-red-600 border-red-500/30",
     HEAD: "bg-slate-500/25 text-slate-600 border-slate-500/30",
     OPTIONS: "bg-slate-500/25 text-slate-600 border-slate-500/30",
+    GRAPHQL: "bg-pink-500/25 text-pink-600 border-pink-500/30",
   }
 
   const methodBgMap: Record<HttpMethod, string> = {
@@ -246,6 +247,7 @@ ${bodyPart}})
     DELETE: "bg-red-500",
     HEAD: "bg-slate-500",
     OPTIONS: "bg-slate-500",
+    GRAPHQL: "bg-pink-500",
   }
 
   const bodyTypeLabels: Record<BodyType, string> = {

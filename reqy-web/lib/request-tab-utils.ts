@@ -8,6 +8,7 @@ export const methodColors: Record<HttpMethod, string> = {
   DELETE: "bg-red-500 text-white",
   HEAD: "bg-slate-500 text-white",
   OPTIONS: "bg-slate-500 text-white",
+  GRAPHQL: "bg-pink-500 text-white",
 }
 
 export const defaultQueryParams: QueryParam[] = []
@@ -75,6 +76,8 @@ export function getMethodPanelClass(method: HttpMethod): string {
       return "border-b-amber-500/15 bg-amber-500/[0.02]"
     case "PATCH":
       return "border-b-purple-500/15 bg-purple-500/[0.02]"
+    case "GRAPHQL":
+      return "border-b-pink-500/15 bg-pink-500/[0.02]"
     default:
       return "border-b-red-500/15 bg-red-500/[0.02]"
   }
@@ -90,6 +93,8 @@ export function getMethodBadgeClass(method: HttpMethod): string {
       return "bg-amber-500 text-white border-amber-500"
     case "PATCH":
       return "bg-purple-500 text-white border-purple-500"
+    case "GRAPHQL":
+      return "bg-pink-500 text-white border-pink-500"
     default:
       return "bg-red-500 text-white border-red-500"
   }
@@ -105,6 +110,8 @@ export function getMethodDotClass(method: HttpMethod): string {
       return "bg-amber-500"
     case "PATCH":
       return "bg-purple-500"
+    case "GRAPHQL":
+      return "bg-pink-500"
     default:
       return "bg-red-500"
   }

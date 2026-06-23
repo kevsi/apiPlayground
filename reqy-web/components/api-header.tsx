@@ -31,8 +31,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { Wifi } from "lucide-react"
+import { Wifi, Radio, Network, Braces } from "lucide-react"
 import { WebSocketPanel } from "@/components/websocket-panel"
+import { SSEPanel } from "@/components/sse-panel"
+import { CaptureProxyPanel } from "@/components/capture-proxy-panel"
+import { GraphQLPanel } from "@/components/graphql-panel"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { useRouter } from "next/navigation"
 
@@ -41,6 +44,9 @@ export function ApiHeader() {
   const router = useRouter()
   const [searchOpen, setSearchOpen] = useState(false)
   const [wsOpen, setWsOpen] = useState(false)
+  const [sseOpen, setSseOpen] = useState(false)
+  const [proxyOpen, setProxyOpen] = useState(false)
+  const [graphqlOpen, setGraphqlOpen] = useState(false)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -90,6 +96,18 @@ export function ApiHeader() {
                 <Wifi className="mr-2 size-4" />
                 <span>Open WebSocket Panel</span>
               </CommandItem>
+              <CommandItem onSelect={() => { setSseOpen(true); setSearchOpen(false) }}>
+                <Radio className="mr-2 size-4" />
+                <span>Open SSE Panel</span>
+              </CommandItem>
+              <CommandItem onSelect={() => { setProxyOpen(true); setSearchOpen(false) }}>
+                <Network className="mr-2 size-4" />
+                <span>Open Capture Proxy</span>
+              </CommandItem>
+              <CommandItem onSelect={() => { setGraphqlOpen(true); setSearchOpen(false) }}>
+                <Braces className="mr-2 size-4" />
+                <span>Open GraphQL Playground</span>
+              </CommandItem>
             </CommandGroup>
             <CommandGroup heading="History">
               {history.slice(0, 10).map((item) => (
@@ -104,6 +122,21 @@ export function ApiHeader() {
         <Dialog open={wsOpen} onOpenChange={setWsOpen}>
           <DialogContent className="max-w-3xl h-[80vh]">
             <WebSocketPanel />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={sseOpen} onOpenChange={setSseOpen}>
+          <DialogContent className="max-w-3xl h-[80vh]">
+            <SSEPanel />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={proxyOpen} onOpenChange={setProxyOpen}>
+          <DialogContent className="max-w-4xl h-[85vh]">
+            <CaptureProxyPanel />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={graphqlOpen} onOpenChange={setGraphqlOpen}>
+          <DialogContent className="max-w-4xl h-[85vh]">
+            <GraphQLPanel />
           </DialogContent>
         </Dialog>
         <EnvironmentSelector />

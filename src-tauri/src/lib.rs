@@ -2,13 +2,19 @@ use base64::{Engine as _, engine::general_purpose};
 use reqwest::Client;
 use rfd::FileDialog;
 use serde::Serialize;
+use serde::Deserialize;
 use dirs::data_dir;
+use std::collections::HashMap;
 use std::fs;
-use std::net::{IpAddr, Ipv6Addr, ToSocketAddrs};
+use std::io::Read;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock, Mutex};
 use std::time::Instant;
+use tauri::{AppHandle, Emitter, Window};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tiny_http::{Header, Response, Server};
 
 /// Decode common HTML entities in response bodies.
 /// Some upstream servers/frameworks encode characters like ' → &#x27; in JSON.
@@ -311,6 +317,300 @@ async fn fetch_proxy(
   })
 }
 
+// ── Capture Proxy ────────────────────────────────────────────────────────────
+
+struct CaptureProxyState {
+  shutdown_flag: Arc<AtomicBool>,
+}
+
+static CAPTURE_PROXY_STATE: OnceLock<Mutex<CaptureProxyState>> = OnceLock::new();
+
+fn get_capture_proxy_state() -> Option<&'static Mutex<CaptureProxyState>> {
+  CAPTURE_PROXY_STATE.get()
+}
+
+/// Check if a hostname resolves to a private IP (sync, no DNS lookup).
+/// Returns true if the hostname is clearly private without DNS resolution.
+fn hostname_is_private_sync(hostname: &str) -> bool {
+  let lower = hostname.to_lowercase();
+
+  // IPv6-mapped IPv4 (::ffff:x.x.x.x)
+  if lower.starts_with("::ffff:") {
+    let mapped = &lower[7..];
+    if let Ok(ip) = mapped.parse::<IpAddr>() {
+      return is_private_ip(ip);
+    }
+  }
+
+  if let Ok(ip) = hostname.parse::<IpAddr>() {
+    return is_private_ip(ip);
+  }
+
+  lower == "localhost"
+    || lower == "localhost.localdomain"
+    || lower == "0.0.0.0"
+    || lower.ends_with(".local")
+    || lower.ends_with(".internal")
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CapturedRequest {
+  pub id: String,
+  pub method: String,
+  pub url: String,
+  pub headers: Vec<(String, String)>,
+  pub body: Option<String>,
+  pub timestamp: u64,
+  // Response fields (populated after forwarding)
+  pub status: Option<u16>,
+  pub response_headers: Option<Vec<(String, String)>>,
+  pub response_body: Option<String>,
+  pub duration_ms: Option<u128>,
+  pub error: Option<String>,
+}
+
+impl CapturedRequest {
+  fn from_http_request(
+    method: &str,
+    url: &str,
+    headers: &[(String, String)],
+    body: Option<String>,
+  ) -> Self {
+    CapturedRequest {
+      id: format!("cap-{}-{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis(),
+        rand_id()),
+      method: method.to_string(),
+      url: url.to_string(),
+      headers: headers.to_vec(),
+      body,
+      timestamp: std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64,
+      status: None,
+      response_headers: None,
+      response_body: None,
+      duration_ms: None,
+      error: None,
+    }
+  }
+}
+
+fn rand_id() -> String {
+  use std::time::SystemTime;
+  let now = SystemTime::now()
+    .duration_since(SystemTime::UNIX_EPOCH)
+    .unwrap()
+    .as_nanos();
+  (now % 99999).to_string()
+}
+
+/// Forward an HTTP request using reqwest (sync helper via blocking task).
+fn forward_request_sync(
+  method: &str,
+  url: &str,
+  headers: &[(String, String)],
+  body: Option<&str>,
+) -> Result<(u16, Vec<(String, String)>, String), String> {
+  let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+  rt.block_on(async {
+    let parsed_url = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+
+    // SSRF protection
+    if let Some(host) = parsed_url.host_str() {
+      if hostname_is_private_sync(host) {
+        return Err("Cannot forward to private/internal host".to_string());
+      }
+    }
+
+    let client = Client::builder()
+      .timeout(std::time::Duration::from_secs(30))
+      .gzip(true)
+      .brotli(true)
+      .deflate(true)
+      .build()
+      .map_err(|e| e.to_string())?;
+
+    let mut request = client
+      .request(method.parse().map_err(|e| e.to_string())?, url);
+
+    for (key, value) in headers {
+      request = request.header(key, value);
+    }
+
+    if let Some(b) = body {
+      request = request.body(reqwest::Body::from(b.to_string()));
+    }
+
+    let response = request.send().await.map_err(|e| e.to_string())?;
+    let status = response.status().as_u16();
+    let resp_headers: Vec<(String, String)> = response
+      .headers()
+      .iter()
+      .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
+      .collect();
+    let body_str = response.text().await.map_err(|e| e.to_string())?;
+
+    Ok((status, resp_headers, body_str))
+  })
+}
+
+fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
+  let addr = SocketAddr::from(([127, 0, 0, 1], port));
+  let server = Server::http(&addr).map_err(|e| format!("Failed to bind port {}: {}", port, e))?;
+
+  let shutdown_flag = Arc::new(AtomicBool::new(false));
+  let flag_for_server = shutdown_flag.clone();
+
+  // Spawn the blocking proxy loop in a tokio task
+  let handle = app_handle.clone();
+  std::thread::spawn(move || {
+    for request in server.incoming_requests() {
+      if flag_for_server.load(Ordering::Relaxed) {
+        break;
+      }
+
+      let method = request.method().to_string();
+      let url = request.url().to_string();
+
+      // Reconstruct full URL — if the request URL is a path, prepend http://127.0.0.1:port
+      let full_url = if url.starts_with("http://") || url.starts_with("https://") {
+        url.clone()
+      } else {
+        // Use Host header to determine target
+        let host_header = request
+          .headers()
+          .iter()
+          .find(|h| h.field.equiv("Host"))
+          .map(|h| h.value.as_str())
+          .unwrap_or("");
+
+        // Try to determine scheme from the request itself
+        // Default to http for the proxy
+        let scheme = "http";
+        format!("{}://{}{}", scheme, host_header, url)
+      };
+
+      let req_headers: Vec<(String, String)> = request
+        .headers()
+        .iter()
+        .map(|h| (h.field.to_string(), h.value.as_str().to_string()))
+        .collect();
+
+      let mut body_bytes: Option<Vec<u8>> = None;
+      if method != "GET" && method != "HEAD" {
+        let mut buf = Vec::new();
+        if let Ok(mut reader) = request.as_reader().cloned() {
+          let _ = reader.read_to_end(&mut buf);
+          if !buf.is_empty() {
+            body_bytes = Some(buf);
+          }
+        }
+      }
+
+      let body_str = body_bytes.as_ref().map(|b| String::from_utf8_lossy(b).to_string());
+
+      // Emit "captured" event (before forwarding)
+      let mut captured = CapturedRequest::from_http_request(&method, &full_url, &req_headers, body_str.clone());
+      let captured_id = captured.id.clone();
+
+      let emit_result = handle.emit("captured-request", &captured);
+      if emit_result.is_err() {
+        eprintln!("[capture-proxy] failed to emit event: {:?}", emit_result);
+      }
+
+      // Forward the request
+      let start = Instant::now();
+      let forward_result = forward_request_sync(
+        &method,
+        &full_url,
+        &req_headers,
+        body_str.as_deref(),
+      );
+
+      let (status, resp_headers, resp_body) = match forward_result {
+        Ok((s, h, b)) => (s, Some(h), Some(b)),
+        Err(e) => {
+          captured.error = Some(e.clone());
+          captured.duration_ms = Some(start.elapsed().as_millis());
+          let _ = handle.emit("captured-request-updated", &captured);
+          let _ = request.respond(
+            Response::from_string(format!("Proxy error: {}", e))
+              .with_status_code(502)
+              .with_header("Content-Type: text/plain"),
+          );
+          continue;
+        }
+      };
+
+      captured.status = status;
+      captured.response_headers = resp_headers.clone();
+      captured.response_body = resp_body.clone();
+      captured.duration_ms = Some(start.elapsed().as_millis());
+
+      let _ = handle.emit("captured-request-updated", &captured);
+
+      // Build tiny_http response headers
+      let http_resp_headers: Vec<Header> = resp_headers
+        .unwrap_or_default()
+        .iter()
+        .filter(|(k, _)| !k.eq_ignore_ascii_case("transfer-encoding"))
+        .filter(|(k, _)| !k.eq_ignore_ascii_case("content-encoding"))
+        .map(|(k, v)| {
+          Header::from_bytes(&k.as_bytes(), &v.as_bytes()).unwrap_or_else(|_| {
+            Header::from_bytes(&k.as_bytes(), v.as_bytes()).unwrap()
+          })
+        })
+        .collect();
+
+      let _ = request.respond(
+        Response::from_string(resp_body.unwrap_or_default())
+          .with_status_code(status.unwrap_or(500))
+          .with_headers(http_resp_headers),
+      );
+    }
+  });
+
+  let state = CaptureProxyState {
+    shutdown_flag,
+  };
+  let _ = CAPTURE_PROXY_STATE.set(Mutex::new(state));
+
+  Ok(())
+}
+
+#[tauri::command]
+fn start_capture_proxy(app_handle: AppHandle, port: u16) -> Result<(), String> {
+  if port < 1024 || port > 65535 {
+    return Err("Port must be between 1024 and 65535".to_string());
+  }
+
+  if get_capture_proxy_state().is_some() {
+    return Err("Capture proxy is already running".to_string());
+  }
+
+  start_proxy_server(app_handle, port)
+}
+
+#[tauri::command]
+fn stop_capture_proxy() -> Result<(), String> {
+  let state = get_capture_proxy_state()
+    .ok_or_else(|| "Capture proxy is not running".to_string())?;
+
+  let state = state.lock().map_err(|e| e.to_string())?;
+  state.shutdown_flag.store(true, Ordering::Relaxed);
+
+  drop(state);
+  // Clear the state so start can be called again
+  let _ = CAPTURE_PROXY_STATE.get().map(|m| m.lock().map(|_| ()));
+
+  Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let mut builder = tauri::Builder::default();
@@ -336,6 +636,8 @@ pub fn run() {
       toggle_mock_enabled,
       is_mock_enabled_globally,
       set_mock_enabled_globally,
+      start_capture_proxy,
+      stop_capture_proxy,
     ])
     .setup(|app| {
       // Initialize mock store (file-persisted, survives restarts)

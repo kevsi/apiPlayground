@@ -82,6 +82,7 @@ const methodColors: Record<HttpMethod, string> = {
   DELETE: "bg-red-500/20 text-red-600 border-red-500/30",
   HEAD: "bg-slate-500/20 text-slate-600 border-slate-500/30",
   OPTIONS: "bg-slate-500/20 text-slate-600 border-slate-500/30",
+  GRAPHQL: "bg-pink-500/20 text-pink-600 border-pink-500/30",
 }
 
 const methodBadgeColors: Record<HttpMethod, string> = {
@@ -92,6 +93,7 @@ const methodBadgeColors: Record<HttpMethod, string> = {
   DELETE: "bg-red-500 text-white",
   HEAD: "bg-slate-500 text-white",
   OPTIONS: "bg-slate-500 text-white",
+  GRAPHQL: "bg-pink-500 text-white",
 }
 
 const collectionColors: Record<string, string> = {

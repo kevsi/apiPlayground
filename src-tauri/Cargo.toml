@@ -33,3 +33,4 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 open = "5.3"
 rfd = "0.15"
 base64 = "0.22"
+tiny_http = "0.12"

@@ -37,6 +37,7 @@ const methodBadgeColors: Record<HttpMethod, string> = {
   DELETE: "bg-red-500 text-white",
   HEAD: "bg-slate-500 text-white",
   OPTIONS: "bg-slate-500 text-white",
+  GRAPHQL: "bg-pink-500 text-white",
 }
 
 export function BatchRunProgress({

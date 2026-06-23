@@ -44,6 +44,7 @@ const methodColors: Record<HttpMethod, string> = {
   DELETE: "bg-red-500/20 text-red-600 border-red-500/30",
   HEAD: "bg-slate-500/20 text-slate-600 border-slate-500/30",
   OPTIONS: "bg-slate-500/20 text-slate-600 border-slate-500/30",
+  GRAPHQL: "bg-pink-500/20 text-pink-600 border-pink-500/30",
 }
 
 function loadCollapsedState(collectionId: string): Set<string> {
