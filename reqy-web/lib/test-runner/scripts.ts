@@ -1,0 +1,98 @@
+import vm from "node:vm"
+import type { RunnerContext, RequestResponse } from "./types"
+
+export interface ScriptOptions {
+  phase: "pre" | "post"
+  response?: RequestResponse
+  timeoutMs?: number
+}
+
+export interface ScriptOutput {
+  result?: unknown
+  error?: string
+  consoleLines: string[]
+}
+
+const FORBIDDEN_GLOBALS = [
+  "require",
+  "module",
+  "exports",
+  "__dirname",
+  "__filename",
+  "global",
+  "globalThis",
+  "process",
+  "Buffer",
+  "setImmediate",
+  "setInterval",
+]
+
+function createPmApi(ctx: RunnerContext, response?: RequestResponse) {
+  const environment = {
+    get: (k: string) => ctx.environment[k],
+    set: (k: string, v: string) => { ctx.environment[k] = v },
+    has: (k: string) => k in ctx.environment,
+    unset: (k: string) => { delete ctx.environment[k] },
+  }
+  const variables = {
+    get: (k: string) => ctx.iterationData[k] ?? ctx.environment[k],
+    set: (k: string, v: string) => { ctx.iterationData[k] = v },
+  }
+  const iterationData = {
+    get: (k: string) => ctx.iterationData[k],
+    set: (k: string, v: string) => { ctx.iterationData[k] = v },
+  }
+  return {
+    environment,
+    variables,
+    iterationData,
+    expect: (actual: unknown) => ({
+      to: {
+        equal: (expected: unknown) => {
+          if (actual !== expected) throw new Error(`Expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`)
+        },
+        exist: () => {
+          if (actual === undefined || actual === null) throw new Error(`Expected value to exist`)
+        },
+      },
+    }),
+    response,
+  }
+}
+
+function stringify(v: unknown): string {
+  if (typeof v === "string") return v
+  try { return JSON.stringify(v) } catch { return String(v) }
+}
+
+export function runScript(
+  code: string,
+  ctx: RunnerContext,
+  options: ScriptOptions
+): ScriptOutput {
+  const consoleLines: string[] = []
+  const log = (msg: string) => { consoleLines.push(msg); ctx.log(msg) }
+  const consoleShim = {
+    log: (...args: unknown[]) => log(args.map(stringify).join(" ")),
+    warn: (...args: unknown[]) => log("[WARN] " + args.map(stringify).join(" ")),
+    error: (...args: unknown[]) => log("[ERROR] " + args.map(stringify).join(" ")),
+  }
+
+  const sandbox: Record<string, unknown> = {
+    pm: createPmApi(ctx, options.response),
+    console: consoleShim,
+    Math, Date, JSON, Array, Object, String, Number, Boolean, RegExp, Map, Set,
+    URL, parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
+  }
+  for (const key of FORBIDDEN_GLOBALS) sandbox[key] = undefined
+
+  try {
+    const wrapped = `(function() { return (${code}); })()`
+    const script = new vm.Script(wrapped)
+    const vmContext = vm.createContext(sandbox)
+    const result = script.runInContext(vmContext, { timeout: options.timeoutMs ?? 5000 })
+    return { result, consoleLines }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err), consoleLines }
+  }
+}

@@ -12,6 +12,7 @@ import type {
   VariableMapping,
   Notification,
 } from "@/lib/types"
+import type { Dataset } from "./store/types"
 
 export type {
   HttpMethod,
@@ -25,6 +26,7 @@ export type {
   VariableMapping,
   Notification,
 } from "@/lib/types"
+export type { Dataset } from "./store/types"
 
 export interface RequestStore {
   history: HistoryItem[]
@@ -46,4 +48,5 @@ export interface RequestStore {
   workspaces: Workspace[]
   activeWorkspaceId: string | null
   notificationPreferences?: Record<string, boolean>
+  datasets?: Dataset[]
 }

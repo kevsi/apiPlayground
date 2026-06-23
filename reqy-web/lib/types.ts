@@ -24,6 +24,9 @@ export interface RequestItem {
   queryParams?: Array<{ key: string; value: string }>
   folderId?: string | null
   assertions?: RequestTestAssertion[]
+  preRequestScript?: string
+  postResponseScript?: string
+  datasetKey?: string
   createdAt: number
   updatedAt: number
 }

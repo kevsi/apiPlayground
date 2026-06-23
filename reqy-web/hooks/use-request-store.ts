@@ -44,6 +44,7 @@ import { createVariableMappingsMutations } from "./store/variable-mappings"
 import { createProjectsMutations } from "./store/projects"
 import { createEnvironmentsMutations } from "./store/environments"
 import { createWorkspacesMutations } from "./store/workspaces"
+import { createDatasetsMutations } from "./store/datasets"
 
 const STORAGE_KEY = "reqly-request-store"
 
@@ -100,6 +101,7 @@ const initialStore: RequestStore = {
   workspaces: [defaultWorkspace],
   activeWorkspaceId: WORKSPACE_PERSONAL_ID,
   notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+  datasets: [],
 }
 
 function migrateWorkspaceIds(store: RequestStore): RequestStore {
@@ -173,6 +175,7 @@ async function loadFromStorageAsync(): Promise<RequestStore> {
       activeWorkspaceId: parsed.activeWorkspaceId ?? WORKSPACE_PERSONAL_ID,
       notificationPreferences:
         parsed.notificationPreferences ?? { ...DEFAULT_NOTIFICATION_PREFERENCES },
+      datasets: parsed.datasets || [],
     })
   } catch (e) {
     console.warn("Migration failed:", e)
@@ -210,6 +213,7 @@ async function loadFallback(): Promise<RequestStore> {
       workspaces: [defaultWorkspace],
       activeWorkspaceId: WORKSPACE_PERSONAL_ID,
       notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+      datasets: [],
     }
   } catch {
     return {
@@ -235,6 +239,7 @@ async function loadFallback(): Promise<RequestStore> {
       workspaces: [defaultWorkspace],
       activeWorkspaceId: WORKSPACE_PERSONAL_ID,
       notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+      datasets: [],
     }
   }
 }
@@ -409,6 +414,7 @@ export function useRequestStore() {
   const projectsMutations = createProjectsMutations(commit)
   const environmentsMutations = createEnvironmentsMutations(commit)
   const workspacesMutations = createWorkspacesMutations(commit)
+  const datasetsMutations = createDatasetsMutations(commit)
 
   // ── Filtered getters ────────────────────────────────────────────────
   const activeWorkspaceId = store.activeWorkspaceId
@@ -434,6 +440,10 @@ export function useRequestStore() {
   const workspaceProjects = activeWorkspaceId
     ? store.projects.filter((p) => p.workspaceId === activeWorkspaceId)
     : store.projects
+
+  const workspaceDatasets = activeWorkspaceId
+    ? (store.datasets ?? []).filter((d) => d.workspaceId === activeWorkspaceId)
+    : (store.datasets ?? [])
 
   const computedEnvironmentVariables =
     workspaceEnvironments
@@ -499,6 +509,7 @@ export function useRequestStore() {
     aiAudit: store.aiAudit,
     workspaces: store.workspaces,
     activeWorkspaceId,
+    datasets: workspaceDatasets,
 
     // Notifications
     ...notificationsMutations,
@@ -530,5 +541,8 @@ export function useRequestStore() {
 
     // Workspaces
     ...workspacesMutations,
+
+    // Datasets
+    ...datasetsMutations,
   }
 }
