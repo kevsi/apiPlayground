@@ -4,6 +4,7 @@ import { resolveMockMatch, applyMockDelay, buildMockHeaders } from "@/lib/mock-r
 import { validateProxyPayload } from "@/lib/schemas/proxy"
 import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils"
 import { isBoolean, isHttpMethod } from "@/lib/type-guards"
+import { InMemoryRateLimiter } from "@/lib/rate-limiter"
 import dns from "node:dns/promises"
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -16,43 +17,12 @@ const PRIVATE_HOSTS = [
   "192.168.", "169.254.",
 ]
 
-// ── In-memory rate limiter ──────────────────────────────────────────────
-const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX_REQUESTS = 100
-
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-
-// Clean stale entries every 5 minutes
-if (typeof setInterval !== "undefined") {
-  setInterval(() => {
-    const now = Date.now()
-    for (const [key, entry] of rateLimitMap) {
-      if (entry.resetAt <= now) {
-        rateLimitMap.delete(key)
-      }
-    }
-  }, 300_000)
-}
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 100 })
 
 function getRateLimitKey(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for")
   const ip = forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1"
   return ip
-}
-
-function checkRateLimit(key: string): { allowed: boolean; remaining: number; resetAt: number } {
-  const now = Date.now()
-  let entry = rateLimitMap.get(key)
-  if (!entry || entry.resetAt <= now) {
-    entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS }
-    rateLimitMap.set(key, entry)
-  }
-  entry.count++
-  return {
-    allowed: entry.count <= RATE_LIMIT_MAX_REQUESTS,
-    remaining: Math.max(0, RATE_LIMIT_MAX_REQUESTS - entry.count),
-    resetAt: entry.resetAt,
-  }
 }
 
 function isPrivateHost(hostname: string): boolean {
@@ -122,7 +92,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const rateKey = getRateLimitKey(request)
-    const rateResult = checkRateLimit(rateKey)
+    const rateResult = rateLimiter.check(rateKey)
     if (!rateResult.allowed) {
       return structuredError(
         "Rate limit exceeded. Try again later.",
