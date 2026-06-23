@@ -23,6 +23,16 @@ import {
 import type { BodyType, AuthType, QueryParam, Header } from "@/lib/request-executor"
 import type { RequestTestAssertion, AssertionType } from "@/lib/types"
 import { Switch } from "@/components/ui/switch"
+// TODO(chunk3): wire GraphQL protocol tabs into RequestPanel.
+// The new `protocol` and `graphql` fields on `RequestItem` are now defined in
+// `@/lib/types`, but this component is prop-based (individual `onBodyChange`
+// / `onUrlChange` callbacks). Full integration requires extending
+// `RequestPanelProps` with `protocol`, `graphql`, and matching change handlers,
+// then propagating them from `components/request-tabs-manager.tsx`. The
+// following primitives are ready to drop in once the prop wiring is done:
+//   import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+//   import { GraphQLBodyEditor } from "@/components/graphql-body-editor"
+//   import { GraphQLIntrospectButton } from "@/components/graphql-introspect-button"
 
 interface RequestPanelProps {
   method: HttpMethod

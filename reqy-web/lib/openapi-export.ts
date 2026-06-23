@@ -1,4 +1,12 @@
 import type { Collection, RequestItem } from "@/lib/types"
+import { inferSchemaFromValue } from "@/lib/openapi-inference/infer-schema"
+import { mergeInferredWithGeneric } from "@/lib/openapi-inference/merge-schemas"
+import { extractExample } from "@/lib/openapi-inference/examples"
+
+export interface OpenApiExportOptions {
+  enableInference?: boolean
+  historyItems?: Array<{ requestId: string; responseBody?: unknown }>
+}
 
 function formatPath(request: RequestItem): string {
   const rawPath = request.endpoint?.trim() || request.url?.trim() || "/"
@@ -35,7 +43,64 @@ function operationId(collectionName: string, request: RequestItem): string {
   return slug || `operation_${request.method.toLowerCase()}`
 }
 
-export function generateOpenApiSpec(collections: Collection[]) {
+function parseResponseBody(body: unknown): unknown | undefined {
+  if (body === undefined || body === null) return undefined
+  if (typeof body === "string") {
+    const trimmed = body.trim()
+    if (!trimmed) return undefined
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return undefined
+    }
+  }
+  return body
+}
+
+function findHistoryResponse(
+  historyItems: OpenApiExportOptions["historyItems"],
+  requestId: string,
+): unknown | undefined {
+  if (!historyItems || historyItems.length === 0) return undefined
+  // Pick the most recent matching history item (history is assumed newest-last or newest-first;
+  // iterate in reverse to favour the last entry that matches).
+  for (let i = historyItems.length - 1; i >= 0; i--) {
+    const entry = historyItems[i]
+    if (entry.requestId === requestId) {
+      const parsed = parseResponseBody(entry.responseBody)
+      if (parsed !== undefined) return parsed
+    }
+  }
+  return undefined
+}
+
+function buildResponseSchema(
+  request: RequestItem,
+  options?: OpenApiExportOptions,
+): Record<string, unknown> {
+  const generic = { type: "object" as const }
+
+  if (!options?.enableInference || !options.historyItems) {
+    return generic
+  }
+
+  const responseValue = findHistoryResponse(options.historyItems, request.id)
+  if (responseValue === undefined) return generic
+
+  const inferred = inferSchemaFromValue(responseValue)
+  const merged = mergeInferredWithGeneric(inferred, generic)
+  const example = extractExample(responseValue)
+
+  if (example !== undefined) {
+    return { ...merged, example }
+  }
+  return merged
+}
+
+export function generateOpenApiSpec(
+  collections: Collection[],
+  options?: OpenApiExportOptions,
+) {
   const paths: Record<string, Record<string, unknown>> = {}
   const usedOperationIds = new Set<string>()
 
@@ -90,6 +155,8 @@ export function generateOpenApiSpec(collections: Collection[]) {
           }
         : undefined
 
+      const responseSchema = buildResponseSchema(request, options)
+
       paths[path][method] = {
         operationId: opId,
         tags: [collection.name],
@@ -102,7 +169,7 @@ export function generateOpenApiSpec(collections: Collection[]) {
             description: "Successful response",
             content: {
               "application/json": {
-                schema: { type: "object" as const },
+                schema: responseSchema,
               },
             },
           },

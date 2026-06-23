@@ -27,6 +27,12 @@ export interface RequestItem {
   preRequestScript?: string
   postResponseScript?: string
   datasetKey?: string
+  protocol?: "rest" | "graphql"
+  graphql?: {
+    query: string
+    variables: string
+    operationName?: string
+  }
   createdAt: number
   updatedAt: number
 }
