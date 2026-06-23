@@ -24,6 +24,7 @@ export interface RequestItem {
   queryParams?: Array<{ key: string; value: string }>
   folderId?: string | null
   assertions?: RequestTestAssertion[]
+  runnerAssertions?: import("@/lib/test-runner/types").Assertion[]
   preRequestScript?: string
   postResponseScript?: string
   datasetKey?: string

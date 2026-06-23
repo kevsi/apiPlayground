@@ -22,17 +22,13 @@ import {
 
 import type { BodyType, AuthType, QueryParam, Header } from "@/lib/request-executor"
 import type { RequestTestAssertion, AssertionType } from "@/lib/types"
+import type { Assertion } from "@/lib/test-runner/types"
 import { Switch } from "@/components/ui/switch"
-// TODO(chunk3): wire GraphQL protocol tabs into RequestPanel.
-// The new `protocol` and `graphql` fields on `RequestItem` are now defined in
-// `@/lib/types`, but this component is prop-based (individual `onBodyChange`
-// / `onUrlChange` callbacks). Full integration requires extending
-// `RequestPanelProps` with `protocol`, `graphql`, and matching change handlers,
-// then propagating them from `components/request-tabs-manager.tsx`. The
-// following primitives are ready to drop in once the prop wiring is done:
-//   import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-//   import { GraphQLBodyEditor } from "@/components/graphql-body-editor"
-//   import { GraphQLIntrospectButton } from "@/components/graphql-introspect-button"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { GraphQLBodyEditor } from "@/components/graphql-body-editor"
+import { GraphQLIntrospectButton } from "@/components/graphql-introspect-button"
+import { AssertionEditor } from "@/components/assertion-editor"
+import { ScriptEditor } from "@/components/script-editor"
 
 interface RequestPanelProps {
   method: HttpMethod
@@ -44,6 +40,11 @@ interface RequestPanelProps {
   authType: AuthType
   authToken: string
   assertions?: RequestTestAssertion[]
+  runnerAssertions?: Assertion[]
+  preRequestScript?: string
+  postResponseScript?: string
+  protocol?: "rest" | "graphql"
+  graphql?: { query: string; variables: string; operationName?: string }
   onMethodChange: (method: HttpMethod) => void
   onUrlChange: (url: string) => void
   onQueryParamsChange: (queryParams: QueryParam[]) => void
@@ -52,6 +53,11 @@ interface RequestPanelProps {
   onBodyTypeChange: (bodyType: BodyType) => void
   onAuthChange: (type: AuthType, token: string) => void
   onAssertionsChange?: (assertions: RequestTestAssertion[]) => void
+  onRunnerAssertionsChange?: (assertions: Assertion[]) => void
+  onPreRequestScriptChange?: (script: string) => void
+  onPostResponseScriptChange?: (script: string) => void
+  onProtocolChange?: (protocol: "rest" | "graphql") => void
+  onGraphqlChange?: (graphql: { query: string; variables: string; operationName?: string }) => void
   onRunTests?: () => void
   onSend: () => Promise<void>
   isLoading?: boolean
@@ -68,6 +74,11 @@ export function RequestPanel({
   authType,
   authToken,
   assertions,
+  runnerAssertions,
+  preRequestScript,
+  postResponseScript,
+  protocol,
+  graphql,
   onMethodChange,
   onUrlChange,
   onQueryParamsChange,
@@ -76,6 +87,11 @@ export function RequestPanel({
   onBodyTypeChange,
   onAuthChange,
   onAssertionsChange,
+  onRunnerAssertionsChange,
+  onPreRequestScriptChange,
+  onPostResponseScriptChange,
+  onProtocolChange,
+  onGraphqlChange,
   onRunTests,
   onSend,
   isLoading,
@@ -577,59 +593,104 @@ ${bodyPart}})
               </span>
             </AccordionTrigger>
             <AccordionContent>
-              <div className="flex items-center gap-3 mb-3">
-                <Select value={bodyType} onValueChange={(value) => onBodyTypeChange(value as BodyType)}>
-                  <SelectTrigger className="w-32 h-9 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="json">
-                      <span className="font-mono">JSON</span>
-                    </SelectItem>
-                    <SelectItem value="form-data">Form Data</SelectItem>
-                    <SelectItem value="x-www-form">x-www-form</SelectItem>
-                    <SelectItem value="raw">Raw</SelectItem>
-                    <SelectItem value="binary">Binary</SelectItem>
-                  </SelectContent>
-                </Select>
-                {bodyType === "json" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFormatJson}
-                    className="h-9 gap-1.5 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30"
-                    title="Format JSON"
-                  >
-                    <Code className="size-3.5" />
-                    Format
-                  </Button>
-                )}
-                {bodyType === "json" && body.trim() && isValidJson !== null && (
-                  <span className={cn(
-                    "text-[11px] font-mono font-medium transition-colors duration-200",
-                    isValidJson ? "text-emerald-500" : "text-red-500"
-                  )}>
-                    {isValidJson ? "Valid" : "Invalid"}
-                  </span>
-                )}
-              </div>
-              <div className="h-48 overflow-auto rounded-lg border border-border bg-code-bg flex flex-col transition-all duration-200 focus-within:border-primary/30 focus-within:shadow-[0_0_0_2px] focus-within:shadow-primary/10">
-                <div className="flex items-center justify-between bg-code-header-bg px-4 py-1.5 border-b border-border/50">
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-full bg-red-500/70" />
-                    <span className="size-2.5 rounded-full bg-yellow-500/70" />
-                    <span className="size-2.5 rounded-full bg-emerald-500/70" />
+              <Tabs
+                value={protocol ?? "rest"}
+                onValueChange={(v) => onProtocolChange?.(v as "rest" | "graphql")}
+              >
+                <TabsList className="mb-3">
+                  <TabsTrigger value="rest" className="text-xs">REST</TabsTrigger>
+                  <TabsTrigger value="graphql" className="text-xs">GraphQL</TabsTrigger>
+                </TabsList>
+                <TabsContent value="rest" className="mt-0">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Select value={bodyType} onValueChange={(value) => onBodyTypeChange(value as BodyType)}>
+                      <SelectTrigger className="w-32 h-9 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="json">
+                          <span className="font-mono">JSON</span>
+                        </SelectItem>
+                        <SelectItem value="form-data">Form Data</SelectItem>
+                        <SelectItem value="x-www-form">x-www-form</SelectItem>
+                        <SelectItem value="raw">Raw</SelectItem>
+                        <SelectItem value="binary">Binary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {bodyType === "json" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleFormatJson}
+                        className="h-9 gap-1.5 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30"
+                        title="Format JSON"
+                      >
+                        <Code className="size-3.5" />
+                        Format
+                      </Button>
+                    )}
+                    {bodyType === "json" && body.trim() && isValidJson !== null && (
+                      <span className={cn(
+                        "text-[11px] font-mono font-medium transition-colors duration-200",
+                        isValidJson ? "text-emerald-500" : "text-red-500"
+                      )}>
+                        {isValidJson ? "Valid" : "Invalid"}
+                      </span>
+                    )}
                   </div>
-                  <span className="text-[10px] font-mono text-muted-foreground/50">{bodyType.toUpperCase()}</span>
-                </div>
-                <textarea
-                  value={body}
-                  onChange={(e) => onBodyChange(e.target.value)}
-                  className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
-                  spellCheck={false}
-                  placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
-                />
-              </div>
+                  <div className="h-48 overflow-auto rounded-lg border border-border bg-code-bg flex flex-col transition-all duration-200 focus-within:border-primary/30 focus-within:shadow-[0_0_0_2px] focus-within:shadow-primary/10">
+                    <div className="flex items-center justify-between bg-code-header-bg px-4 py-1.5 border-b border-border/50">
+                      <div className="flex items-center gap-1.5">
+                        <span className="size-2.5 rounded-full bg-red-500/70" />
+                        <span className="size-2.5 rounded-full bg-yellow-500/70" />
+                        <span className="size-2.5 rounded-full bg-emerald-500/70" />
+                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground/50">{bodyType.toUpperCase()}</span>
+                    </div>
+                    <textarea
+                      value={body}
+                      onChange={(e) => onBodyChange(e.target.value)}
+                      className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
+                      spellCheck={false}
+                      placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
+                    />
+                  </div>
+                </TabsContent>
+                <TabsContent value="graphql" className="mt-0">
+                  <GraphQLBodyEditor
+                    query={graphql?.query ?? ""}
+                    variables={graphql?.variables ?? "{}"}
+                    operationName={graphql?.operationName}
+                    onQueryChange={(q) =>
+                      onGraphqlChange?.({
+                        query: q,
+                        variables: graphql?.variables ?? "{}",
+                        operationName: graphql?.operationName,
+                      })
+                    }
+                    onVariablesChange={(v) =>
+                      onGraphqlChange?.({
+                        query: graphql?.query ?? "",
+                        variables: v,
+                        operationName: graphql?.operationName,
+                      })
+                    }
+                    onOperationNameChange={(o) =>
+                      onGraphqlChange?.({
+                        query: graphql?.query ?? "",
+                        variables: graphql?.variables ?? "{}",
+                        operationName: o,
+                      })
+                    }
+                  />
+                  <div className="mt-3">
+                    <GraphQLIntrospectButton
+                      endpoint={url}
+                      onSchemaFetched={(_sdl, hash) => console.log("Schema cached:", hash)}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
             </AccordionContent>
           </AccordionItem>
 
@@ -744,6 +805,45 @@ ${bodyPart}})
                 assertions={assertions ?? []}
                 onChange={onAssertionsChange ?? (() => {})}
                 onRunTests={onRunTests}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Assertions (test-runner) */}
+          <AccordionItem value="assertions-runner" className="border border-border rounded-lg px-4">
+            <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wider hover:no-underline [&[data-state=open]>svg]:rotate-180">
+              <span className="flex items-center gap-2">
+                <FlaskConical className="size-3.5" />
+                Assertions
+                {(runnerAssertions?.length ?? 0) > 0 && (
+                  <span className="rounded-full bg-muted-foreground/10 px-1.5 py-0.5 text-[10px] font-mono font-normal">
+                    {runnerAssertions?.length ?? 0}
+                  </span>
+                )}
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <AssertionEditor
+                assertions={runnerAssertions ?? []}
+                onChange={onRunnerAssertionsChange ?? (() => {})}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Scripts */}
+          <AccordionItem value="scripts" className="border border-border rounded-lg px-4">
+            <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wider hover:no-underline [&[data-state=open]>svg]:rotate-180">
+              <span className="flex items-center gap-2">
+                <Code className="size-3.5" />
+                Scripts
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <ScriptEditor
+                preRequestScript={preRequestScript}
+                postResponseScript={postResponseScript}
+                onPreChange={onPreRequestScriptChange ?? (() => {})}
+                onPostChange={onPostResponseScriptChange ?? (() => {})}
               />
             </AccordionContent>
           </AccordionItem>
