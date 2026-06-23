@@ -19,7 +19,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
+import { WorkspaceInviteDialog } from "@/components/workspace-invite-dialog"
 import { useSyncState } from "@/hooks/store/sync-state"
+import { useRequestStore } from "@/hooks/use-request-store"
+import { WORKSPACE_PERSONAL_ID } from "@/hooks/store/types"
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", key: "dashboard" },
@@ -47,6 +50,11 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
   }
   const syncWorkspaceId = useSyncState((s) => s.workspaceId)
   const syncEnabled = useSyncState((s) => s.enabled)
+  const requestStore = useRequestStore()
+  const activeWorkspaceId = requestStore.activeWorkspaceId
+  const workspaces = requestStore.workspaces
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
+  const activeWorkspaceName: string = activeWorkspace?.name ?? activeWorkspaceId ?? "Workspace"
 
   return (
     <aside
@@ -120,13 +128,29 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
 
       {/* Sync section */}
       {!collapsed && (
-        <div className="flex items-center gap-1 border-t border-sidebar-border px-2 py-2">
-          <WorkspaceJoinDialog />
-          {syncWorkspaceId && syncEnabled && (
-            <span className="text-[10px] text-muted-foreground truncate" title={syncWorkspaceId}>
-              ws: {syncWorkspaceId.slice(0, 8)}
-            </span>
+        <div className="flex flex-col gap-1.5 border-t border-sidebar-border px-2 py-2">
+          {activeWorkspaceId && activeWorkspaceId !== WORKSPACE_PERSONAL_ID && (
+            <div className="flex items-center gap-1 truncate px-1 text-[10px] text-muted-foreground">
+              <span className="shrink-0">Workspace:</span>
+              <span className="truncate font-mono" title={activeWorkspaceName}>
+                {activeWorkspaceName}
+              </span>
+            </div>
           )}
+          <div className="flex items-center gap-1">
+            <WorkspaceJoinDialog />
+            {activeWorkspaceId && activeWorkspaceId !== WORKSPACE_PERSONAL_ID && (
+              <WorkspaceInviteDialog
+                workspaceId={activeWorkspaceId}
+                workspaceName={activeWorkspaceName}
+              />
+            )}
+            {syncWorkspaceId && syncEnabled && (
+              <span className="text-[10px] text-muted-foreground truncate" title={syncWorkspaceId}>
+                ws: {syncWorkspaceId.slice(0, 8)}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
