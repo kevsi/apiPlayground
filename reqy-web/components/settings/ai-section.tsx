@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { Sparkles, ChevronsUpDown } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Sparkles, ChevronsUpDown, Loader2, RefreshCw } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -35,6 +36,47 @@ interface AISectionProps {
   setShowAiConfirm: (val: boolean) => void
 }
 
+interface ModelOption {
+  id: string
+  label: string
+}
+
+const STATIC_MODELS: Record<AIProvider, ModelOption[]> = {
+  openrouter: [
+    { id: "qwen/qwen3-coder", label: "Qwen3 Coder" },
+    { id: "deepseek/deepseek-chat-v3-0324", label: "DeepSeek V3" },
+    { id: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
+    { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  ],
+  anthropic: [
+    { id: "claude-opus-4-5", label: "Claude Opus 4.5" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
+  ],
+  gemini: [
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  ],
+  openai: [
+    { id: "gpt-4o", label: "GPT-4o" },
+    { id: "gpt-4o-mini", label: "GPT-4o Mini" },
+    { id: "gpt-4-turbo", label: "GPT-4 Turbo" },
+  ],
+  ollama: [
+    { id: "llama3.2", label: "Llama 3.2" },
+    { id: "qwen2.5-coder", label: "Qwen2.5 Coder" },
+    { id: "phi3", label: "Phi-3" },
+  ],
+  deepseek: [
+    { id: "deepseek-chat", label: "DeepSeek Chat" },
+    { id: "deepseek-coder", label: "DeepSeek Coder" },
+    { id: "deepseek-reasoner", label: "DeepSeek Reasoner" },
+  ],
+}
+
+const ANTHROPIC_NO_FETCH = new Set<AIProvider>(["anthropic"])
+
 export default function AISection({
   provider, apiKey, aiModel, aiBaseUrl,
   ollamaHost, ollamaPort, ollamaModel,
@@ -46,6 +88,109 @@ export default function AISection({
 }: AISectionProps) {
   const [advOpen, setAdvOpen] = useState(provider === "openai")
   const [ollamaOpen, setOllamaOpen] = useState(provider === "ollama")
+
+  // --- Dynamic model fetching state ---
+  const [models, setModels] = useState<ModelOption[]>([])
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [modelsFetched, setModelsFetched] = useState(false)
+
+  // Reset model list whenever the provider changes so the user never picks
+  // a model belonging to the previous provider.
+  useEffect(() => {
+    setModels([])
+    setModelsFetched(false)
+    setLoadingModels(false)
+  }, [provider])
+
+  async function handleFetchModels() {
+    if (loadingModels) return
+    setLoadingModels(true)
+    try {
+      let result: ModelOption[] = []
+
+      if (ANTHROPIC_NO_FETCH.has(provider)) {
+        // No public list endpoint — fall back to static list immediately.
+        result = STATIC_MODELS[provider] ?? []
+        toast.info("Liste statique utilisée pour Anthropic (pas d'endpoint public).")
+      } else if (provider === "openrouter") {
+        const res = await fetch("https://openrouter.ai/api/v1/models", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as { data?: Array<{ id: string; name?: string }> }
+        result = (data.data ?? [])
+          .filter((m) => typeof m.id === "string")
+          .map((m) => ({ id: m.id, label: m.name ?? m.id }))
+        if (result.length === 0) throw new Error("Empty list")
+      } else if (provider === "gemini") {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as {
+          models?: Array<{
+            name?: string
+            displayName?: string
+            supportedGenerationMethods?: string[]
+          }>
+        }
+        result = (data.models ?? [])
+          .filter(
+            (m) =>
+              Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.includes("generateContent"),
+          )
+          .map((m) => {
+            const id = (m.name ?? "").replace(/^models\//, "")
+            return { id, label: m.displayName ?? id }
+          })
+          .filter((m) => m.id.length > 0)
+        if (result.length === 0) throw new Error("Empty list")
+      } else if (provider === "openai") {
+        const base = aiBaseUrl?.trim() || "https://api.openai.com/v1"
+        const url = `${base.replace(/\/+$/, "")}/models`
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as { data?: Array<{ id: string }> }
+        result = (data.data ?? [])
+          .filter((m) => typeof m.id === "string" && m.id.startsWith("gpt-"))
+          .map((m) => ({ id: m.id, label: m.id }))
+        if (result.length === 0) throw new Error("No gpt-* models in response")
+      } else if (provider === "ollama") {
+        const host = ollamaHost?.trim() || "127.0.0.1"
+        const port = ollamaPort?.trim() || "11434"
+        const url = `http://${host}:${port}/api/tags`
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as { models?: Array<{ name: string }> }
+        result = (data.models ?? [])
+          .filter((m) => typeof m.name === "string")
+          .map((m) => ({ id: m.name, label: m.name }))
+        if (result.length === 0) throw new Error("No local models found")
+      } else if (provider === "deepseek") {
+        // DeepSeek exposes /models but auth can be flaky; static fallback is safer.
+        result = STATIC_MODELS[provider] ?? []
+        toast.info("Liste statique utilisée pour DeepSeek.")
+      }
+
+      setModels(result)
+      setModelsFetched(true)
+      if (result.length > 0) {
+        toast.success(`${result.length} modèles chargés pour ${provider}.`)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      const fallback = STATIC_MODELS[provider] ?? []
+      setModels(fallback)
+      setModelsFetched(true)
+      toast.warning(
+        `Échec du chargement (${message}). Fallback sur ${fallback.length} modèles statiques.`,
+      )
+    } finally {
+      setLoadingModels(false)
+    }
+  }
 
   return (
     <Card>
@@ -96,14 +241,66 @@ export default function AISection({
 
         {provider !== "ollama" ? (
           <div>
-            <label className="mb-2 block text-sm font-medium text-foreground">Modèle</label>
-            <Input
-              value={aiModel}
-              onChange={(event) => setAiModel(event.target.value)}
-              placeholder="gpt-4o / qwen3-coder-80b"
-            />
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <label className="text-sm font-medium text-foreground">Modèle</label>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={
+                  loadingModels ||
+                  !apiKey ||
+                  ANTHROPIC_NO_FETCH.has(provider)
+                }
+                onClick={handleFetchModels}
+                data-testid="ai-fetch-models"
+                title={
+                  ANTHROPIC_NO_FETCH.has(provider)
+                    ? "Anthropic n'expose pas d'endpoint public de listing"
+                    : apiKey
+                      ? "Charger la liste depuis l'API du fournisseur"
+                      : "Entrez une clé API pour activer le chargement"
+                }
+              >
+                {loadingModels ? (
+                  <>
+                    <Loader2 className="mr-2 size-3 animate-spin" />
+                    Chargement...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 size-3" />
+                    Charger les modèles
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {modelsFetched && models.length > 0 ? (
+              <Select value={aiModel} onValueChange={setAiModel}>
+                <SelectTrigger className="w-full" data-testid="ai-model-select">
+                  <SelectValue placeholder="Choisir un modèle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder="Cliquez sur Charger les modèles ou entrez un ID manuellement"
+                data-testid="ai-model-input"
+              />
+            )}
+
             <p className="mt-2 text-xs text-muted-foreground">
-              Laissez vide pour utiliser le modèle par défaut. Pour g0i.ai, utilisez <code>qwen3-coder-80b</code>.
+              {ANTHROPIC_NO_FETCH.has(provider)
+                ? "Anthropic n'expose pas d'endpoint public — la liste est statique. Entrez l'ID du modèle (ex. claude-sonnet-4-5)."
+                : "Laissez vide pour utiliser le modèle par défaut. Pour g0i.ai, utilisez qwen3-coder-80b."}
             </p>
           </div>
         ) : null}
