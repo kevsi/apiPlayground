@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import { z } from "zod"
 import { requireAuth, type AuthContext } from "../auth.js"
 import { getChangesSince, isMember, pushChanges, type LocalChange } from "../sync-engine.js"
+import { broadcastToWorkspace } from "../ws-hub.js"
 
 const sync = new Hono<{ Variables: { auth: AuthContext } }>()
 sync.use("*", requireAuth)
@@ -36,6 +37,18 @@ sync.post("/push", async (c) => {
     return c.json({ error: "Not a member" }, 403)
   }
   const result = pushChanges(body.workspaceId, auth.userId, body.changes as LocalChange[])
+  // Broadcast to all connected clients in this workspace so they can fetch
+  // the change immediately rather than waiting for their next poll.
+  // Per-entity broadcast is intentionally collapsed to a single signal: the
+  // receiving client treats it as a hint to re-poll and applies the diff.
+  if (result.accepted.length > 0) {
+    broadcastToWorkspace(body.workspaceId, {
+      type: "change",
+      workspaceId: body.workspaceId,
+      entityIds: result.accepted,
+      timestamp: Date.now(),
+    })
+  }
   return c.json(result)
 })
 

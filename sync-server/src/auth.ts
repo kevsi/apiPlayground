@@ -11,6 +11,10 @@ interface SessionPayload {
 
 const COOKIE_NAME = "auth_session"
 
+export function parseSessionCookie(cookieValue: string | undefined): SessionPayload | null {
+  return parseSession(cookieValue)
+}
+
 function getSecret(): string {
   const s = process.env.AUTH_SIGNING_SECRET
   if (!s) throw new Error("AUTH_SIGNING_SECRET env variable not set")
