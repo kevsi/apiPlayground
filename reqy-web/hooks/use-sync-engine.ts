@@ -2,6 +2,7 @@
 import { useEffect, useRef, useCallback } from "react"
 import { useSyncState } from "@/hooks/store/sync-state"
 import { useRequestStore } from "@/hooks/use-request-store"
+import { useSyncSocket } from "@/hooks/use-sync-socket"
 
 const POLL_INTERVAL_MS = 30_000
 
@@ -89,6 +90,14 @@ export function useSyncEngine() {
       setSyncError(err instanceof Error ? err.message : "Push failed")
     }
   }, [syncEnabled, workspaceId, serverUrl, addConflict, setSyncError])
+
+  // WebSocket push: trigger an immediate poll when the server notifies of a
+  // remote change. Polling remains active as a fallback (e.g. when WS is down).
+  useSyncSocket(
+    useCallback(() => {
+      void pollOnce()
+    }, [])
+  )
 
   // Wire up the banner's retry button: pressing it re-runs the poll loop.
   // Re-registered whenever pollOnce changes (sync state changes).
