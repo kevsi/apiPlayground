@@ -5,6 +5,7 @@ import { Loader2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { SdkDownloadButton } from "@/components/sdk-download-button"
 import type { Collection } from "@/hooks/use-request-store"
 
 interface HistoryLikeItem {
@@ -121,6 +122,16 @@ export function OpenApiExportModal({
                 "Exporter"
               )}
             </Button>
+          </div>
+
+          <div className="rounded-lg border border-dashed border-border px-4 py-3 space-y-2">
+            <p className="text-xs font-medium">SDK client</p>
+            <SdkDownloadButton
+              collections={collections}
+              historyItems={historyItems}
+              inferFromHistory={inferFromHistory && hasInferableHistory}
+              defaultName={collections.length === 1 ? collections[0].name : "reqly"}
+            />
           </div>
         </div>
       </div>
