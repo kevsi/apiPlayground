@@ -13,8 +13,11 @@ interface Props {
   onStop: () => void
   onExport: () => void
   onAiAssist: () => void
+  onAiFix?: () => void
   onLoadFromCollection?: () => void
   running: boolean
+  aiLoading?: boolean
+  aiError?: string | null
 }
 
 export function GraphqlActiveToolbar({
@@ -25,8 +28,11 @@ export function GraphqlActiveToolbar({
   onStop,
   onExport,
   onAiAssist,
+  onAiFix,
   onLoadFromCollection,
   running,
+  aiLoading,
+  aiError,
 }: Props) {
   return (
     <div
@@ -49,9 +55,26 @@ export function GraphqlActiveToolbar({
           <GitBranch className="w-3 h-3 mr-1" /> Load
         </Button>
       )}
-      <Button size="sm" variant="ghost" onClick={onAiAssist} data-testid="graphql-ai-button">
-        <Sparkles className="w-3 h-3 mr-1" /> AI
+      <Button size="sm" variant="ghost" onClick={onAiAssist} disabled={aiLoading} data-testid="graphql-ai-button">
+        <Sparkles className="w-3 h-3 mr-1" /> {aiLoading ? "Thinking…" : "AI"}
       </Button>
+      {onAiFix && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onAiFix}
+          disabled={aiLoading || !activeTab.response?.errors?.length}
+          data-testid="graphql-ai-fix"
+          title="Auto-fix query from the last server-side error"
+        >
+          <Sparkles className="w-3 h-3 mr-1" /> Fix
+        </Button>
+      )}
+      {aiError && (
+        <span className="text-[10px] text-red-500 max-w-[160px] truncate" title={aiError}>
+          {aiError}
+        </span>
+      )}
       <Button size="sm" variant="ghost" onClick={onExport} data-testid="graphql-export-button">
         <Copy className="w-3 h-3 mr-1" /> Export
       </Button>

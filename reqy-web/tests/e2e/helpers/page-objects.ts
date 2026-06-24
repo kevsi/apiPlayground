@@ -41,3 +41,9 @@ export const activeWorkspaceDisplay = (page: Page): Locator =>
 
 export const syncStatusBanner = (page: Page): Locator =>
   page.locator('[data-testid="sync-status-banner"]').first()
+
+export const runButton = (page: Page): Locator =>
+  page.locator('[data-testid="run-button"]').first()
+
+export const statusBadge = (page: Page): Locator =>
+  page.locator('[data-testid="response-status"]').first()

@@ -55,7 +55,7 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
               <CheckCircle2 className="w-3 h-3" /> OK
             </span>
           )}
-          {!error && errors && (
+          {!error && Array.isArray(errors) && errors.length > 0 && (
             <span className="text-yellow-600 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" /> errors
             </span>

@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { useGraphqlTabsState } from "@/hooks/use-graphql-tabs-state"
+import { useGraphqlAI } from "@/hooks/use-graphql-ai"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { GraphqlTabBar } from "./graphql-tab-bar"
 import { GraphqlActiveToolbar } from "./graphql-active-toolbar"
@@ -42,6 +43,8 @@ export function GraphqlTabsManager() {
   const collections = useRequestStore().collections
   const addCollection = useRequestStore().addCollection
   const addRequestToCollection = useRequestStore().addRequestToCollection
+
+  const { assistGraphql, fixGraphqlError, isLoading: aiLoading, error: aiError } = useGraphqlAI()
 
   const handleSave = useCallback(() => {
     setSaveName(activeTab.name)
@@ -120,18 +123,30 @@ export function GraphqlTabsManager() {
     URL.revokeObjectURL(url)
   }, [activeTab])
 
-  const handleAiAssist = useCallback(() => {
-    // Placeholder: integrate with lib/ai-engine.ts
-    updateTab(activeTab.id, {
-      query:
-        activeTab.query +
-        "\n# AI: describe your schema to get suggestions (stub)",
+  const handleAiAssist = useCallback(async () => {
+    const description = window.prompt(
+      "Describe the data you want to fetch (e.g. \"all users with their last 5 orders\"):",
+      "Give me the first 5 countries with their capitals",
+    )
+    if (!description || !description.trim()) return
+    await assistGraphql({
+      description,
+      schema: activeTab.schema,
+      currentQuery: activeTab.query,
+      applyQuery: (q) => updateTab(activeTab.id, { query: q }),
     })
-    toast({
-      title: "AI assistant ready",
-      description: "Hook to lib/ai-engine.ts in a follow-up.",
+  }, [activeTab, updateTab, assistGraphql])
+
+  const handleAiFix = useCallback(async () => {
+    const errMsg =
+      (activeTab.response?.errors && activeTab.response.errors[0]?.message) ||
+      "Unknown GraphQL error"
+    await fixGraphqlError({
+      query: activeTab.query,
+      errorMessage: errMsg,
+      applyQuery: (q) => updateTab(activeTab.id, { query: q }),
     })
-  }, [activeTab, updateTab])
+  }, [activeTab, updateTab, fixGraphqlError])
 
   const handleSelectFromCollection = useCallback(
     (req: import("@/lib/types").RequestItem) => {
@@ -189,6 +204,9 @@ export function GraphqlTabsManager() {
         onStop={stopSubscription}
         onExport={handleExport}
         onAiAssist={handleAiAssist}
+        onAiFix={handleAiFix}
+        aiLoading={aiLoading}
+        aiError={aiError ?? null}
         onLoadFromCollection={() => setCollectionsOpen(true)}
         running={isLoading || !!activeTab.schemaLoading}
       />

@@ -181,6 +181,40 @@ Provide method, full URL, headers, params, and a sample body if applicable. Use 
       .join("\n");
     return `Generate Markdown documentation for the following endpoints:\n${list}\nInclude summary, example request (with {{variables}}), example response schema, and quick usage notes. Return JSON only with GENERATE_DOC action containing the Markdown.`;
   },
+  graphqlFromDescription: (description: string, schemaHint?: string): string => {
+    const schema = schemaHint
+      ? `\nIntrospection schema (truncated):\n${schemaHint.slice(0, 4000)}\n`
+      : "\nNo introspection schema available — use sensible defaults.\n"
+    return `You are a GraphQL expert. Convert the natural language description into a valid GraphQL query.
+${schema}
+Description: "${description}"
+
+Rules:
+- Output ONLY the GraphQL query string, no prose, no markdown fences.
+- Use the introspection schema if available; otherwise pick fields that match the description.
+- Use $variables for dynamic values when the description implies them.
+- Prefer query (not mutation) unless the description clearly writes data.
+- Indent with 2 spaces.
+
+Example output:
+query GetUser($id: ID!) {
+  user(id: $id) {
+    id
+    name
+    email
+  }
+}`
+  },
+  graphqlFixFromError: (query: string, errorMessage: string): string => {
+    return `You are a GraphQL expert. The user query below produced the given error. Output ONLY a corrected GraphQL query string (no prose, no markdown fences).
+
+Query:
+${query}
+
+Error: ${errorMessage}
+
+Corrected query:`
+  },
 };
 
 /**
