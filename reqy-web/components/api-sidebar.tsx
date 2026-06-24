@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
 import { WorkspaceInviteDialog } from "@/components/workspace-invite-dialog"
+import { WorkspaceCreateDialog } from "@/components/workspace-create-dialog"
 import { useSyncState } from "@/hooks/store/sync-state"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { WORKSPACE_PERSONAL_ID } from "@/hooks/store/types"
@@ -138,6 +139,7 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
             </div>
           )}
           <div className="flex items-center gap-1">
+            <WorkspaceCreateDialog />
             <WorkspaceJoinDialog />
             {activeWorkspaceId && activeWorkspaceId !== WORKSPACE_PERSONAL_ID && (
               <WorkspaceInviteDialog
