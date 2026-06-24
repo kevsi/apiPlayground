@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, CheckCircle2, XCircle, Loader2, Download, Clock } from "lucide-react"
 import { useRequestStore } from "@/hooks/use-request-store"
+import { useSidebar } from "@/contexts/sidebar-context"
+import { cn } from "@/lib/utils"
 import { runCollection } from "@/lib/test-runner/runner"
 import { toJUnitXml } from "@/lib/test-runner/junit-export"
 import type { CollectionRunReport } from "@/lib/test-runner/types"
@@ -40,6 +42,7 @@ function saveHistory(history: RunHistoryEntry[]) {
 }
 
 export default function RunnerPage() {
+  const { isCollapsed, toggleSidebar } = useSidebar()
   const { collections } = useRequestStore()
   const [history, setHistory] = useState<RunHistoryEntry[]>([])
   const [activeReport, setActiveReport] = useState<CollectionRunReport | null>(null)
@@ -117,9 +120,13 @@ export default function RunnerPage() {
   }
 
   return (
-    <div className="flex h-screen">
-      <ApiSidebar />
-      <div className="flex-1 flex flex-col">
+    <div className="flex min-h-screen bg-background">
+      <ApiSidebar activePage="runner" collapsed={isCollapsed} onCollapse={toggleSidebar} />
+      <div className={cn(
+        "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
+        isCollapsed ? "ml-[60px]" : "ml-64",
+        "max-[916px]:ml-[60px]"
+      )}>
         <ApiHeader />
         <main className="flex-1 overflow-auto p-6" data-testid="runner-page">
           <div className="max-w-5xl mx-auto space-y-6">

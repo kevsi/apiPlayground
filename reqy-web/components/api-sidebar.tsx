@@ -127,6 +127,7 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
             )
           })}
         </ul>
+        <ToolsSection />
       </nav>
 
       {/* Sync section */}

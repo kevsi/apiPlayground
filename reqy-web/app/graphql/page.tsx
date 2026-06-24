@@ -12,6 +12,8 @@ import { Code2, Play, Loader2, ChevronRight, ChevronDown, RefreshCw, Save, Alert
 import { executeGraphQL } from "@/lib/graphql/execute"
 import { introspectSchema } from "@/lib/graphql/introspect"
 import type { GraphQLError } from "@/lib/graphql/types"
+import { useSidebar } from "@/contexts/sidebar-context"
+import { cn } from "@/lib/utils"
 
 interface SavedQuery {
   id: string
@@ -112,6 +114,7 @@ function SchemaTreeView({ data }: { data: SchemaData }) {
 }
 
 export default function GraphqlPage() {
+  const { isCollapsed, toggleSidebar } = useSidebar()
   const [endpoint, setEndpoint] = useState("https://countries.trevorblades.com/")
   const [query, setQuery] = useState(`query {
   countries {
@@ -229,9 +232,13 @@ export default function GraphqlPage() {
   }
 
   return (
-    <div className="flex h-screen">
-      <ApiSidebar />
-      <div className="flex-1 flex flex-col">
+    <div className="flex min-h-screen bg-background">
+      <ApiSidebar activePage="graphql" collapsed={isCollapsed} onCollapse={toggleSidebar} />
+      <div className={cn(
+        "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
+        isCollapsed ? "ml-[60px]" : "ml-64",
+        "max-[916px]:ml-[60px]"
+      )}>
         <ApiHeader />
         <main className="flex-1 overflow-auto p-6" data-testid="graphql-page">
           <div className="max-w-7xl mx-auto space-y-4">

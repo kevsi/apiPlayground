@@ -10,6 +10,8 @@ import { Package, Download, Copy, Check, Loader2 } from "lucide-react"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { generateTypeScriptSdk, type GeneratedFile } from "@/lib/sdk-codegen/typescript-generator"
 import { generateOpenApiSpec } from "@/lib/openapi-export"
+import { useSidebar } from "@/contexts/sidebar-context"
+import { cn } from "@/lib/utils"
 
 type Language = "typescript" | "python" | "go"
 
@@ -20,6 +22,7 @@ const LANGUAGES: Array<{ id: Language; label: string; available: boolean }> = [
 ]
 
 export default function SdksPage() {
+  const { isCollapsed, toggleSidebar } = useSidebar()
   const { collections } = useRequestStore()
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("")
   const [language, setLanguage] = useState<Language>("typescript")
@@ -80,9 +83,13 @@ export default function SdksPage() {
   const activeFileContent = files.find((f) => f.path === activeFile)?.content ?? ""
 
   return (
-    <div className="flex h-screen">
-      <ApiSidebar />
-      <div className="flex-1 flex flex-col">
+    <div className="flex min-h-screen bg-background">
+      <ApiSidebar activePage="sdks" collapsed={isCollapsed} onCollapse={toggleSidebar} />
+      <div className={cn(
+        "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
+        isCollapsed ? "ml-[60px]" : "ml-64",
+        "max-[916px]:ml-[60px]"
+      )}>
         <ApiHeader />
         <main className="flex-1 overflow-auto p-6" data-testid="sdks-page">
           <div className="max-w-6xl mx-auto space-y-6">

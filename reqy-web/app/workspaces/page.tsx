@@ -10,6 +10,8 @@ import { useSyncState } from "@/hooks/store/sync-state"
 import { WorkspaceCreateDialog } from "@/components/workspace-create-dialog"
 import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
 import { WorkspaceInviteDialog } from "@/components/workspace-invite-dialog"
+import { useSidebar } from "@/contexts/sidebar-context"
+import { cn } from "@/lib/utils"
 
 interface Workspace {
   id: string
@@ -52,6 +54,7 @@ function saveJson(key: string, value: unknown) {
 }
 
 export default function WorkspacesPage() {
+  const { isCollapsed, toggleSidebar } = useSidebar()
   const serverUrl = useSyncState((s) => s.serverUrl)
   const activeWorkspaceId = useSyncState((s) => s.workspaceId)
   const setWorkspace = useSyncState((s) => s.setWorkspace)
@@ -179,9 +182,13 @@ export default function WorkspacesPage() {
   }
 
   return (
-    <div className="flex h-screen">
-      <ApiSidebar />
-      <div className="flex-1 flex flex-col">
+    <div className="flex min-h-screen bg-background">
+      <ApiSidebar activePage="workspaces" collapsed={isCollapsed} onCollapse={toggleSidebar} />
+      <div className={cn(
+        "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out",
+        isCollapsed ? "ml-[60px]" : "ml-64",
+        "max-[916px]:ml-[60px]"
+      )}>
         <ApiHeader />
         <main className="flex-1 overflow-auto p-6" data-testid="workspaces-page">
           <div className="max-w-5xl mx-auto space-y-6">
