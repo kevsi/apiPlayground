@@ -16,9 +16,10 @@ import {
 } from "lucide-react"
 import { AppIcon } from "@/components/app-icon"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { ToolsSection } from "@/components/sidebar/tools-section"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
 import { WorkspaceInviteDialog } from "@/components/workspace-invite-dialog"
 import { WorkspaceCreateDialog } from "@/components/workspace-create-dialog"
@@ -57,6 +58,31 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
   const workspaces = requestStore.workspaces
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
   const activeWorkspaceName: string = activeWorkspace?.name ?? activeWorkspaceId ?? "Workspace"
+
+  const [aiHidden, setAiHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    try {
+      return localStorage.getItem("reqly-hide-ai-chat") === "true"
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    const onStorage = () => {
+      try {
+        setAiHidden(localStorage.getItem("reqly-hide-ai-chat") === "true")
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    const interval = window.setInterval(onStorage, 1000)
+    return () => {
+      window.removeEventListener("storage", onStorage)
+      window.clearInterval(interval)
+    }
+  }, [])
 
   return (
     <aside
@@ -204,6 +230,29 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
           </div>
         )}
       </div>
+
+      {/* Restore hidden AI chat (only visible when the user has hidden it) */}
+      {!collapsed && aiHidden && (
+        <div className="border-t border-sidebar-border p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-xs text-muted-foreground"
+            onClick={() => {
+              try {
+                localStorage.setItem("reqly-hide-ai-chat", "false")
+              } catch {
+                /* ignore */
+              }
+              setAiHidden(false)
+            }}
+            data-testid="show-ai-chat-button"
+          >
+            <Sparkles className="mr-2 size-3" />
+            Show AI chat
+          </Button>
+        </div>
+      )}
 
       {/* Collapse toggle button — always visible on hover */}
       <button
