@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { AppIcon } from "@/components/app-icon"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ToolsSection } from "@/components/sidebar/tools-section"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
@@ -87,6 +88,7 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
 
       {/* Navigation */}
       <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden px-2 scrollbar-discreet", collapsed ? "py-2" : "py-4")}>
+        {!collapsed && <ToolsSection />}
         <ul className="space-y-0.5">
           {navItems.map((item) => {
             const isActive = item.key === activePage
