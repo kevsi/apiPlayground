@@ -29,6 +29,14 @@ type ChatState = "closed" | "minimized" | "open"
 export function FloatingAiChat() {
   const pathname = usePathname()
   const [chatState, setChatState] = useState<ChatState>("closed")
+  const [hidden, setHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    try {
+      return localStorage.getItem("reqly-hide-ai-chat") === "true"
+    } catch {
+      return false
+    }
+  })
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
@@ -312,27 +320,57 @@ export function FloatingAiChat() {
     return null
   }
 
+  if (hidden) {
+    return null
+  }
+
   return (
     <>
-      {/* ── Floating button ──────────────────────────────────────────── */}
+      {/* ── Floating trigger (closed state only) ─────────────────────── */}
       <button
         id="floating-ask-ai-btn"
         onClick={toggleChat}
         aria-label="Assistant IA"
+        title="Assistant IA"
         className={cn(
-          "fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full px-4 py-3 shadow-2xl",
+          "fixed bottom-4 right-4 z-50 flex items-center justify-center rounded-full shadow-2xl",
+          "size-12",
           "bg-violet-600 text-white",
           "transition-all duration-300 hover:scale-105 hover:shadow-[0_8px_30px_rgba(124,58,237,0.25)]",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
-          chatState === "open" && "scale-95 opacity-90"
+          chatState !== "closed" && "scale-95 opacity-0 pointer-events-none"
         )}
       >
         {hasUnread && (
           <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
         )}
-        <Sparkles className="size-4" />
-        <span className="text-sm font-semibold tracking-wide">Assistant IA</span>
+        <Sparkles className="size-5" />
       </button>
+
+      {/* ── Permanently hide the AI chat ─────────────────────────────── */}
+      {chatState === "closed" && (
+        <button
+          onClick={() => {
+            try {
+              localStorage.setItem("reqly-hide-ai-chat", "true")
+            } catch {
+              /* localStorage unavailable, ignore */
+            }
+            setHidden(true)
+          }}
+          aria-label="Masquer le chat IA"
+          title="Masquer le chat IA"
+          className={cn(
+            "fixed bottom-4 right-[72px] z-50 flex items-center justify-center rounded-full",
+            "size-7 bg-slate-900/80 text-white/70 backdrop-blur-sm",
+            "border border-white/10 shadow-lg",
+            "transition-all duration-200 hover:bg-slate-800 hover:text-white",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          )}
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
 
       {/* ── Chat panel ───────────────────────────────────────────────── */}
       <div
@@ -344,10 +382,10 @@ export function FloatingAiChat() {
           "rounded-2xl border border-white/10 bg-[#0f1117] shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
           "transition-all duration-300 origin-bottom-right",
           chatState === "open"
-            ? "w-[calc(100vw-32px)] sm:w-[370px] max-h-[560px] opacity-100 scale-100 pointer-events-auto"
+            ? "w-[calc(100vw-32px)] sm:w-[370px] max-w-sm max-h-[560px] opacity-100 scale-100 pointer-events-auto"
             : chatState === "minimized"
-            ? "w-[calc(100vw-32px)] sm:w-[280px] max-h-[52px] opacity-100 scale-100 pointer-events-auto overflow-hidden"
-            : "w-[calc(100vw-32px)] sm:w-[370px] max-h-[560px] opacity-0 scale-90 pointer-events-none"
+            ? "w-[calc(100vw-32px)] sm:w-[240px] max-h-[44px] opacity-100 scale-100 pointer-events-auto overflow-hidden"
+            : "w-[calc(100vw-32px)] sm:w-[370px] max-w-sm max-h-[560px] opacity-0 scale-90 pointer-events-none"
         )}
       >
         {/* Header */}
