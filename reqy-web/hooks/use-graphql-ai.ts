@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { callAIText, PROMPTS } from "@/lib/ai-engine"
+import { extractGraphqlReply } from "@/lib/graphql/extract-reply"
 import { loadAIProvider, loadApiKey, loadOllamaConfig, loadAiBaseUrl, loadAiModel } from "@/lib/projects-store"
 import { toast } from "@/hooks/use-toast"
 
@@ -11,7 +12,34 @@ export interface GraphqlAIConfig {
   model?: string
   openaiUrl?: string
   ollamaUrl?: string
+  system?: string
 }
+
+/**
+ * Override the global SYSTEM_PROMPT (which forces a JSON wrapper with a
+ * summary + actions array) so the model can reply with a bare GraphQL
+ * operation. We still tolerate JSON wrappers on the receive side via
+ * extractGraphqlReply, in case some models refuse to drop the JSON habit.
+ */
+const GRAPHQL_AI_SYSTEM_PROMPT = `You are a GraphQL query generation expert.
+
+ABSOLUTE RULES — do not violate:
+- Output ONLY the GraphQL operation string (query, mutation, or subscription).
+- DO NOT wrap your reply in JSON, markdown fences, or any other structure.
+- DO NOT include a summary, explanation, or commentary.
+- DO NOT include a code-fence language tag like \`\`\`graphql.
+- The first non-whitespace character of your reply must be the keyword
+  (query | mutation | subscription | fragment) or a curly brace.
+
+Example of a correct reply:
+query GetUser($id: ID!) {
+  user(id: $id) {
+    id
+    name
+    email
+  }
+}`
+
 
 export interface UseGraphqlAIResult {
   isLoading: boolean
@@ -60,32 +88,9 @@ function parseAiConfig(): GraphqlAIConfig {
   }
 }
 
-/** Strip markdown code fences and surrounding prose from an LLM reply. */
-function extractGraphqlReply(raw: string): string {
-  let text = raw.trim()
-  // Drop ```graphql ... ``` fences if present.
-  const fence = text.match(/```(?:graphql|gql)?\s*([\s\S]*?)```/i)
-  if (fence) text = fence[1].trim()
-  // If the model returned JSON, pull the "query" / "queryString" field if present.
-  const json = text.match(/\{[\s\S]*\}/)
-  if (json) {
-    try {
-      const parsed = JSON.parse(json[0])
-      const candidate =
-        parsed.query ??
-        parsed.graphql ??
-        parsed.queryString ??
-        parsed.result ??
-        parsed.text
-      if (typeof candidate === "string" && candidate.trim().includes("{")) {
-        return candidate.trim()
-      }
-    } catch {
-      // not JSON, fall through
-    }
-  }
-  return text
-}
+/** Strip markdown code fences and surrounding prose from an LLM reply.
+ *  Implementation lives in @/lib/graphql/extract-reply (with unit tests). */
+void extractGraphqlReply // keep import alive for tooling / tree-shake check
 
 export function useGraphqlAI(): UseGraphqlAIResult {
   const [isLoading, setIsLoading] = useState(false)
@@ -109,7 +114,10 @@ export function useGraphqlAI(): UseGraphqlAIResult {
         const config = parseAiConfig()
         const schemaHint = schema ? JSON.stringify(schema) : undefined
         const prompt = PROMPTS.graphqlFromDescription(description, schemaHint)
-        const raw = await callAIText(prompt, config)
+        const raw = await callAIText(prompt, {
+          ...config,
+          system: GRAPHQL_AI_SYSTEM_PROMPT,
+        })
         const suggestion = extractGraphqlReply(raw)
         if (!suggestion) throw new Error("Empty AI response")
         applyQuery(suggestion)
@@ -150,7 +158,10 @@ export function useGraphqlAI(): UseGraphqlAIResult {
       try {
         const config = parseAiConfig()
         const prompt = PROMPTS.graphqlFixFromError(query, errorMessage)
-        const raw = await callAIText(prompt, config)
+        const raw = await callAIText(prompt, {
+          ...config,
+          system: GRAPHQL_AI_SYSTEM_PROMPT,
+        })
         const suggestion = extractGraphqlReply(raw)
         if (!suggestion) throw new Error("Empty AI response")
         applyQuery(suggestion)
