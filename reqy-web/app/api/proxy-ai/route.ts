@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing message" }, { status: 400 })
   }
 
-  const PROVIDERS_WITH_API_KEY = new Set(["openai", "openrouter", "anthropic", "gemini", "deepseek"])
+  const PROVIDERS_WITH_API_KEY = new Set(["openai", "openrouter", "anthropic", "gemini", "deepseek", "opencode-zen"])
   if (PROVIDERS_WITH_API_KEY.has(provider) && !apiKey) {
     return NextResponse.json({ error: "Missing API key" }, { status: 400 })
   }
@@ -83,14 +83,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ content })
     }
 
-    if (provider === "openai" || provider === "openrouter") {
+    if (provider === "openai" || provider === "openrouter" || provider === "opencode-zen") {
       const url = provider === "openai"
         ? body.openaiUrl && body.openaiUrl.trim()
           ? body.openaiUrl.trim().replace(/\/+$/, "").endsWith("/chat/completions")
             ? body.openaiUrl.trim().replace(/\/+$/, "")
             : body.openaiUrl.trim().replace(/\/+$/, "") + "/chat/completions"
           : "https://api.openai.com/v1/chat/completions"
-        : "https://openrouter.ai/api/v1/chat/completions"
+        : provider === "openrouter"
+        ? "https://openrouter.ai/api/v1/chat/completions"
+        : "https://opencode.ai/zen/v1/chat/completions"
       const res = await abortableFetch(url, {
         method: "POST",
         headers: {
@@ -98,7 +100,11 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: model || (provider === "openrouter" ? "openai/gpt-5.2" : "gpt-3.5-turbo"),
+          model: model || (provider === "openrouter"
+            ? "openai/gpt-5.2"
+            : provider === "opencode-zen"
+              ? "gpt-5"
+              : "gpt-3.5-turbo"),
           messages: [
             { role: "system", content: system },
             { role: "user", content: message },

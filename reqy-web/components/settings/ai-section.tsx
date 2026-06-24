@@ -73,6 +73,13 @@ const STATIC_MODELS: Record<AIProvider, ModelOption[]> = {
     { id: "deepseek-coder", label: "DeepSeek Coder" },
     { id: "deepseek-reasoner", label: "DeepSeek Reasoner" },
   ],
+  "opencode-zen": [
+    { id: "gpt-5", label: "GPT 5" },
+    { id: "gpt-5-codex", label: "GPT 5 Codex" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+    { id: "claude-opus-4-1", label: "Claude Opus 4.1" },
+    { id: "grok-code", label: "Grok Code" },
+  ],
 }
 
 const ANTHROPIC_NO_FETCH = new Set<AIProvider>(["anthropic"])
@@ -172,6 +179,18 @@ export default function AISection({
         // DeepSeek exposes /models but auth can be flaky; static fallback is safer.
         result = STATIC_MODELS[provider] ?? []
         toast.info("Liste statique utilisée pour DeepSeek.")
+      } else if (provider === "opencode-zen") {
+        const res = await fetch("https://opencode.ai/zen/v1/models", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as {
+          data?: Array<{ id: string; name?: string; owned_by?: string }>
+        }
+        result = (data.data ?? [])
+          .filter((m) => typeof m.id === "string" && !m.id.startsWith("alpha-"))
+          .map((m) => ({ id: m.id, label: m.name ?? m.id }))
+        if (result.length === 0) throw new Error("Empty list")
       }
 
       setModels(result)

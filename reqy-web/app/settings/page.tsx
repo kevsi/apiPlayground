@@ -31,6 +31,7 @@ const AI_PROVIDERS: Array<{ value: AIProvider; label: string }> = [
   { value: "openrouter", label: "OpenRouter" },
   { value: "gemini", label: "Gemini" },
   { value: "ollama", label: "Ollama" },
+  { value: "opencode-zen", label: "Opencode Zen" },
 ]
 
 type SectionItem = {

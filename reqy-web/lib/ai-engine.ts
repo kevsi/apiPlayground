@@ -324,6 +324,8 @@ export async function callAI(
     ? "gpt-4o"
     : provider === "deepseek"
     ? "deepseek-chat"
+    : provider === "opencode-zen"
+    ? "gpt-5"
     : "llama3";
 
   const system = SYSTEM_PROMPT;
@@ -342,6 +344,30 @@ export async function callAI(
           system,
           message: userPrompt,
           ...extra,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${provider} proxy error ${res.status}: ${text}`);
+      }
+
+      const data = await res.json();
+      const content = typeof data.content === "string" ? data.content : JSON.stringify(data);
+      return parseAIResponse(String(content));
+    }
+
+    if (provider === "opencode-zen") {
+      if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
+      const res = await fetchWithTimeout("/api/proxy-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          apiKey: config.apiKey,
+          model,
+          system,
+          message: userPrompt,
         }),
       });
 
@@ -434,6 +460,8 @@ export async function callAIText(
     ? "gpt-4o"
     : provider === "deepseek"
     ? "deepseek-chat"
+    : provider === "opencode-zen"
+    ? "gpt-5"
     : "llama3";
 
   const system = config.system ?? SYSTEM_PROMPT;
@@ -463,7 +491,7 @@ export async function callAIText(
     return typeof data.content === "string" ? String(data.content) : JSON.stringify(data);
   }
 
-  if (provider === "openrouter" || provider === "gemini" || provider === "deepseek") {
+  if (provider === "openrouter" || provider === "gemini" || provider === "deepseek" || provider === "opencode-zen") {
     if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
     const res = await fetchWithTimeout("/api/proxy-ai", {
       method: "POST",

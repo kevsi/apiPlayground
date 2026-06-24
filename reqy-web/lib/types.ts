@@ -134,7 +134,7 @@ export interface TestResult {
   message: string
 }
 
-export type AIProvider = "anthropic" | "openai" | "openrouter" | "gemini" | "deepseek" | "ollama"
+export type AIProvider = "anthropic" | "openai" | "openrouter" | "gemini" | "deepseek" | "ollama" | "opencode-zen"
 export type AnalysisMode = "static" | "ai"
 
 export interface SavedProject {

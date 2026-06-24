@@ -15,6 +15,7 @@ const MODEL_MAP: Record<AIProvider, string> = {
   gemini: "gemini-2.0-flash",
   deepseek: "deepseek-chat",
   ollama: "llama2",
+  "opencode-zen": "gpt-5",
 }
 
 export function isAiConfigured(): boolean {
