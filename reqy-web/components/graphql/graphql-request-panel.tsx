@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { GraphqlAddressBar } from "./address-bar"
 import { GraphqlToolbar } from "./graphql-toolbar"
 import { GraphqlQueryEditor } from "./graphql-query-editor"
@@ -23,6 +23,32 @@ interface Props {
   running: boolean
 }
 
+function countJsonKeys(raw: string): number {
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed === "{}") return 0
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.keys(parsed).length
+    }
+    if (Array.isArray(parsed)) return parsed.length
+    return 1
+  } catch {
+    return 0
+  }
+}
+
+function isValidJson(raw: string): boolean {
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed === "{}") return true
+  try {
+    JSON.parse(trimmed)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function GraphqlRequestPanel({
   tab,
   onUpdate,
@@ -33,8 +59,15 @@ export function GraphqlRequestPanel({
   running,
 }: Props) {
   const [showBuilder, setShowBuilder] = useState(false)
+  const [showVariables, setShowVariables] = useState(false)
+  const [showHeaders, setShowHeaders] = useState(false)
   const [operationType, setOperationType] = useState<OperationType>("query")
   const schemaData = (tab.schema as SchemaData | null) ?? null
+
+  const variablesCount = useMemo(() => countJsonKeys(tab.variables), [tab.variables])
+  const headersCount = useMemo(() => countJsonKeys(tab.headers), [tab.headers])
+  const variablesValid = useMemo(() => isValidJson(tab.variables), [tab.variables])
+  const headersValid = useMemo(() => isValidJson(tab.headers), [tab.headers])
 
   return (
     <div
@@ -52,13 +85,42 @@ export function GraphqlRequestPanel({
         onIntrospect={onIntrospect}
         onToggleSchema={() => {}}
         onPrettify={onPrettify}
-        onToggleBuilder={() => setShowBuilder((s) => !s)}
         schemaOpen={false}
         introspecting={tab.schemaLoading ?? false}
         canPrettify={!!tab.query.trim()}
+        onToggleBuilder={() => setShowBuilder((s) => !s)}
         showBuilder={showBuilder}
         builderAvailable={!!schemaData}
+        onToggleVariables={() => setShowVariables((s) => !s)}
+        showVariables={showVariables}
+        variablesCount={variablesCount}
+        variablesError={!variablesValid}
+        onToggleHeaders={() => setShowHeaders((s) => !s)}
+        showHeaders={showHeaders}
+        headersCount={headersCount}
+        headersError={!headersValid}
       />
+
+      {/* Inline panels — always visible right under the toolbar, never buried at the bottom */}
+      {showVariables && (
+        <div className="max-h-56 overflow-auto border-b bg-background">
+          <VariablesPanel
+            value={tab.variables}
+            onChange={(v) => onUpdate({ variables: v })}
+            defaultOpen
+          />
+        </div>
+      )}
+      {showHeaders && (
+        <div className="max-h-56 overflow-auto border-b bg-background">
+          <HeadersPanel
+            value={tab.headers}
+            onChange={(h) => onUpdate({ headers: h })}
+            defaultOpen
+          />
+        </div>
+      )}
+
       {showBuilder && schemaData && (
         <GraphqlQueryBuilder
           schema={schemaData}
@@ -68,21 +130,13 @@ export function GraphqlRequestPanel({
           operationName={tab.operationName ?? "Generated"}
         />
       )}
-      <div className="flex-1 overflow-auto">
+
+      {/* Editor takes the remaining space; no more scroll-area burial. */}
+      <div className="flex-1 min-h-0 overflow-auto">
         <GraphqlQueryEditor
           value={tab.query}
           onChange={(q) => onUpdate({ query: q })}
           schema={tab.schema}
-        />
-        <VariablesPanel
-          value={tab.variables}
-          onChange={(v) => onUpdate({ variables: v })}
-          defaultOpen={false}
-        />
-        <HeadersPanel
-          value={tab.headers}
-          onChange={(h) => onUpdate({ headers: h })}
-          defaultOpen={false}
         />
       </div>
     </div>
