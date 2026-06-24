@@ -8,6 +8,7 @@ export function SyncStatusBanner() {
   const lastSyncAt = useSyncState((s) => s.lastSyncAt)
   const enabled = useSyncState((s) => s.enabled)
   const clearConflicts = useSyncState((s) => s.clearConflicts)
+  const retrySync = useSyncState((s) => s.retrySync)
 
   if (!enabled) return null
 
@@ -20,6 +21,15 @@ export function SyncStatusBanner() {
             lastSyncAt ? `Last sync: ${new Date(lastSyncAt).toLocaleTimeString()}` :
             "Sync idle"}
         </span>
+        {syncError && !syncing && (
+          <button
+            type="button"
+            onClick={() => retrySync()}
+            className="ml-2 rounded border px-2 py-0.5 text-xs hover:bg-accent"
+          >
+            Retry
+          </button>
+        )}
       </div>
       {conflicts.length > 0 && (
         <div className="mt-1 flex items-center justify-between gap-2 text-orange-600">

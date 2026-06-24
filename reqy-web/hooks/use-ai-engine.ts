@@ -110,6 +110,11 @@ function getHandlers(store: AIRequestStore) {
 }
 
 export function useAIEngine(): UseAIEngineResult {
+  // The flat useRequestStore() does not expose every method listed in
+  // AIRequestStore (e.g. patchRequest, addAssertions, setDoc) — those live
+  // on action helpers imported elsewhere. The cast lets the AI engine call
+  // them with optional chaining; the engine falls back to no-ops when a
+  // method is missing. Tighten when the store interface is unified.
   const store = useRequestStore() as unknown as AIRequestStore
   const [isLoading, setIsLoading] = useState(false)
   const [lastSummary, setLastSummary] = useState<string | null>(null)

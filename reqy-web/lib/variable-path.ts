@@ -4,7 +4,7 @@ export type PathExtractionResult = {
   error?: string
 }
 
-const JSON_PATH_PATTERN = /^[\w.\[\]-]+$/
+const JSON_PATH_PATTERN = /^\$?[\w.\[\]-]+$/
 
 export function isSourcePathSyntaxValid(path: string): boolean {
   return typeof path === "string" && (path.trim() === "" || JSON_PATH_PATTERN.test(path.trim()))
@@ -25,7 +25,9 @@ export function getValueByPath(value: unknown, path: string): PathExtractionResu
   }
 
   try {
-    const result = trimmedPath.split(".").reduce<unknown | undefined>((current, segment) => {
+    // Strip optional JSONPath-style $ prefix so "$.id" matches "id".
+    const normalizedPath = trimmedPath.replace(/^\$\.?/, "")
+    const result = normalizedPath.split(".").reduce<unknown | undefined>((current, segment) => {
       if (current === undefined || current === null) return undefined
 
       const parts = segment

@@ -14,6 +14,16 @@ export interface LocalSyncChange {
   baseVersion?: number
 }
 
+// Subset of the request store that the sync engine mutates when applying
+// remote changes. These live in hooks/store/workspaces.ts but are not yet
+// reflected in the public RequestStore interface, so we narrow with a local
+// shape instead of `as any`.
+interface SyncMutations {
+  upsertCollectionFromSync?: (data: unknown) => void
+  upsertEnvironmentFromSync?: (data: unknown) => void
+  upsertFolderFromSync?: (data: unknown) => void
+}
+
 export function useSyncEngine() {
   const syncEnabled = useSyncState((s) => s.enabled)
   const workspaceId = useSyncState((s) => s.workspaceId)
@@ -24,7 +34,7 @@ export function useSyncEngine() {
   const addConflict = useSyncState((s) => s.addConflict)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const store = useRequestStore()
+  const store = useRequestStore() as unknown as SyncMutations
 
   const pollOnce = useCallback(async () => {
     if (!syncEnabled || !workspaceId || !serverUrl) return
@@ -40,11 +50,11 @@ export function useSyncEngine() {
       for (const change of data.changes ?? []) {
         if (change.deleted) continue
         if (change.entityType === "collection") {
-          (store as any).upsertCollectionFromSync?.(change.data)
+          store.upsertCollectionFromSync?.(change.data)
         } else if (change.entityType === "environment") {
-          (store as any).upsertEnvironmentFromSync?.(change.data)
+          store.upsertEnvironmentFromSync?.(change.data)
         } else if (change.entityType === "folder") {
-          (store as any).upsertFolderFromSync?.(change.data)
+          store.upsertFolderFromSync?.(change.data)
         }
       }
       setLastSyncAt(data.serverTime ?? Date.now())
@@ -79,6 +89,12 @@ export function useSyncEngine() {
       setSyncError(err instanceof Error ? err.message : "Push failed")
     }
   }, [syncEnabled, workspaceId, serverUrl, addConflict, setSyncError])
+
+  // Wire up the banner's retry button: pressing it re-runs the poll loop.
+  // Re-registered whenever pollOnce changes (sync state changes).
+  useEffect(() => {
+    useSyncState.setState({ retrySync: () => { void pollOnce() } })
+  }, [pollOnce])
 
   useEffect(() => {
     if (!syncEnabled) {

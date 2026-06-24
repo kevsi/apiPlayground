@@ -8,8 +8,8 @@ describe('isSourcePathSyntaxValid', () => {
     expect(isSourcePathSyntaxValid('')).toBe(true)
   })
 
-  it('rejects paths with $-prefix', () => {
-    expect(isSourcePathSyntaxValid('$.id')).toBe(false)
+  it('accepts paths with $-prefix', () => {
+    expect(isSourcePathSyntaxValid('$.id')).toBe(true)
   })
 
   it('rejects paths with special characters', () => {

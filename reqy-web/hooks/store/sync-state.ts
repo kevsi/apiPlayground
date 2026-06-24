@@ -25,6 +25,9 @@ export interface SyncState {
   setLastSyncAt: (timestamp: number) => void
   addConflict: (conflict: ConflictRecord) => void
   clearConflicts: () => void
+  // retrySync is wired up by useSyncEngine; the store only triggers the
+  // request so the banner can call it without depending on the engine hook.
+  retrySync: () => void
 }
 
 export const useSyncState = create<SyncState>((set) => ({
@@ -43,4 +46,8 @@ export const useSyncState = create<SyncState>((set) => ({
   setLastSyncAt: (lastSyncAt) => set({ lastSyncAt }),
   addConflict: (conflict) => set((s) => ({ conflicts: [...s.conflicts, conflict] })),
   clearConflicts: () => set({ conflicts: [] }),
+  retrySync: () => {
+    // Default no-op; useSyncEngine overrides this on mount.
+    set({ syncError: null })
+  },
 }))
