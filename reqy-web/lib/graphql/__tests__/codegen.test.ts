@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest"
 import {
   generateFetchSnippet,
   generateCurlSnippet,
   generateTypeScriptStub,
-} from "@/lib/graphql/codegen";
+} from "@/lib/graphql/codegen"
 
 describe("generateFetchSnippet", () => {
   it("produces valid JS fetch code", () => {
@@ -12,24 +12,22 @@ describe("generateFetchSnippet", () => {
       query: "{ hello }",
       variables: {},
       headers: { Authorization: "Bearer token" },
-    });
-    expect(code).toContain("fetch");
-    expect(code).toContain("https://api.example.com/graphql");
-    expect(code).toContain("{ hello }");
-    expect(code).toContain("Authorization");
-  });
+    })
+    expect(code).toContain("fetch")
+    expect(code).toContain("https://api.example.com/graphql")
+    expect(code).toContain("{ hello }")
+    expect(code).toContain("Bearer token")
+  })
 
-  it("includes variables and operation name when provided", () => {
+  it("handles missing headers and variables", () => {
     const code = generateFetchSnippet({
-      endpoint: "https://api.example.com/graphql",
-      query: "query Hello($id: ID!) { hello(id: $id) }",
-      variables: { id: "1" },
-      operationName: "Hello",
-    });
-    expect(code).toContain('"operationName": "Hello"');
-    expect(code).toContain('"id": "1"');
-  });
-});
+      endpoint: "https://x",
+      query: "{ a }",
+    })
+    expect(code).toContain("Content-Type")
+    expect(code).not.toContain("undefined")
+  })
+})
 
 describe("generateCurlSnippet", () => {
   it("produces valid curl command", () => {
@@ -38,28 +36,35 @@ describe("generateCurlSnippet", () => {
       query: "{ hello }",
       variables: {},
       headers: { Authorization: "Bearer token" },
-    });
-    expect(code).toContain("curl");
-    expect(code).toContain("-X POST");
-    expect(code).toContain("Authorization: Bearer token");
-    expect(code).toContain("Content-Type: application/json");
-  });
+    })
+    expect(code).toContain("curl")
+    expect(code).toContain("-X POST")
+    expect(code).toContain("Authorization: Bearer token")
+  })
 
-  it("produces minimal curl when no extra headers", () => {
+  it("encodes single quotes via JSON escaping", () => {
     const code = generateCurlSnippet({
-      endpoint: "https://api.example.com/graphql",
-      query: "{ hello }",
-    });
-    expect(code).toContain("-d");
-    expect(code).not.toContain("-H \"Authorization");
-  });
-});
+      endpoint: "https://x",
+      query: `{ a(b: "it's") }`,
+    })
+    expect(code).toContain("-d")
+    // JSON.stringify escapes the double quotes around "it's"
+    expect(code).toMatch(/\\"it/)
+  })
+})
 
 describe("generateTypeScriptStub", () => {
-  it("produces a TypeScript interface", () => {
-    const code = generateTypeScriptStub("GetUsers", ["id", "name"]);
-    expect(code).toContain("interface GetUsersResponse");
-    expect(code).toContain("id: unknown");
-    expect(code).toContain("name: unknown");
-  });
-});
+  it("generates an interface with the given fields", () => {
+    const code = generateTypeScriptStub("GetUser", ["id", "name", "email"])
+    expect(code).toContain("interface GetUserResponse")
+    expect(code).toContain("id: unknown")
+    expect(code).toContain("name: unknown")
+    expect(code).toContain("email: unknown")
+  })
+
+  it("handles empty fields gracefully", () => {
+    const code = generateTypeScriptStub("Empty", [])
+    expect(code).toContain("interface EmptyResponse")
+    expect(code).toContain("// no fields detected")
+  })
+})

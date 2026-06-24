@@ -1,5 +1,5 @@
 "use client"
-import { RefreshCw, BookOpen, Loader2 } from "lucide-react"
+import { RefreshCw, BookOpen, Loader2, ListTree } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PrettifyButton } from "./prettify-button"
 
@@ -10,6 +10,9 @@ interface Props {
   schemaOpen: boolean
   introspecting: boolean
   canPrettify: boolean
+  onToggleBuilder?: () => void
+  showBuilder?: boolean
+  builderAvailable?: boolean
 }
 
 export function GraphqlToolbar({
@@ -19,6 +22,9 @@ export function GraphqlToolbar({
   schemaOpen,
   introspecting,
   canPrettify,
+  onToggleBuilder,
+  showBuilder,
+  builderAvailable,
 }: Props) {
   return (
     <div className="flex items-center gap-2 p-2 border-b bg-muted/20 flex-wrap" data-testid="graphql-toolbar">
@@ -41,6 +47,19 @@ export function GraphqlToolbar({
         <BookOpen className="w-3 h-3 mr-1" />
         {schemaOpen ? "Hide" : "Show"} Schema
       </Button>
+      {onToggleBuilder && (
+        <Button
+          variant={showBuilder ? "default" : "outline"}
+          size="sm"
+          onClick={onToggleBuilder}
+          disabled={!builderAvailable}
+          data-testid="graphql-toggle-builder"
+          title={builderAvailable ? "Toggle visual query builder" : "Run Refresh Schema first"}
+        >
+          <ListTree className="w-3 h-3 mr-1" />
+          {showBuilder ? "Hide" : "Show"} Builder
+        </Button>
+      )}
       <PrettifyButton onClick={onPrettify} disabled={!canPrettify} />
     </div>
   )

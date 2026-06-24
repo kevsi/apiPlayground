@@ -160,6 +160,56 @@ export interface OllamaConfig {
   model?: string
 }
 
+// --- GraphQL additions ---
+
+export interface GraphQLError {
+  message: string
+  path?: (string | number)[]
+  extensions?: Record<string, unknown>
+}
+
+export interface GraphQLExecuteResult {
+  statusCode: number
+  responseTimeMs: number
+  headers: Record<string, string>
+  data?: unknown
+  errors?: GraphQLError[]
+  graphqlBody: { data?: unknown; errors?: GraphQLError[] } | unknown
+}
+
+export interface GraphQLRequest {
+  endpoint: string
+  query: string
+  variables?: Record<string, unknown>
+  operationName?: string
+  headers?: Record<string, string>
+}
+
+export type GraphqlMessageType = "data" | "error" | "complete" | "info"
+
+export interface GraphqlSubscriptionMessage {
+  id: number
+  type: GraphqlMessageType
+  payload: unknown
+  timestamp: number
+}
+
+export interface GraphqlTab {
+  id: string
+  name: string
+  endpoint: string
+  query: string
+  variables: string
+  headers: string
+  operationName?: string
+  schema?: unknown
+  schemaLoading?: boolean
+  response?: GraphQLExecuteResult
+  subscriptionMessages?: GraphqlSubscriptionMessage[]
+  saved?: boolean
+  dirty?: boolean
+}
+
 export interface GraphQLError {
   message: string
   path?: (string | number)[]
