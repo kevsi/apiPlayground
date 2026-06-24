@@ -159,3 +159,47 @@ export interface OllamaConfig {
   port?: number
   model?: string
 }
+
+export interface GraphQLError {
+  message: string
+  path?: (string | number)[]
+  extensions?: Record<string, unknown>
+}
+
+export interface GraphQLExecuteResult {
+  statusCode: number
+  responseTimeMs: number
+  headers: Record<string, string>
+  data?: unknown
+  errors?: GraphQLError[]
+  graphqlBody: { data?: unknown; errors?: GraphQLError[] } | unknown
+}
+
+export interface GraphQLRequest {
+  endpoint: string
+  query: string
+  variables?: Record<string, unknown>
+  operationName?: string
+  headers?: Record<string, string>
+}
+
+export interface GraphqlTab {
+  id: string
+  name: string
+  endpoint: string
+  query: string
+  variables: string
+  headers: string
+  operationName?: string
+  schema?: unknown
+  schemaLoading?: boolean
+  response?: GraphQLExecuteResult
+  subscriptionMessages?: Array<{
+    id: number
+    type: "data" | "error" | "complete" | "info"
+    payload: unknown
+    timestamp: number
+  }>
+  saved?: boolean
+  dirty?: boolean
+}
