@@ -57,6 +57,7 @@ export function GraphqlRequestPanel({
         introspecting={tab.schemaLoading ?? false}
         canPrettify={!!tab.query.trim()}
         showBuilder={showBuilder}
+        builderAvailable={!!schemaData}
       />
       {showBuilder && schemaData && (
         <GraphqlQueryBuilder
