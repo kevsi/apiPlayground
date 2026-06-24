@@ -13,7 +13,6 @@ import {
   FlaskConical,
   ChevronsLeft,
   ChevronsRight,
-  Braces,
 } from "lucide-react"
 import { AppIcon } from "@/components/app-icon"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -31,7 +30,6 @@ import { WORKSPACE_PERSONAL_ID } from "@/hooks/store/types"
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", key: "dashboard" },
   { icon: Zap, label: "API Endpoints", href: "/", key: "api-endpoints" },
-  { icon: Braces, label: "GraphQL", href: "/graphql", key: "graphql" },
   { icon: Folder, label: "Collections", href: "/collections", key: "collections" },
   { icon: FolderCode, label: "Projects", href: "/my-projects", key: "projects" },
   { icon: FlaskConical, label: "Mock Server", href: "/mocks", key: "mocks" },
