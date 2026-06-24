@@ -131,7 +131,7 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
       {!collapsed && (
         <div className="flex flex-col gap-1.5 border-t border-sidebar-border px-2 py-2">
           {activeWorkspaceId && activeWorkspaceId !== WORKSPACE_PERSONAL_ID && (
-            <div className="flex items-center gap-1 truncate px-1 text-[10px] text-muted-foreground">
+            <div data-testid="active-workspace" className="flex items-center gap-1 truncate px-1 text-[10px] text-muted-foreground">
               <span className="shrink-0">Workspace:</span>
               <span className="truncate font-mono" title={activeWorkspaceName}>
                 {activeWorkspaceName}
@@ -139,13 +139,15 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
             </div>
           )}
           <div className="flex items-center gap-1">
-            <WorkspaceCreateDialog />
-            <WorkspaceJoinDialog />
+            <span data-testid="create-workspace-button"><WorkspaceCreateDialog /></span>
+            <span data-testid="join-workspace-button"><WorkspaceJoinDialog /></span>
             {activeWorkspaceId && activeWorkspaceId !== WORKSPACE_PERSONAL_ID && (
-              <WorkspaceInviteDialog
-                workspaceId={activeWorkspaceId}
-                workspaceName={activeWorkspaceName}
-              />
+              <span data-testid="invite-workspace-button">
+                <WorkspaceInviteDialog
+                  workspaceId={activeWorkspaceId}
+                  workspaceName={activeWorkspaceName}
+                />
+              </span>
             )}
             {syncWorkspaceId && syncEnabled && (
               <span className="text-[10px] text-muted-foreground truncate" title={syncWorkspaceId}>

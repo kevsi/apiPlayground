@@ -305,6 +305,7 @@ ${bodyPart}})
           >
             <SelectTrigger
               aria-label="HTTP method"
+              data-testid="method-selector"
               className={cn(
                 "shrink-0 rounded-lg border-0 px-2.5 py-1 text-[11px] font-bold font-mono cursor-pointer transition-all duration-200 outline-none ring-offset-0 focus:ring-0 focus:ring-offset-0 h-auto w-auto gap-1 [&>svg]:size-3.5",
                 methodBgMap[method],
@@ -337,6 +338,7 @@ ${bodyPart}})
             <input
               ref={urlInputRef}
               type="text"
+              data-testid="url-input"
               value={url}
               onChange={(e) => onUrlChange(e.target.value)}
               placeholder="https://api.example.com/endpoint"
@@ -407,6 +409,7 @@ ${bodyPart}})
         <div className="mt-2 flex items-center gap-2 flex-wrap">
           <Button
             disabled={!hasUrl || isLoading}
+            data-testid="send-button"
             onClick={async () => {
               if (!hasUrl) return
               await onSend()

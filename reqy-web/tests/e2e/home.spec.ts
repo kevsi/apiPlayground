@@ -1,17 +1,15 @@
 import { test, expect } from "@playwright/test"
-import { startMockServer, stopMockServer } from "./fixtures/mock-server"
-
-test.beforeAll(async () => { await startMockServer() })
-test.afterAll(async () => { await stopMockServer() })
 
 test("home page loads", async ({ page }) => {
   await page.goto("/")
   await expect(page).toHaveURL(/\/$/)
+  // Body is visible (basic smoke test)
+  await expect(page.locator("body")).toBeVisible()
 })
 
 test("collections page loads", async ({ page }) => {
   await page.goto("/collections")
-  await expect(page.locator("body")).toContainText(/collection/i)
+  await expect(page.locator("body")).toContainText(/collection/i, { timeout: 5000 })
 })
 
 test("dashboard page loads", async ({ page }) => {

@@ -112,8 +112,9 @@ export function RequestTabsManager() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <RequestTabBar
-        tabs={tabs}
+      <div data-testid="request-tabs">
+        <RequestTabBar
+          tabs={tabs}
         activeTabId={activeTabId}
         canScrollLeft={canScrollLeft}
         canScrollRight={canScrollRight}
@@ -132,6 +133,7 @@ export function RequestTabsManager() {
         onCloseAllTabs={closeAllTabs}
         onSaveAllTabs={saveAllTabs}
       />
+      </div>
 
       <RequestActiveToolbar
         activeTab={activeTab}

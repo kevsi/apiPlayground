@@ -506,6 +506,7 @@ export function CollectionsPanel({
           <Button
             variant="default"
             size="sm"
+            data-testid="new-collection-button"
             onClick={() => onAddCollection()}
             className="h-7 gap-1.5 px-2.5 text-xs font-medium shadow-xs"
           >
@@ -591,7 +592,7 @@ export function CollectionsPanel({
       )}
 
       {/* Collections content */}
-      <div ref={listContainerRef} className="flex-1 overflow-y-auto hide-scrollbar p-2" style={{ maxHeight: "60vh" }}>
+      <div ref={listContainerRef} data-testid="collection-list" className="flex-1 overflow-y-auto hide-scrollbar p-2" style={{ maxHeight: "60vh" }}>
         {viewMode === "list" ? (
           // ── LIST VIEW ──────────────────────────────────────────────────
           <div
@@ -608,6 +609,7 @@ export function CollectionsPanel({
                 <div
                   key={collection.id}
                   data-index={virtualItem.index}
+                  data-testid={`collection-item-${collection.id}`}
                   ref={rowVirtualizer.measureElement}
                   className={cn(
                     "rounded-xl transition-all duration-200 absolute top-0 left-0 w-full",
@@ -717,6 +719,7 @@ export function CollectionsPanel({
                       {editingCollectionId === collection.id ? (
                         <div className="flex w-full items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <Input
+                            data-testid="collection-name-input"
                             value={renameValue}
                             onChange={(e) => setRenameValue(e.target.value)}
                             onKeyDown={(event) => {
@@ -778,7 +781,7 @@ export function CollectionsPanel({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem onClick={() => onAddRequestToCollection(collection.id)}>
+                          <DropdownMenuItem data-testid="add-request-button" onClick={() => onAddRequestToCollection(collection.id)}>
                             <Plus className="mr-2 size-3.5" /> Add Request
                           </DropdownMenuItem>
                           {onRunCollection && (
@@ -979,6 +982,7 @@ export function CollectionsPanel({
               <Button
                 variant="default"
                 size="sm"
+                data-testid="new-collection-button"
                 onClick={() => onAddCollection()}
                 className="mt-5 h-8 gap-1.5 text-xs font-medium shadow-xs"
               >

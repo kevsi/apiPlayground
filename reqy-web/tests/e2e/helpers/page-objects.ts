@@ -1,45 +1,43 @@
 import type { Page, Locator } from "@playwright/test"
 
-export function urlInput(page: Page): Locator {
-  return page.locator('input[type="url"], input[placeholder*="http"], input[name*="url"]').first()
-}
+export const urlInput = (page: Page): Locator =>
+  page.locator('[data-testid="url-input"]').first()
 
-export function sendButton(page: Page): Locator {
-  return page.getByRole("button", { name: /^send$/i }).first()
-}
+export const sendButton = (page: Page): Locator =>
+  page.locator('[data-testid="send-button"]').first()
 
-export function statusBadge(page: Page): Locator {
-  return page.locator('[data-testid="status-code"], .status-badge, [class*="status"]').first()
-}
+export const responseStatus = (page: Page): Locator =>
+  page.locator('[data-testid="response-status"]').first()
 
-export function methodSelector(page: Page): Locator {
-  return page.getByRole("combobox", { name: /method/i }).first()
-}
+export const responseBody = (page: Page): Locator =>
+  page.locator('[data-testid="response-body"]').first()
 
-export function collectionsLink(page: Page): Locator {
-  return page.getByRole("link", { name: /collections/i }).first()
-}
+export const methodSelector = (page: Page): Locator =>
+  page.locator('[data-testid="method-selector"]').first()
 
-export function newCollectionButton(page: Page): Locator {
-  return page.getByRole("button", { name: /new collection|create collection/i }).first()
-}
+export const requestTabs = (page: Page): Locator =>
+  page.locator('[data-testid="request-tabs"]').first()
 
-export function collectionName(page: Page): Locator {
-  return page.locator('input[name="name"], input[placeholder*="name" i]').first()
-}
+export const newCollectionButton = (page: Page): Locator =>
+  page.getByRole("button", { name: /new collection|create collection/i }).first()
 
-export function saveButton(page: Page): Locator {
-  return page.getByRole("button", { name: /^save$|create|add/i }).first()
-}
+export const collectionNameInput = (page: Page): Locator =>
+  page.locator('[data-testid="collection-name-input"]').first()
 
-export function runButton(page: Page): Locator {
-  return page.getByRole("button", { name: /^run$|^run collection/i }).first()
-}
+export const collectionList = (page: Page): Locator =>
+  page.locator('[data-testid="collection-list"]').first()
 
-export function exportJunitButton(page: Page): Locator {
-  return page.getByRole("button", { name: /junit|export.*junit/i }).first()
-}
+export const createWorkspaceButton = (page: Page): Locator =>
+  page.locator('[data-testid="create-workspace-button"]').first()
 
-export function protocolTabs(page: Page): Locator {
-  return page.getByRole("tablist").first()
-}
+export const joinWorkspaceButton = (page: Page): Locator =>
+  page.locator('[data-testid="join-workspace-button"]').first()
+
+export const inviteWorkspaceButton = (page: Page): Locator =>
+  page.locator('[data-testid="invite-workspace-button"]').first()
+
+export const activeWorkspaceDisplay = (page: Page): Locator =>
+  page.locator('[data-testid="active-workspace"]').first()
+
+export const syncStatusBanner = (page: Page): Locator =>
+  page.locator('[data-testid="sync-status-banner"]').first()

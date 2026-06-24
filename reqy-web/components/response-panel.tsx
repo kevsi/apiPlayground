@@ -318,7 +318,7 @@ export function ResponsePanel({
           </TabsList>
         </div>
 
-        <TabsContent value="response" className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-hidden">
+        <TabsContent value="response" data-testid="response-body" className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-hidden">
           {/* Giant floating status code background */}
           {hasResponse && responseStatus && !isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">

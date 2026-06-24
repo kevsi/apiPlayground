@@ -13,7 +13,7 @@ export function SyncStatusBanner() {
   if (!enabled) return null
 
   return (
-    <div className="fixed bottom-2 right-2 z-50 max-w-sm rounded-md border bg-card p-2 text-xs shadow">
+    <div data-testid="sync-status-banner" className="fixed bottom-2 right-2 z-50 max-w-sm rounded-md border bg-card p-2 text-xs shadow">
       <div className="flex items-center justify-between gap-2">
         <span>
           {syncing ? "Syncing..." :
@@ -24,6 +24,7 @@ export function SyncStatusBanner() {
         {syncError && !syncing && (
           <button
             type="button"
+            data-testid="sync-retry-button"
             onClick={() => retrySync()}
             className="ml-2 rounded border px-2 py-0.5 text-xs hover:bg-accent"
           >

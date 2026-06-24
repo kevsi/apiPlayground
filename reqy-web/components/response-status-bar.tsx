@@ -119,10 +119,13 @@ export function ResponseStatusBar({
         ) : hasResponse ? (
           <div className="flex items-center gap-3">
             {/* Status badge — pill style */}
-            <div className={cn(
-              "flex items-center gap-1.5 rounded-lg border px-2.5 py-1",
-              getStatusColor(responseStatus)
-            )}>
+            <div
+              data-testid="response-status"
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border px-2.5 py-1",
+                getStatusColor(responseStatus)
+              )}
+            >
               {getStatusIcon(responseStatus)}
               <span className="text-xs font-bold font-mono">{responseStatus ?? "-"}</span>
             </div>
