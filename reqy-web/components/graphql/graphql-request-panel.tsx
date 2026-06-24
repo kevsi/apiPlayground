@@ -11,6 +11,7 @@ import {
 } from "./graphql-query-builder"
 import { VariablesPanel } from "./variables-panel"
 import { HeadersPanel } from "./headers-panel"
+import { CollapsibleSection } from "./collapsible-section"
 import type { GraphqlTab } from "@/lib/types"
 
 interface Props {
@@ -69,6 +70,10 @@ export function GraphqlRequestPanel({
   const variablesValid = useMemo(() => isValidJson(tab.variables), [tab.variables])
   const headersValid = useMemo(() => isValidJson(tab.headers), [tab.headers])
 
+  // When both Variables and Headers are open, place them side-by-side to save
+  // vertical space and keep the editor reachable.
+  const sideBySide = showVariables && showHeaders
+
   return (
     <div
       className="flex flex-col h-full overflow-hidden"
@@ -101,43 +106,113 @@ export function GraphqlRequestPanel({
         headersError={!headersValid}
       />
 
-      {/* Inline panels — always visible right under the toolbar, never buried at the bottom */}
-      {showVariables && (
-        <div className="max-h-56 overflow-auto border-b bg-background">
-          <VariablesPanel
-            value={tab.variables}
-            onChange={(v) => onUpdate({ variables: v })}
+      {/*
+        Scrollable area for Variables / Headers / Builder. Each section has
+        its own max-h + scroll so the editor below is never pushed off-screen.
+      */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {sideBySide ? (
+          <div className="grid grid-cols-2 divide-x divide-border">
+            {showVariables && (
+              <CollapsibleSection
+                title="Variables"
+                count={variablesCount}
+                error={!variablesValid}
+                onClose={() => setShowVariables(false)}
+                bodyMaxHeightClass="max-h-[40vh]"
+              >
+                <VariablesPanel
+                  value={tab.variables}
+                  onChange={(v) => onUpdate({ variables: v })}
+                  defaultOpen
+                  hideHeader
+                />
+              </CollapsibleSection>
+            )}
+            {showHeaders && (
+              <CollapsibleSection
+                title="Headers"
+                count={headersCount}
+                error={!headersValid}
+                onClose={() => setShowHeaders(false)}
+                bodyMaxHeightClass="max-h-[40vh]"
+                className="border-l-0"
+              >
+                <HeadersPanel
+                  value={tab.headers}
+                  onChange={(h) => onUpdate({ headers: h })}
+                  defaultOpen
+                  hideHeader
+                />
+              </CollapsibleSection>
+            )}
+          </div>
+        ) : (
+          <>
+            {showVariables && (
+              <CollapsibleSection
+                title="Variables"
+                count={variablesCount}
+                error={!variablesValid}
+                onClose={() => setShowVariables(false)}
+                bodyMaxHeightClass="max-h-[40vh]"
+              >
+                <VariablesPanel
+                  value={tab.variables}
+                  onChange={(v) => onUpdate({ variables: v })}
+                  defaultOpen
+                  hideHeader
+                />
+              </CollapsibleSection>
+            )}
+            {showHeaders && (
+              <CollapsibleSection
+                title="Headers"
+                count={headersCount}
+                error={!headersValid}
+                onClose={() => setShowHeaders(false)}
+                bodyMaxHeightClass="max-h-[40vh]"
+              >
+                <HeadersPanel
+                  value={tab.headers}
+                  onChange={(h) => onUpdate({ headers: h })}
+                  defaultOpen
+                  hideHeader
+                />
+              </CollapsibleSection>
+            )}
+          </>
+        )}
+
+        {showBuilder && schemaData && (
+          <CollapsibleSection
+            title="Visual Builder"
+            onClose={() => setShowBuilder(false)}
             defaultOpen
+            bodyMaxHeightClass="max-h-[50vh]"
+            hint="Check fields to build a query"
+          >
+            <GraphqlQueryBuilder
+              schema={schemaData}
+              operationType={operationType}
+              onOperationTypeChange={setOperationType}
+              onQueryChange={(q) => onUpdate({ query: q })}
+              operationName={tab.operationName ?? "Generated"}
+            />
+          </CollapsibleSection>
+        )}
+
+        {/*
+          Editor always has a minimum visible height so it never disappears
+          even when every other panel is expanded.
+        */}
+        <div className="min-h-[200px] flex flex-col" data-testid="graphql-editor-wrap">
+          <GraphqlQueryEditor
+            value={tab.query}
+            onChange={(q) => onUpdate({ query: q })}
+            schema={tab.schema}
           />
         </div>
-      )}
-      {showHeaders && (
-        <div className="max-h-56 overflow-auto border-b bg-background">
-          <HeadersPanel
-            value={tab.headers}
-            onChange={(h) => onUpdate({ headers: h })}
-            defaultOpen
-          />
-        </div>
-      )}
-
-      {showBuilder && schemaData && (
-        <GraphqlQueryBuilder
-          schema={schemaData}
-          operationType={operationType}
-          onOperationTypeChange={setOperationType}
-          onQueryChange={(q) => onUpdate({ query: q })}
-          operationName={tab.operationName ?? "Generated"}
-        />
-      )}
-
-      {/* Editor takes the remaining space; no more scroll-area burial. */}
-      <div className="flex-1 min-h-0 overflow-auto">
-        <GraphqlQueryEditor
-          value={tab.query}
-          onChange={(q) => onUpdate({ query: q })}
-          schema={tab.schema}
-        />
       </div>
     </div>
   )
