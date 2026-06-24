@@ -1,7 +1,9 @@
 "use client"
+
 import { useState } from "react"
-import { Copy, Check, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Copy, Check, AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 interface Props {
   data?: unknown
@@ -12,10 +14,38 @@ interface Props {
   loading?: boolean
 }
 
+const STATUS_TEXT: Record<number, string> = {
+  0: "Network Error",
+  200: "OK",
+  201: "Created",
+  204: "No Content",
+  301: "Moved Permanently",
+  302: "Found",
+  304: "Not Modified",
+  400: "Bad Request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  405: "Method Not Allowed",
+  408: "Request Timeout",
+  409: "Conflict",
+  422: "Unprocessable Entity",
+  429: "Too Many Requests",
+  500: "Internal Server Error",
+  501: "Not Implemented",
+  502: "Bad Gateway",
+  503: "Service Unavailable",
+  504: "Gateway Timeout",
+}
+
+function statusLabel(code: number): string {
+  return STATUS_TEXT[code] ?? ""
+}
+
 export function ResponseViewer({ data, errors, error, status, timeMs, loading }: Props) {
   const [copied, setCopied] = useState(false)
 
-  const text = error
+  const text: string = error
     ? error
     : (() => {
         try {
@@ -33,15 +63,33 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
     }
   }
 
-  const hasErrors = !!errors || !!error
+  const graphqlErrors = Array.isArray(errors) ? errors : []
+  const isGraphQLError = status !== undefined && status >= 200 && status < 300 && graphqlErrors.length > 0
+  const isHttpError = status !== undefined && status >= 400
+  const hasErrors = isGraphQLError || isHttpError || !!error
 
   return (
     <div className="border-t bg-card" data-testid="graphql-response-viewer">
       <div className="flex items-center justify-between p-2 border-b">
         <div className="flex items-center gap-2 text-xs">
           {status !== undefined && (
-            <Badge variant={status >= 400 || hasErrors ? "destructive" : "default"} data-testid="graphql-response-status">
-              {status}
+            <Badge
+              variant={isHttpError ? "destructive" : "outline"}
+              className={cn(
+                "gap-1",
+                !isHttpError && !isGraphQLError && "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+                isGraphQLError && "border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+              )}
+              data-testid="graphql-response-status"
+            >
+              {!isHttpError && !isGraphQLError && <CheckCircle2 className="w-3 h-3" />}
+              {isGraphQLError && <AlertTriangle className="w-3 h-3" />}
+              {isHttpError && <AlertCircle className="w-3 h-3" />}
+              <span>
+                {status}
+                {statusLabel(status) && <> {statusLabel(status)}</>}
+                {isGraphQLError && <> · GQL Error</>}
+              </span>
             </Badge>
           )}
           {timeMs !== undefined && <span className="text-muted-foreground">{timeMs}ms</span>}
@@ -50,14 +98,17 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
               <AlertCircle className="w-3 h-3" /> {error}
             </span>
           )}
-          {!error && !errors && data !== undefined && (
-            <span className="text-green-500 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> OK
+          {isGraphQLError && !error && (
+            <span className="text-amber-700 dark:text-amber-300 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              {graphqlErrors.length === 1
+                ? graphqlErrors[0]?.message
+                : `${graphqlErrors.length} GraphQL errors`}
             </span>
           )}
-          {!error && Array.isArray(errors) && errors.length > 0 && (
-            <span className="text-yellow-600 flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" /> errors
+          {!error && graphqlErrors.length === 0 && data !== undefined && (
+            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> OK
             </span>
           )}
         </div>

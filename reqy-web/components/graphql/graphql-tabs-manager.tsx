@@ -8,6 +8,7 @@ import { GraphqlTabBar } from "./graphql-tab-bar"
 import { GraphqlActiveToolbar } from "./graphql-active-toolbar"
 import { GraphqlRequestPanel } from "./graphql-request-panel"
 import { GraphqlResponsePanel } from "./graphql-response-panel"
+import { GraphqlAIDialog } from "./graphql-ai-dialog"
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -39,6 +40,7 @@ export function GraphqlTabsManager() {
   const [saveOpen, setSaveOpen] = useState(false)
   const [saveName, setSaveName] = useState("")
   const [saveCollectionId, setSaveCollectionId] = useState<string>("none")
+  const [aiDialogOpen, setAiDialogOpen] = useState(false)
 
   const collections = useRequestStore().collections
   const addCollection = useRequestStore().addCollection
@@ -123,19 +125,24 @@ export function GraphqlTabsManager() {
     URL.revokeObjectURL(url)
   }, [activeTab])
 
-  const handleAiAssist = useCallback(async () => {
-    const description = window.prompt(
-      "Describe the data you want to fetch (e.g. \"all users with their last 5 orders\"):",
-      "Give me the first 5 countries with their capitals",
-    )
-    if (!description || !description.trim()) return
-    await assistGraphql({
-      description,
-      schema: activeTab.schema,
-      currentQuery: activeTab.query,
-      applyQuery: (q) => updateTab(activeTab.id, { query: q }),
-    })
-  }, [activeTab, updateTab, assistGraphql])
+  const handleAiAssist = useCallback(() => {
+    setAiDialogOpen(true)
+  }, [])
+
+  const handleAiSubmit = useCallback(
+    async (description: string) => {
+      const result = await assistGraphql({
+        description,
+        schema: activeTab.schema,
+        currentQuery: activeTab.query,
+        applyQuery: (q) => updateTab(activeTab.id, { query: q }),
+      })
+      if (result) {
+        setAiDialogOpen(false)
+      }
+    },
+    [activeTab, updateTab, assistGraphql],
+  )
 
   const handleAiFix = useCallback(async () => {
     const errMsg =
@@ -284,6 +291,15 @@ export function GraphqlTabsManager() {
         onCollectionIdChange={setSaveCollectionId}
         collections={collections}
         onSubmit={handleSaveSubmit}
+      />
+
+      <GraphqlAIDialog
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
+        onSubmit={handleAiSubmit}
+        loading={aiLoading}
+        error={aiError}
+        hasSchema={!!activeTab.schema}
       />
     </div>
   )

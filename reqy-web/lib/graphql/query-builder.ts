@@ -4,6 +4,8 @@ export interface SelectionNode {
   subfields: string[] | SelectionNode[]
 }
 
+export type GraphQLOperationType = "query" | "mutation" | "subscription"
+
 function renderArgs(args: Record<string, string>): string {
   const entries = Object.entries(args)
   if (entries.length === 0) return ""
@@ -24,9 +26,28 @@ function renderFields(fields: string[] | SelectionNode[], indent: string): strin
 
 export function buildQueryFromSelections(
   selections: SelectionNode[],
-  operationName = "GeneratedQuery",
+  operationTypeOrName?: GraphQLOperationType | string,
+  operationName?: string,
 ): string {
   if (selections.length === 0) return ""
+
+  // Back-compat: accept (selections, "Foo") as (selections, operationName)
+  // New signature: (selections, "mutation" | "query" | "subscription", operationName?)
+  let opType: GraphQLOperationType = "query"
+  let opName = "GeneratedQuery"
+  if (typeof operationTypeOrName === "string") {
+    if (
+      operationTypeOrName === "query" ||
+      operationTypeOrName === "mutation" ||
+      operationTypeOrName === "subscription"
+    ) {
+      opType = operationTypeOrName
+      opName = operationName ?? "Generated"
+    } else {
+      opName = operationTypeOrName
+    }
+  }
+
   const body = selections
     .map((sel) => {
       const args = renderArgs(sel.args)
@@ -34,5 +55,5 @@ export function buildQueryFromSelections(
       return sub ? `  ${sel.field}${args} {\n${sub}\n  }` : `  ${sel.field}${args}`
     })
     .join("\n")
-  return `query ${operationName} {\n${body}\n}`
+  return `${opType} ${opName} {\n${body}\n}`
 }

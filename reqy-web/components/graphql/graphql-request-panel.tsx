@@ -4,7 +4,11 @@ import { useState } from "react"
 import { GraphqlAddressBar } from "./address-bar"
 import { GraphqlToolbar } from "./graphql-toolbar"
 import { GraphqlQueryEditor } from "./graphql-query-editor"
-import { GraphqlQueryBuilder, type SchemaData } from "./graphql-query-builder"
+import {
+  GraphqlQueryBuilder,
+  type OperationType,
+  type SchemaData,
+} from "./graphql-query-builder"
 import { VariablesPanel } from "./variables-panel"
 import { HeadersPanel } from "./headers-panel"
 import type { GraphqlTab } from "@/lib/types"
@@ -29,6 +33,7 @@ export function GraphqlRequestPanel({
   running,
 }: Props) {
   const [showBuilder, setShowBuilder] = useState(false)
+  const [operationType, setOperationType] = useState<OperationType>("query")
   const schemaData = (tab.schema as SchemaData | null) ?? null
 
   return (
@@ -56,6 +61,8 @@ export function GraphqlRequestPanel({
       {showBuilder && schemaData && (
         <GraphqlQueryBuilder
           schema={schemaData}
+          operationType={operationType}
+          onOperationTypeChange={setOperationType}
           onQueryChange={(q) => onUpdate({ query: q })}
           operationName={tab.operationName ?? "Generated"}
         />
