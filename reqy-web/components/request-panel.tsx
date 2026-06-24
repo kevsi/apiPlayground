@@ -24,9 +24,6 @@ import type { BodyType, AuthType, QueryParam, Header } from "@/lib/request-execu
 import type { RequestTestAssertion, AssertionType } from "@/lib/types"
 import type { Assertion } from "@/lib/test-runner/types"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { GraphQLBodyEditor } from "@/components/graphql-body-editor"
-import { GraphQLIntrospectButton } from "@/components/graphql-introspect-button"
 import { AssertionEditor } from "@/components/assertion-editor"
 import { ScriptEditor } from "@/components/script-editor"
 
@@ -43,8 +40,6 @@ interface RequestPanelProps {
   runnerAssertions?: Assertion[]
   preRequestScript?: string
   postResponseScript?: string
-  protocol?: "rest" | "graphql"
-  graphql?: { query: string; variables: string; operationName?: string }
   onMethodChange: (method: HttpMethod) => void
   onUrlChange: (url: string) => void
   onQueryParamsChange: (queryParams: QueryParam[]) => void
@@ -56,8 +51,6 @@ interface RequestPanelProps {
   onRunnerAssertionsChange?: (assertions: Assertion[]) => void
   onPreRequestScriptChange?: (script: string) => void
   onPostResponseScriptChange?: (script: string) => void
-  onProtocolChange?: (protocol: "rest" | "graphql") => void
-  onGraphqlChange?: (graphql: { query: string; variables: string; operationName?: string }) => void
   onRunTests?: () => void
   onSend: () => Promise<void>
   isLoading?: boolean
@@ -77,8 +70,6 @@ export function RequestPanel({
   runnerAssertions,
   preRequestScript,
   postResponseScript,
-  protocol,
-  graphql,
   onMethodChange,
   onUrlChange,
   onQueryParamsChange,
@@ -90,8 +81,6 @@ export function RequestPanel({
   onRunnerAssertionsChange,
   onPreRequestScriptChange,
   onPostResponseScriptChange,
-  onProtocolChange,
-  onGraphqlChange,
   onRunTests,
   onSend,
   isLoading,
@@ -596,16 +585,7 @@ ${bodyPart}})
               </span>
             </AccordionTrigger>
             <AccordionContent>
-              <Tabs
-                value={protocol ?? "rest"}
-                onValueChange={(v) => onProtocolChange?.(v as "rest" | "graphql")}
-              >
-                <TabsList className="mb-3">
-                  <TabsTrigger value="rest" className="text-xs">REST</TabsTrigger>
-                  <TabsTrigger value="graphql" className="text-xs">GraphQL</TabsTrigger>
-                </TabsList>
-                <TabsContent value="rest" className="mt-0">
-                  <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-3">
                     <Select value={bodyType} onValueChange={(value) => onBodyTypeChange(value as BodyType)}>
                       <SelectTrigger className="w-32 h-9 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
                         <SelectValue placeholder="Type" />
@@ -650,50 +630,14 @@ ${bodyPart}})
                       </div>
                       <span className="text-[10px] font-mono text-muted-foreground/50">{bodyType.toUpperCase()}</span>
                     </div>
-                    <textarea
-                      value={body}
-                      onChange={(e) => onBodyChange(e.target.value)}
-                      className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
-                      spellCheck={false}
-                      placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
-                    />
-                  </div>
-                </TabsContent>
-                <TabsContent value="graphql" className="mt-0">
-                  <GraphQLBodyEditor
-                    query={graphql?.query ?? ""}
-                    variables={graphql?.variables ?? "{}"}
-                    operationName={graphql?.operationName}
-                    onQueryChange={(q) =>
-                      onGraphqlChange?.({
-                        query: q,
-                        variables: graphql?.variables ?? "{}",
-                        operationName: graphql?.operationName,
-                      })
-                    }
-                    onVariablesChange={(v) =>
-                      onGraphqlChange?.({
-                        query: graphql?.query ?? "",
-                        variables: v,
-                        operationName: graphql?.operationName,
-                      })
-                    }
-                    onOperationNameChange={(o) =>
-                      onGraphqlChange?.({
-                        query: graphql?.query ?? "",
-                        variables: graphql?.variables ?? "{}",
-                        operationName: o,
-                      })
-                    }
+                  <textarea
+                    value={body}
+                    onChange={(e) => onBodyChange(e.target.value)}
+                    className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
+                    spellCheck={false}
+                    placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
                   />
-                  <div className="mt-3">
-                    <GraphQLIntrospectButton
-                      endpoint={url}
-                      onSchemaFetched={(_sdl, hash) => console.log("Schema cached:", hash)}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
+                </div>
             </AccordionContent>
           </AccordionItem>
 

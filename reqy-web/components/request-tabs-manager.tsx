@@ -190,8 +190,6 @@ export function RequestTabsManager() {
                 authType={activeTab.authType}
                 authToken={activeTab.authToken}
                 assertions={activeTab.assertions}
-                protocol={activeTab.protocol}
-                graphql={activeTab.graphql}
                 runnerAssertions={activeTab.runnerAssertions}
                 preRequestScript={activeTab.preRequestScript}
                 postResponseScript={activeTab.postResponseScript}
@@ -206,8 +204,6 @@ export function RequestTabsManager() {
                 onBodyTypeChange={(bodyType) => updateTab(activeTab.id, { bodyType })}
                 onAuthChange={(authType, authToken) => updateTab(activeTab.id, { authType, authToken })}
                 onAssertionsChange={(assertions) => updateTab(activeTab.id, { assertions })}
-                onProtocolChange={(protocol) => updateTab(activeTab.id, { protocol })}
-                onGraphqlChange={(graphql) => updateTab(activeTab.id, { graphql })}
                 onRunnerAssertionsChange={(runnerAssertions) => updateTab(activeTab.id, { runnerAssertions })}
                 onPreRequestScriptChange={(preRequestScript) => updateTab(activeTab.id, { preRequestScript })}
                 onPostResponseScriptChange={(postResponseScript) => updateTab(activeTab.id, { postResponseScript })}
