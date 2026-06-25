@@ -7,8 +7,8 @@ export default defineConfig({
     include: [
       'lib/__tests__/**/*.test.ts',
       'lib/**/__tests__/**/*.test.ts',
-      'src/ai/**/__tests__/**/*.test.ts',
-      'src/ai/**/*.test.ts',
+      'src/ai/**/__tests__/**/*.test.{ts,tsx}',
+      'src/ai/**/*.test.{ts,tsx}',
     ],
     exclude: ['node_modules', '.next'],
   },
