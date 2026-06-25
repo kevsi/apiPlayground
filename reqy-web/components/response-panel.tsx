@@ -1,8 +1,12 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { Play, Loader2, FlaskConical, CheckCircle, XCircle } from "lucide-react"
+import { Play, Loader2, FlaskConical, CheckCircle, XCircle, Sparkles } from "lucide-react"
 import { DiffDialog } from "@/components/diff-dialog"
+import { analyze } from "@/src/ai/local-engine/analyzer"
+import { buildRequestContext } from "@/src/ai/local-engine/context"
+import { Panel } from "@/src/ai/components/Panel"
+import type { RequestPayload } from "@/src/ai/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -35,6 +39,7 @@ interface ResponsePanelProps {
   onAnalyze?: () => Promise<void>
   onGenerateTests?: () => Promise<void>
   onCreateMock?: () => void
+  onPatchRequest?: (patch: Partial<RequestPayload>) => void
   aiSummary?: string
   aiError?: string
   aiIsLoading?: boolean
@@ -67,6 +72,7 @@ export function ResponsePanel({
   onAnalyze,
   onGenerateTests,
   onCreateMock,
+  onPatchRequest,
   aiSummary,
   aiError,
   aiIsLoading = false,
@@ -98,6 +104,33 @@ export function ResponsePanel({
   }, [mediaUrl])
 
   const responsePanelRef = useRef<HTMLDivElement>(null)
+
+  const diagnostics = useMemo(() => {
+    const headerRecord: Record<string, string> = {}
+    for (const h of requestHeaders ?? []) {
+      if (h.key) headerRecord[h.key] = h.value
+    }
+    const ctx = buildRequestContext(
+      {
+        method: method as RequestPayload["method"],
+        url: url ?? "",
+        headers: headerRecord,
+        body: body ?? null,
+        authType: (authType ?? "none") as RequestPayload["authType"],
+      },
+      responseStatus !== undefined
+        ? {
+            status: responseStatus,
+            statusText: "",
+            headers: responseHeaders ?? {},
+            body: responseBody,
+            duration: responseTime ?? 0,
+            size: 0,
+          }
+        : undefined
+    )
+    return analyze(ctx)
+  }, [method, url, requestHeaders, body, authType, responseStatus, responseHeaders, responseBody, responseTime])
   const [flash, setFlash] = useState(false)
 
   useEffect(() => {
@@ -315,6 +348,19 @@ export function ResponsePanel({
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger
+              value="reqlyai"
+              data-testid="tab-reqlyai"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:border-muted-foreground/20"
+            >
+              <Sparkles className="size-3 mr-1" />
+              ReqlyAI
+              {diagnostics.length > 0 && (
+                <span className="ml-1.5 rounded-full bg-red-500/20 text-red-600 px-1.5 py-0.5 text-[10px] font-mono">
+                  {diagnostics.length}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -394,6 +440,16 @@ export function ResponsePanel({
             bodyType={bodyType}
             authType={authType}
             authToken={authToken}
+          />
+        </TabsContent>
+
+        <TabsContent value="reqlyai" className="m-0 min-h-0 flex-1 animate-fade-in overflow-auto">
+          <Panel
+            diagnostics={diagnostics}
+            onApplyFix={(diag) => {
+              if (!diag.fix || !onPatchRequest) return
+              onPatchRequest(diag.fix.applyFix())
+            }}
           />
         </TabsContent>
 
