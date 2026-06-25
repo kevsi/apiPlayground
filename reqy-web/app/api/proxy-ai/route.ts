@@ -9,6 +9,8 @@ type ProviderBody = {
   port?: string | number
   system?: string
   message?: string
+  /** Phase 2.5: when true, route returns SSE stream from upstream */
+  stream?: boolean
 }
 
 export async function POST(req: NextRequest) {
@@ -37,6 +39,23 @@ export async function POST(req: NextRequest) {
   const PROVIDERS_WITH_API_KEY = new Set(["openai", "openrouter", "anthropic", "gemini", "deepseek", "opencode-zen"])
   if (PROVIDERS_WITH_API_KEY.has(provider) && !apiKey) {
     return NextResponse.json({ error: "Missing API key" }, { status: 400 })
+  }
+
+  // Phase 2.5: SSE streaming helper for OpenAI-compatible providers
+  function passthroughSSE(upstreamRes: Response): Response {
+    if (!upstreamRes.body) {
+      return new Response("Upstream returned no body", { status: 502 })
+    }
+    // Translate upstream SSE to client SSE, preserving headers that matter for streaming
+    return new Response(upstreamRes.body, {
+      status: upstreamRes.status,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    })
   }
 
   function tryParseGeminiError(raw: string): string {
@@ -105,6 +124,7 @@ export async function POST(req: NextRequest) {
             : provider === "opencode-zen"
               ? "gpt-5"
               : "gpt-3.5-turbo"),
+          stream: Boolean(body.stream),
           messages: [
             { role: "system", content: system },
             { role: "user", content: message },
@@ -121,6 +141,8 @@ export async function POST(req: NextRequest) {
       if (!res.ok) {
         return NextResponse.json({ error: data.error?.message ?? data.error ?? `${provider} error` }, { status: res.status })
       }
+      // Phase 2.5: stream passthrough
+      if (body.stream && res.body) return passthroughSSE(res)
       return NextResponse.json({ content: data.choices?.[0]?.message?.content ?? data.choices?.[0]?.text ?? "" })
     }
 
@@ -149,6 +171,8 @@ export async function POST(req: NextRequest) {
       if (!res.ok) {
         return NextResponse.json({ error: data.error?.message ?? data.error ?? "DeepSeek error" }, { status: res.status })
       }
+      // Phase 2.5: stream passthrough
+      if (body.stream && res.body) return passthroughSSE(res)
       return NextResponse.json({ content: data.choices?.[0]?.message?.content ?? data.choices?.[0]?.text ?? "" })
     }
 
