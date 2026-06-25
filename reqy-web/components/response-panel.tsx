@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { Play, Loader2, FlaskConical, CheckCircle, XCircle, Sparkles } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { DiffDialog } from "@/components/diff-dialog"
 import { analyze } from "@/src/ai/local-engine/analyzer"
 import { buildRequestContext } from "@/src/ai/local-engine/context"
@@ -89,6 +90,22 @@ export function ResponsePanel({
   const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty")
   const [activeTab, setActiveTab] = useState("response")
   const [diffDialogOpen, setDiffDialogOpen] = useState(false)
+
+  // ── ReqlyAI fix undo state (Phase 4) ──────────────────────────────
+  const { toast } = useToast()
+  type AppliedFix = {
+    diagId: string
+    diagTitle: string
+    preSnapshot: {
+      method: string
+      url: string
+      headers: Array<{ key: string; value: string }>
+      body: string
+      authType: string
+    }
+  }
+  const [lastAppliedFix, setLastAppliedFix] = useState<AppliedFix | null>(null)
+  const [applyingFixId, setApplyingFixId] = useState<string | null>(null)
 
   const mediaUrl = useMemo(() => {
     if (responseData instanceof Blob) {
@@ -245,6 +262,25 @@ export function ResponsePanel({
     await onRun()
     setActiveTab("response")
   }
+
+  // P4.6: Ctrl+Shift+F — re-apply last fix without re-clicking
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
+        if (lastAppliedFix && onPatchRequest && activeTab === "reqlyai") {
+          e.preventDefault()
+          // Re-apply: find the diagnostic by id from current diagnostics
+          const diag = diagnostics.find((d) => d.id === lastAppliedFix.diagId)
+          if (diag?.fix) {
+            onPatchRequest(diag.fix.applyFix())
+            toast({ title: "Fix ré-appliqué", description: diag.title, duration: 3000 })
+          }
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [lastAppliedFix, diagnostics, onPatchRequest, activeTab, toast])
 
   return (
     <div
@@ -448,7 +484,52 @@ export function ResponsePanel({
             diagnostics={diagnostics}
             onApplyFix={(diag) => {
               if (!diag.fix || !onPatchRequest) return
+              // P4.5: Double-clic protection
+              if (applyingFixId === diag.id) return
+              // P4.8: Don't apply if a request is currently in flight
+              if (isLoading) {
+                toast({
+                  title: "Requête en cours",
+                  description: "Attends la fin de la requête avant d'appliquer un fix.",
+                  variant: "destructive",
+                  duration: 3000,
+                })
+                return
+              }
+              // Snapshot current request fields BEFORE applying the patch (for undo)
+              const preSnapshot: AppliedFix["preSnapshot"] = {
+                method,
+                url,
+                headers: requestHeaders ?? [],
+                body: body ?? "",
+                authType: authType ?? "none",
+              }
+              // Apply the fix
               onPatchRequest(diag.fix.applyFix())
+              // Mark this fix as "just applied" for 300ms to prevent rapid double-clicks
+              setApplyingFixId(diag.id)
+              window.setTimeout(() => setApplyingFixId(null), 300)
+              // Store for undo (P4.5)
+              setLastAppliedFix({ diagId: diag.id, diagTitle: diag.title, preSnapshot })
+              // Toast confirmation with Undo button (P4.7) — 5s window
+              toast({
+                title: "Fix appliqué",
+                description: diag.title,
+                duration: 5000,
+                onClick: () => {
+                  // Undo: restore pre-snapshot
+                  onPatchRequest({
+                    method: preSnapshot.method as any,
+                    url: preSnapshot.url,
+                    headers: Object.fromEntries(
+                      preSnapshot.headers.filter((h) => h.key).map((h) => [h.key, h.value])
+                    ) as Record<string, string>,
+                    body: preSnapshot.body,
+                    authType: preSnapshot.authType as any,
+                  })
+                  setLastAppliedFix(null)
+                },
+              })
             }}
           />
         </TabsContent>
