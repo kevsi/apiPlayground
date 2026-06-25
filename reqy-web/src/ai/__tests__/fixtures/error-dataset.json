@@ -25791,7 +25791,7 @@
     }
   },
   {
-    "id": "ssl-cert-has-expired-001",
+    "id": "ssl-cert-expired-001",
     "category": "ssl",
     "context": {
       "request": {
@@ -25816,7 +25816,7 @@
     }
   },
   {
-    "id": "ssl-cert-has-expired-002",
+    "id": "ssl-cert-expired-002",
     "category": "ssl",
     "context": {
       "request": {
@@ -25841,7 +25841,7 @@
     }
   },
   {
-    "id": "ssl-cert-has-expired-003",
+    "id": "ssl-cert-expired-003",
     "category": "ssl",
     "context": {
       "request": {
