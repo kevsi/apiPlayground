@@ -1,26 +1,24 @@
 "use client";
 
 /**
- * Phase 2.7 — ChatPanel
- * Minimal chat UI that streams LLM responses from /api/proxy-ai.
- * Uses the existing useRequestStore (provider config) + analyzes the
- * active request via the local engine for context.
+ * Phase 2.7 + 5.4 + 5.5 — ChatPanel
+ *
+ * Streams LLM responses from /api/proxy-ai AND persists each turn to
+ * Supabase via useChatHistory. The local streaming buffer handles live
+ * token-by-token updates; persisted history is loaded on mount and
+ * updated as messages complete.
  */
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Loader2, Bot, User } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { Send, Loader2, Bot, User, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { analyze } from "@/src/ai/local-engine/analyzer";
 import { buildRequestContext } from "@/src/ai/local-engine/context";
 import { streamLLM } from "@/src/ai/cloud-engine/llm";
 import { loadAIProvider, loadApiKey, loadOllamaConfig } from "@/lib/projects-store";
+import { useChatHistory, computeRequestId } from "@/hooks/use-chat-history";
 import type { AIProvider } from "@/src/ai/types";
 import { cn } from "@/lib/utils";
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
 
 interface ChatPanelProps {
   method: string;
@@ -34,18 +32,45 @@ interface ChatPanelProps {
   responseTime?: number;
 }
 
+interface StreamedMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export function ChatPanel(props: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const requestId = useMemo(
+    () => (props.url ? computeRequestId(props.method, props.url) : null),
+    [props.method, props.url]
+  );
+
+  const { messages: history, append, clear, authenticated } = useChatHistory(requestId);
+
+  const [streamed, setStreamed] = useState<StreamedMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // When the underlying request changes, clear the local streaming buffer.
+  useEffect(() => {
+    setStreamed([]);
+    setError(null);
+  }, [requestId]);
+
+  // Combined view: persisted history + in-flight streamed messages
+  const allMessages = useMemo(() => {
+    const historyMessages: StreamedMessage[] = history.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    return [...historyMessages, ...streamed];
+  }, [history, streamed]);
+
   // Auto-scroll on new content
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [allMessages]);
 
   const handleSend = useCallback(async () => {
     const prompt = input.trim();
@@ -56,19 +81,30 @@ export function ChatPanel(props: ChatPanelProps) {
     const ollama = loadOllamaConfig();
 
     if (provider !== "ollama" && !apiKey) {
-      setError("Configure la clé API dans Settings avant d'utiliser le chat.")
-      return
+      setError("Configure la clé API dans Settings avant d'utiliser le chat.");
+      return;
     }
 
-    setError(null)
-    setInput("")
-    setMessages((prev) => [...prev, { role: "user", content: prompt }])
-    setLoading(true)
+    setError(null);
+    setInput("");
+    setLoading(true);
+
+    // Persist user message immediately
+    if (requestId) {
+      void append("user", prompt);
+    }
+
+    // Add local streaming placeholder for both user + assistant so the UI updates instantly.
+    setStreamed((prev) => [
+      ...prev,
+      { role: "user", content: prompt },
+      { role: "assistant", content: "" },
+    ]);
 
     // Build context from current request/response
-    const headerRecord: Record<string, string> = {}
+    const headerRecord: Record<string, string> = {};
     for (const h of props.requestHeaders ?? []) {
-      if (h.key) headerRecord[h.key] = h.value
+      if (h.key) headerRecord[h.key] = h.value;
     }
     const ctx = buildRequestContext(
       {
@@ -88,14 +124,12 @@ export function ChatPanel(props: ChatPanelProps) {
             size: 0,
           }
         : undefined
-    )
-    const diagnostics = analyze(ctx)
+    );
+    const diagnostics = analyze(ctx);
 
     // Stream response
-    const controller = new AbortController()
-    abortRef.current = controller
-    // Add placeholder assistant message
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const stream = streamLLM({
@@ -108,43 +142,77 @@ export function ChatPanel(props: ChatPanelProps) {
         ctx,
         diagnostics,
         signal: controller.signal,
-      })
+      });
 
-      let acc = ""
+      let acc = "";
       for await (const token of stream) {
-        acc += token
-        setMessages((prev) => {
-          const updated = [...prev]
-          updated[updated.length - 1] = { role: "assistant", content: acc }
-          return updated
-        })
+        acc += token;
+        setStreamed((prev) => {
+          const updated = [...prev];
+          // The last message is the assistant placeholder
+          updated[updated.length - 1] = { role: "assistant", content: acc };
+          return updated;
+        });
+      }
+
+      // Persist final assistant message
+      if (requestId && acc.trim()) {
+        void append("assistant", acc);
       }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
-        setError(e?.message ?? "Erreur inconnue")
+        setError(e?.message ?? "Erreur inconnue");
       }
     } finally {
-      setLoading(false)
-      abortRef.current = null
+      setLoading(false);
+      abortRef.current = null;
     }
-  }, [input, loading, props])
+  }, [input, loading, props, append, requestId]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      e.preventDefault();
+      handleSend();
+    } else if (e.key === "Escape" && loading) {
+      e.preventDefault();
+      handleStop();
     }
-  }
+  };
 
   const handleStop = () => {
-    abortRef.current?.abort()
-    setLoading(false)
-  }
+    abortRef.current?.abort();
+    setLoading(false);
+  };
+
+  const handleClear = () => {
+    if (!requestId) return;
+    void clear();
+    setStreamed([]);
+  };
 
   return (
     <div className="flex h-full flex-col" data-testid="reqlyai-chat-panel">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <span className="text-xs text-muted-foreground">
+          {authenticated
+            ? `${history.length} message${history.length === 1 ? "" : "s"} persisté${history.length === 1 ? "" : "s"}`
+            : "Non connecté — historique non sauvegardé"}
+        </span>
+        {history.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClear}
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-red-600"
+            data-testid="chat-clear-btn"
+          >
+            <Trash2 className="size-3 mr-1" />
+            Effacer
+          </Button>
+        )}
+      </div>
       <div className="flex-1 overflow-y-auto space-y-3 p-4">
-        {messages.length === 0 && (
+        {allMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[200px] gap-3 text-center">
             <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
               <Bot className="size-5 text-primary" />
@@ -157,7 +225,7 @@ export function ChatPanel(props: ChatPanelProps) {
             </div>
           </div>
         )}
-        {messages.map((m, i) => (
+        {allMessages.map((m, i) => (
           <div
             key={i}
             className={cn("flex gap-3", m.role === "user" ? "justify-end" : "justify-start")}
@@ -197,7 +265,7 @@ export function ChatPanel(props: ChatPanelProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Pose ta question... (Entrée pour envoyer, Shift+Entrée = nouvelle ligne)"
+            placeholder="Pose ta question... (Entrée ou Ctrl+Entrée pour envoyer, Esc pour stop)"
             disabled={loading}
             rows={2}
             className="resize-none text-sm"
@@ -219,5 +287,5 @@ export function ChatPanel(props: ChatPanelProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

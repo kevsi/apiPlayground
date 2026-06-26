@@ -9,6 +9,7 @@ export default defineConfig({
       'lib/**/__tests__/**/*.test.ts',
       'src/ai/**/__tests__/**/*.test.{ts,tsx}',
       'src/ai/**/*.test.{ts,tsx}',
+      'hooks/**/__tests__/**/*.test.{ts,tsx}',
     ],
     exclude: ['node_modules', '.next'],
   },
