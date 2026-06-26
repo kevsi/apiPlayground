@@ -6,7 +6,6 @@ import { CollectionsModal } from "@/components/collections-modal"
 import { HistoryPanel } from "@/components/history-panel"
 import { BatchRunProgress } from "@/components/batch-run-progress"
 import { RequestTabBar } from "@/components/request-tab-bar"
-import { RequestActiveToolbar } from "@/components/request-active-toolbar"
 import { RequestChainingDialog } from "@/components/request-chaining-dialog"
 import { RequestSaveDialog } from "@/components/request-save-dialog"
 import { RequestUnsavedCloseDialog } from "@/components/request-unsaved-close-dialog"
@@ -132,21 +131,14 @@ export function RequestTabsManager() {
         onCloseToRight={closeToRight}
         onCloseAllTabs={closeAllTabs}
         onSaveAllTabs={saveAllTabs}
+        onOpenCollections={() => setCollectionsDrawerOpen(true)}
+        onDuplicateActive={() => duplicateTab(activeTab)}
+        onSaveActive={saveActiveTab}
+        onOpenHistory={() => setHistoryOpen(true)}
       />
       </div>
 
-      <RequestActiveToolbar
-        activeTab={activeTab}
-        savedIndicator={savedIndicator}
-        collectionRequestStatus={collectionRequestStatus}
-        onNameChange={(name) => updateTab(activeTab.id, { name })}
-        onOpenCollections={() => setCollectionsDrawerOpen(true)}
-        onDuplicateTab={() => duplicateTab(activeTab)}
-        onSave={saveActiveTab}
-        onOpenHistory={() => setHistoryOpen(true)}
-        onExport={exportActiveRequest}
-        onOpenChaining={() => setChainingOpen(true)}
-      />
+
 
       {collectionRunLogs.length > 0 && (
         <div className="border-b border-border/50 bg-muted/5 px-4 py-2">
@@ -247,6 +239,20 @@ export function RequestTabsManager() {
                 onAnalyze={handleAnalyzeRequest}
                 onGenerateTests={handleGenerateTests}
                 onCreateMock={handleCreateMock}
+                onPatchRequest={(patch) => {
+                  const tabPatch: Record<string, unknown> = {}
+                  if (patch.method !== undefined) tabPatch.method = patch.method
+                  if (patch.url !== undefined) {
+                    tabPatch.url = patch.url
+                    tabPatch.endpoint = patch.url.replace(/^https?:\/\/[^/]+/, "") || "/"
+                  }
+                  if (patch.headers !== undefined) {
+                    tabPatch.headers = Object.entries(patch.headers).map(([key, value]) => ({ key, value }))
+                  }
+                  if (patch.body !== undefined) tabPatch.body = typeof patch.body === "string" ? patch.body : JSON.stringify(patch.body)
+                  if (patch.authType !== undefined) tabPatch.authType = patch.authType
+                  updateTab(activeTab.id, tabPatch as Parameters<typeof updateTab>[1])
+                }}
                 aiSummary={aiEngine.lastSummary ?? undefined}
                 aiError={aiEngine.error ?? undefined}
                 method={activeTab.method}

@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronLeft, ChevronRight, CheckCircle, Copy, List, Plus, Save, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, CheckCircle, Clock, Copy, Folder, List, Plus, Save, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -32,6 +32,12 @@ interface RequestTabBarProps {
   onCloseToRight: (id: string) => void
   onCloseAllTabs: () => void
   onSaveAllTabs: () => void
+  // Phase HTTP-2: 4 quick-action icons for the active tab, moved here from
+  // request-active-toolbar (the toolbar was removed entirely).
+  onOpenCollections: () => void
+  onDuplicateActive: () => void
+  onSaveActive: () => void
+  onOpenHistory: () => void
 }
 
 export function RequestTabBar({
@@ -53,7 +59,13 @@ export function RequestTabBar({
   onCloseToRight,
   onCloseAllTabs,
   onSaveAllTabs,
+  onOpenCollections,
+  onDuplicateActive,
+  onSaveActive,
+  onOpenHistory,
 }: RequestTabBarProps) {
+  const hasActiveTab = tabs.some((t) => t.id === activeTabId)
+
   return (
     <>
       <div className="flex items-center border-b border-border relative bg-muted/5">
@@ -124,6 +136,53 @@ export function RequestTabBar({
             <ChevronRight className="size-3.5" />
           </button>
         )}
+        {/* Quick actions for the ACTIVE tab — moved here from request-active-toolbar */}
+        <div className="flex shrink-0 items-center gap-0.5 border-l border-border/30 px-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenCollections}
+            disabled={!hasActiveTab}
+            className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+            title="Collections"
+            data-testid="tabbar-collections"
+          >
+            <Folder className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDuplicateActive}
+            disabled={!hasActiveTab}
+            className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+            title="Duplicate request"
+            data-testid="tabbar-duplicate"
+          >
+            <Copy className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSaveActive}
+            disabled={!hasActiveTab}
+            className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+            title="Save (Ctrl+S)"
+            data-testid="tabbar-save"
+          >
+            <Save className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenHistory}
+            disabled={!hasActiveTab}
+            className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+            title="Request history"
+            data-testid="tabbar-history"
+          >
+            <Clock className="size-3.5" />
+          </Button>
+        </div>
         <div className="flex shrink-0 items-center gap-0.5 pr-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
