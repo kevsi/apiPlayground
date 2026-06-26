@@ -30,6 +30,7 @@ import { FloatingAiChat } from '@/components/floating-ai-chat'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { DeepLinkHandler } from '@/components/deep-link-handler'
 import { ClientLayoutShell } from '@/components/client-layout-shell'
+import { AiShortcutBridge } from '@/components/ai-shortcut-bridge'
 
 export default function RootLayout({
   children,
@@ -55,6 +56,7 @@ export default function RootLayout({
             </SidebarProvider>
           </ErrorBoundary>
           <FloatingAiChat />
+          <AiShortcutBridge />
           <Toaster />
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

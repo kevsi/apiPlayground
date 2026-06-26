@@ -1,14 +1,18 @@
 "use client";
 
 /**
- * Phase 2.7 + 5.4 + 5.5 — ChatPanel
+ * Phase 2.7 + 5.4 + 5.5 + 7.5 — ChatPanel
  *
  * Streams LLM responses from /api/proxy-ai AND persists each turn to
  * Supabase via useChatHistory. The local streaming buffer handles live
  * token-by-token updates; persisted history is loaded on mount and
  * updated as messages complete.
+ *
+ * Listens for the global "reqly:focus-ai" event (dispatched by
+ * AiShortcutBridge on Ctrl+Shift+A) to focus its textarea.
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { AI_FOCUS_EVENT } from "@/components/ai-shortcut-bridge";
 import { Send, Loader2, Bot, User, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,6 +55,7 @@ export function ChatPanel(props: ChatPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // When the underlying request changes, clear the local streaming buffer.
   useEffect(() => {
@@ -66,6 +71,18 @@ export function ChatPanel(props: ChatPanelProps) {
     }));
     return [...historyMessages, ...streamed];
   }, [history, streamed]);
+
+  // Listen for global "focus AI" shortcut (Ctrl+Shift+A → from AiShortcutBridge).
+  useEffect(() => {
+    function onFocusAi() {
+      // Scroll the panel into view if it's inside a scrollable container.
+      const root = textareaRef.current?.closest("[data-testid='reqlyai-chat-panel']");
+      root?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      textareaRef.current?.focus();
+    }
+    window.addEventListener(AI_FOCUS_EVENT, onFocusAi);
+    return () => window.removeEventListener(AI_FOCUS_EVENT, onFocusAi);
+  }, []);
 
   // Auto-scroll on new content
   useEffect(() => {
@@ -262,6 +279,7 @@ export function ChatPanel(props: ChatPanelProps) {
       <div className="border-t border-border p-3">
         <div className="flex items-end gap-2">
           <Textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
