@@ -25,11 +25,11 @@ function getSupabaseFromRequest(req: NextRequest) {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
   const sb = getSupabaseFromRequest(req);
   if (!sb) return getAuthError();
-  const { requestId } = params;
+  const { requestId } = await params;
   if (!requestId) {
     return NextResponse.json({ error: "Missing requestId" }, { status: 400 });
   }
@@ -49,11 +49,11 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
   const sb = getSupabaseFromRequest(req);
   if (!sb) return getAuthError();
-  const { requestId } = params;
+  const { requestId } = await params;
 
   let body: any;
   try {
@@ -105,11 +105,11 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
   const sb = getSupabaseFromRequest(req);
   if (!sb) return getAuthError();
-  const { requestId } = params;
+  const { requestId } = await params;
 
   const url = new URL(req.url);
   const singleId = url.searchParams.get("id");

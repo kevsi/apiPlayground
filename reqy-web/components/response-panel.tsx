@@ -6,8 +6,7 @@ import { useToast } from "@/hooks/use-toast"
 import { DiffDialog } from "@/components/diff-dialog"
 import { analyze } from "@/src/ai/local-engine/analyzer"
 import { buildRequestContext } from "@/src/ai/local-engine/context"
-import { Panel } from "@/src/ai/components/Panel"
-import { ChatPanel } from "@/src/ai/components/ChatPanel"
+import { AIModal } from "@/src/ai/components/AIModal"
 import type { RequestPayload } from "@/src/ai/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -91,6 +90,7 @@ export function ResponsePanel({
   const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty")
   const [activeTab, setActiveTab] = useState("response")
   const [diffDialogOpen, setDiffDialogOpen] = useState(false)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
 
   // ── ReqlyAI fix undo state (Phase 4) ──────────────────────────────
   const { toast } = useToast()
@@ -385,27 +385,22 @@ export function ResponsePanel({
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger
-              value="reqlyai"
-              data-testid="tab-reqlyai"
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:border-muted-foreground/20"
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setAiModalOpen(true)}
+              className="ml-auto inline-flex items-center gap-1.5 h-auto px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-primary hover:bg-primary/10"
+              data-testid="btn-ai-open"
             >
-              <Sparkles className="size-3 mr-1" />
-              ReqlyAI
+              <Sparkles className="size-3.5" />
+              AI
               {diagnostics.length > 0 && (
-                <span className="ml-1.5 rounded-full bg-red-500/20 text-red-600 px-1.5 py-0.5 text-[10px] font-mono">
+                <span className="ml-1 rounded-full bg-red-500/20 text-red-600 px-1.5 py-0.5 text-[10px] font-mono">
                   {diagnostics.length}
                 </span>
               )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="chat"
-              data-testid="tab-chat"
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:border-muted-foreground/20"
-            >
-              <Bot className="size-3 mr-1" />
-              Chat
-            </TabsTrigger>
+            </Button>
           </TabsList>
         </div>
 
@@ -488,74 +483,6 @@ export function ResponsePanel({
           />
         </TabsContent>
 
-        <TabsContent value="reqlyai" className="m-0 min-h-0 flex-1 animate-fade-in overflow-auto">
-          <Panel
-            diagnostics={diagnostics}
-            onApplyFix={(diag) => {
-              if (!diag.fix || !onPatchRequest) return
-              // P4.5: Double-clic protection
-              if (applyingFixId === diag.id) return
-              // P4.8: Don't apply if a request is currently in flight
-              if (isLoading) {
-                toast({
-                  title: "Requête en cours",
-                  description: "Attends la fin de la requête avant d'appliquer un fix.",
-                  variant: "destructive",
-                  duration: 3000,
-                })
-                return
-              }
-              // Snapshot current request fields BEFORE applying the patch (for undo)
-              const preSnapshot: AppliedFix["preSnapshot"] = {
-                method,
-                url,
-                headers: requestHeaders ?? [],
-                body: body ?? "",
-                authType: authType ?? "none",
-              }
-              // Apply the fix
-              onPatchRequest(diag.fix.applyFix())
-              // Mark this fix as "just applied" for 300ms to prevent rapid double-clicks
-              setApplyingFixId(diag.id)
-              window.setTimeout(() => setApplyingFixId(null), 300)
-              // Store for undo (P4.5)
-              setLastAppliedFix({ diagId: diag.id, diagTitle: diag.title, preSnapshot })
-              // Toast confirmation with Undo button (P4.7) — 5s window
-              toast({
-                title: "Fix appliqué",
-                description: diag.title,
-                duration: 5000,
-                onClick: () => {
-                  // Undo: restore pre-snapshot
-                  onPatchRequest({
-                    method: preSnapshot.method as any,
-                    url: preSnapshot.url,
-                    headers: Object.fromEntries(
-                      preSnapshot.headers.filter((h) => h.key).map((h) => [h.key, h.value])
-                    ) as Record<string, string>,
-                    body: preSnapshot.body,
-                    authType: preSnapshot.authType as any,
-                  })
-                  setLastAppliedFix(null)
-                },
-              })
-            }}
-          />
-        </TabsContent>
-
-        <TabsContent value="chat" className="m-0 min-h-0 flex-1 animate-fade-in overflow-hidden">
-          <ChatPanel
-            method={method ?? "GET"}
-            url={url ?? ""}
-            requestHeaders={requestHeaders ?? []}
-            body={body}
-            authType={authType}
-            responseStatus={responseStatus}
-            responseBody={responseBody}
-            responseHeaders={responseHeaders ?? {}}
-            responseTime={responseTime ?? 0}
-          />
-        </TabsContent>
 
         <TabsContent value="tests" className="m-0 min-h-0 flex-1 animate-fade-in overflow-auto">
           {testResults && testResults.length > 0 ? (
@@ -613,6 +540,19 @@ export function ResponsePanel({
         history={history}
         currentResponse={responseBody}
         currentResponseStatus={responseStatus}
+      />
+
+      <AIModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        method={method}
+        url={url}
+        requestHeaders={requestHeaders}
+        requestBody={body}
+        responseStatus={responseStatus}
+        responseHeaders={responseHeaders}
+        responseBody={responseBody}
+        authToken={authToken}
       />
     </div>
   )

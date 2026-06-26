@@ -274,19 +274,13 @@ export async function POST(request: NextRequest) {
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout))
 
-    // Measure TTFB: time to first byte of response body
-    // We read the first chunk from the response body to capture the actual
-    // time until data starts arriving, not just headers.
-    const ttfbStart = Date.now()
-    if (response.body) {
-      const reader = response.body.getReader()
-      try {
-        await reader.read()
-        timings.ttfbMs = Date.now() - ttfbStart
-      } finally {
-        reader.releaseLock()
-      }
-    }
+    // TTFB approximation: time from request start until response headers
+    // were received. fetch resolves when headers arrive, which for non-
+    // streaming responses is essentially time-to-first-byte.
+    // We deliberately do NOT read the body stream here because doing so
+    // would corrupt it: subsequent response.text()/arrayBuffer() would
+    // miss the consumed chunk, truncating the response body.
+    timings.ttfbMs = Math.max(0, Date.now() - startTime)
 
     const durationMs = Date.now() - startTime
     const responseHeaders: Record<string, string> = {}
