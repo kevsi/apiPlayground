@@ -16,6 +16,22 @@ function AuthCallbackHandler() {
     if (hasRun.current) return
     hasRun.current = true
 
+    // Anti-loop guard: if we've already processed this exact URL hash in this
+    // tab, bail out. Prevents re-mount loops (e.g. if /settings redirects back
+    // here before the server-side cookie is recognized).
+    if (typeof window !== "undefined") {
+      try {
+        const processed = window.sessionStorage.getItem("auth-callback-processed")
+        if (processed === window.location.hash) {
+          window.location.replace("/settings#account")
+          return
+        }
+        window.sessionStorage.setItem("auth-callback-processed", window.location.hash)
+      } catch {
+        /* sessionStorage may be blocked — fall through */
+      }
+    }
+
     async function handleCallback() {
       try {
         // Capture l'URL complète pour le debug (window.location est la source de vérité)
