@@ -4,9 +4,9 @@
  *
  * Re-exports HttpMethod from the existing project types.
  */
-import type { HttpMethod } from "@/lib/types";
+import type { HttpMethod, AIProvider } from "@/lib/types";
 
-export type { HttpMethod };
+export type { HttpMethod, AIProvider };
 
 // ─── Context ──────────────────────────────────────────────────────────────
 
