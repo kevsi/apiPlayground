@@ -6,12 +6,21 @@
  */
 import type { RequestContext, Diagnostic } from "@/src/ai/types";
 
+export interface RetrievedChunk {
+  source: string;
+  content: string;
+  score?: number;
+  origin?: string;
+}
+
 export const SYSTEM_PROMPT = `Tu es ReqlyAI, un assistant API spécialisé.
 Tu aides les développeurs à diagnostiquer des erreurs HTTP, comprendre des réponses,
 et améliorer leurs requêtes. Tu réponds en français, de façon concise et actionnable.
 Quand tu suggères un fix, donne le code exact prêt à coller.`;
 
 const MAX_BODY_CHARS = 2000;
+const MAX_RAG_CHARS = 4000;
+const MAX_RAG_CHUNKS = 8;
 
 function truncate(value: unknown): string {
   if (value == null) return "(empty)";
@@ -47,7 +56,8 @@ export function buildContextSummary(ctx: RequestContext): string {
 export function buildUserPrompt(
   question: string,
   ctx: RequestContext,
-  diagnostics: Diagnostic[] = []
+  diagnostics: Diagnostic[] = [],
+  retrievedChunks: RetrievedChunk[] = []
 ): string {
   const parts: string[] = [];
   parts.push("=== Contexte de la requête ===");
@@ -60,6 +70,26 @@ export function buildUserPrompt(
         `- [${d.severity.toUpperCase()}] ${d.title}: ${d.explanation}` +
           (d.fix ? ` (fix: ${d.fix.description})` : "")
       );
+    }
+  }
+  if (retrievedChunks.length > 0) {
+    parts.push("");
+    parts.push("=== Connaissances pertinentes (RAG) ===");
+    let used = 0;
+    let included = 0;
+    for (const chunk of retrievedChunks) {
+      if (included >= MAX_RAG_CHUNKS) break;
+      const remaining = MAX_RAG_CHARS - used;
+      if (remaining <= 100) break;
+      const text =
+        chunk.content.length <= remaining
+          ? chunk.content
+          : chunk.content.slice(0, Math.max(0, remaining - 40)) +
+            `…(truncated ${chunk.content.length - remaining} chars)`;
+      const score = chunk.score ? ` (score ${chunk.score.toFixed(2)})` : "";
+      parts.push(`- [${chunk.source}${score}] ${text}`);
+      used += text.length;
+      included++;
     }
   }
   parts.push("");
