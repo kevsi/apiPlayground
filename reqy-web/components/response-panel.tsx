@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { Play, Loader2, FlaskConical, CheckCircle, XCircle, Sparkles } from "lucide-react"
+import { Play, Loader2, FlaskConical, CheckCircle, XCircle, Sparkles, Bot } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DiffDialog } from "@/components/diff-dialog"
 import { analyze } from "@/src/ai/local-engine/analyzer"
 import { buildRequestContext } from "@/src/ai/local-engine/context"
 import { Panel } from "@/src/ai/components/Panel"
+import { ChatPanel } from "@/src/ai/components/ChatPanel"
 import type { RequestPayload } from "@/src/ai/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -397,6 +398,14 @@ export function ResponsePanel({
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger
+              value="chat"
+              data-testid="tab-chat"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:border-muted-foreground/20"
+            >
+              <Bot className="size-3 mr-1" />
+              Chat
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -531,6 +540,20 @@ export function ResponsePanel({
                 },
               })
             }}
+          />
+        </TabsContent>
+
+        <TabsContent value="chat" className="m-0 min-h-0 flex-1 animate-fade-in overflow-hidden">
+          <ChatPanel
+            method={method ?? "GET"}
+            url={url ?? ""}
+            requestHeaders={requestHeaders ?? []}
+            body={body}
+            authType={authType}
+            responseStatus={responseStatus}
+            responseBody={responseBody}
+            responseHeaders={responseHeaders ?? {}}
+            responseTime={responseTime ?? 0}
           />
         </TabsContent>
 
