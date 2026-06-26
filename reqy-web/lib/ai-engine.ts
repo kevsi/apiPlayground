@@ -163,11 +163,13 @@ If status is 4xx/5xx → return SUGGEST_FIX + EXPLAIN. If status is 2xx → retu
 Categories: 1) status codes, 2) response time, 3) content-type header, 4) body structure / required fields, 5) business logic correctness. Produce TestAssertion objects with label and JavaScript test code suitable for the app's Tests tab. Use {{variable_name}} for env values. Return JSON only.`;
   },
   naturalLanguageToRequest: (description: string, ctx: AIContext): string => {
-    const envVars = Object.entries(ctx.environmentVariables)
+    // Delegates to the canonical prompt builder in cloud-engine/generate.ts (Phase 6.1).
+    const envVars = ctx.environmentVariables ?? {};
+    const envList = Object.entries(envVars)
       .map(([key, value]) => `- {{${key}}} = ${String(value).slice(0, 40)}`)
       .join("\n") || "none";
     return `Convert the natural language description into a complete HTTP request. Description: "${description}".
-Available env variables (use them when appropriate):\n${envVars}
+Available env variables (use them when appropriate):\n${envList}
 Provide method, full URL, headers, params, and a sample body if applicable. Use {{variable_name}} for secrets or env variables. Return JSON with an action FILL_REQUEST only.`;
   },
   debugError: (ctx: AIContext): string => {
