@@ -3,7 +3,7 @@ packages:
   - 'reqy-cli'
   - 'reqy-mcp'
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: false
   sharp: true
   tree-sitter-c-sharp: true
   tree-sitter-go: true
