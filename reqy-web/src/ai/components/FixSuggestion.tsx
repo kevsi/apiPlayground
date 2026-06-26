@@ -1,5 +1,6 @@
 import type { Diagnostic } from "@/src/ai/types";
 import { DiagBadge } from "./DiagBadge";
+import { RatingButtons } from "./RatingButtons";
 
 export function FixSuggestion({
   diagnostic,
@@ -10,9 +11,12 @@ export function FixSuggestion({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-3 space-y-2" data-testid={`fix-${diagnostic.id}`}>
-      <div className="flex items-center gap-2">
-        <DiagBadge severity={diagnostic.severity} />
-        <span className="text-sm font-medium">{diagnostic.title}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <DiagBadge severity={diagnostic.severity} />
+          <span className="text-sm font-medium truncate">{diagnostic.title}</span>
+        </div>
+        <RatingButtons diagnosticId={diagnostic.id} />
       </div>
       <p className="text-xs text-muted-foreground">{diagnostic.explanation}</p>
       {diagnostic.fix && (
