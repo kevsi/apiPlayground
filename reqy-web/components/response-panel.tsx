@@ -303,8 +303,6 @@ export function ResponsePanel({
         onRun={onRun}
         onRunAndSave={onRunAndSave}
         onRunAndDownload={onRunAndDownload}
-        onAnalyze={onAnalyze}
-        onGenerateTests={onGenerateTests}
         onExport={handleExport}
         onCreateMock={onCreateMock}
         onDiff={() => setDiffDialogOpen(true)}
@@ -332,15 +330,9 @@ export function ResponsePanel({
         }}
       />
 
-      <ResponseAiSummary
-        aiSummary={aiSummary}
-        aiError={aiError}
-        aiIsLoading={aiIsLoading}
-      />
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
         <div className="shrink-0 border-b border-border px-4">
-          <TabsList className="h-auto gap-0 bg-transparent p-0 -mb-px">
+          <TabsList className="h-auto gap-0 bg-transparent p-0 -mb-px flex w-full overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] justify-start [&>button]:shrink-0">
             <TabsTrigger
               value="response"
               className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:border-muted-foreground/20"
@@ -404,7 +396,7 @@ export function ResponsePanel({
           </TabsList>
         </div>
 
-        <TabsContent value="response" data-testid="response-body" className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-hidden">
+        <TabsContent value="response" data-testid="response-body" className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-auto">
           {/* Giant floating status code background */}
           {hasResponse && responseStatus && !isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
