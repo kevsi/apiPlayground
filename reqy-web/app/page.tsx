@@ -25,10 +25,7 @@ export default function ApiTestingDashboard() {
         {/* Subtle top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent pointer-events-none" />
         <ApiHeader />
-        {/* Zone scrollable — RequestTabsManager peut dépasser du viewport (panels, logs, etc.) */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <RequestTabsManager />
-        </div>
+        <RequestTabsManager />
       </div>
     </div>
   )
