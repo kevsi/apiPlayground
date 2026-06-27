@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { formatZodError, postmanImportBodySchema, postmanImportResponseSchema } from "@/lib/import-schemas"
-
-const POSTMAN_API_BASE = "https://api.getpostman.com"
+import { postmanFetch } from "@/lib/postman-api"
 
 export async function POST(request: NextRequest) {
   const bodyResult = postmanImportBodySchema.safeParse(await request.json())
@@ -29,14 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(
-      `${POSTMAN_API_BASE}/collections/${collectionId}`,
-      {
-        headers: {
-          "X-Api-Key": apiKey,
-        },
-      }
-    )
+    const response = await postmanFetch(apiKey, `/collections/${collectionId}`)
 
     if (!response.ok) {
       return NextResponse.json(
