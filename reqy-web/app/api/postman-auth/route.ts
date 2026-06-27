@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validatePostmanApiKey } from "@/lib/postman"
+import { validatePostmanApiKey, PostmanApiError } from "@/lib/postman"
 import { buildApiKeyCookie, buildClearApiKeyCookie } from "./cookies"
 
 const API_KEY_REGEX = /^PMAK-[A-Za-z0-9_-]+$/
@@ -20,17 +20,17 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const user = await validatePostmanApiKey(apiKey)
-  if (!user) {
-    return NextResponse.json(
-      { error: "Clé API rejetée par Postman (invalide, expirée ou révoquée)" },
-      { status: 400 }
-    )
+  try {
+    const user = await validatePostmanApiKey(apiKey)
+    const response = NextResponse.json({ connected: true, user })
+    response.cookies.set(buildApiKeyCookie(apiKey))
+    return response
+  } catch (err) {
+    if (err instanceof PostmanApiError) {
+      return NextResponse.json({ error: err.message }, { status: 400 })
+    }
+    return NextResponse.json({ error: "Erreur inattendue" }, { status: 500 })
   }
-
-  const response = NextResponse.json({ connected: true, user })
-  response.cookies.set(buildApiKeyCookie(apiKey))
-  return response
 }
 
 export async function DELETE() {
