@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import { Bell, Sparkles, Loader2, User, Plug, ShieldAlert, Cloud } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { ApiHeader } from "@/components/api-header"
 import { ApiSidebar } from "@/components/api-sidebar"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useRequestStore } from "@/hooks/use-request-store"
@@ -15,15 +17,13 @@ import { AIProvider, loadAIProvider, loadApiKey, saveAIProvider, saveApiKey, loa
 import { useSidebar } from "@/contexts/sidebar-context"
 import { ImportExportModal } from "@/components/import-export-modal"
 import { toast } from '@/hooks/use-toast'
-import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { isTauriAvailable } from "@/lib/tauri"
+import { useAuth } from "@/hooks/use-auth"
 
-const ProfileSection = dynamic(() => import("@/components/settings/profile-section"), { ssr: false })
+const ProfileSection = dynamic(() => import("@/components/settings/profile-section").then((m) => ({ default: m.ProfileSection })), { ssr: false })
 const AISection = dynamic(() => import("@/components/settings/ai-section"), { ssr: false })
 const NotificationsSection = dynamic(() => import("@/components/settings/notifications-section"), { ssr: false })
 const SyncSection = dynamic(() => import("@/components/settings/sync-section"), { ssr: false })
 const IntegrationsSection = dynamic(() => import("@/components/settings/integrations-section"), { ssr: false })
-const AccountSection = dynamic(() => import("@/components/settings/account-section"), { ssr: false })
 
 const AI_PROVIDERS: Array<{ value: AIProvider; label: string }> = [
   { value: "openai", label: "OpenAI" },
@@ -76,12 +76,8 @@ export default function SettingsPage() {
   const [githubConnectDialogOpen, setGithubConnectDialogOpen] = useState(false)
   const [postmanConnecting, setPostmanConnecting] = useState(false)
 
-  const [authStatus, setAuthStatus] = useState<"loading" | "connected" | "disconnected" | "error">("loading")
-  const [authUser, setAuthUser] = useState<{ email: string; name: string; provider: string } | null>(null)
-  const [authConnecting, setAuthConnecting] = useState(false)
-  const [authEmail, setAuthEmail] = useState<string>("")
-  const [authPassword, setAuthPassword] = useState<string>("")
-  const [authError, setAuthError] = useState<string | null>(null)
+  const { user: authUser, status: authStatus } = useAuth()
+  const router = useRouter()
 
   const [activeSection, setActiveSection] = useState<SectionKey>(() => {
     if (typeof window !== 'undefined') {
@@ -108,14 +104,6 @@ export default function SettingsPage() {
       return { requestComplete: true, collectionComplete: true, aiResponse: true, aiError: true, importExport: true }
     }
   })
-
-  // Profile state
-  const [email, setEmail] = useState<string>(
-    (typeof window !== 'undefined' && (persistence.getItem<string>("probe_user_email") ?? "")) || ""
-  )
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(
-    (typeof window !== 'undefined' && persistence.getItem<string>("probe_two_factor_enabled") === "true") || false
-  )
 
   // Sync active section with URL hash
   useEffect(() => {
@@ -202,17 +190,6 @@ export default function SettingsPage() {
     } catch { setGithubStatus("error"); setGithubUser(null) }
   }, [])
 
-  const fetchAuthStatus = useCallback(async () => {
-    try {
-      const response = await fetch("/api/auth/status")
-      if (!response.ok) throw new Error("Échec")
-      const data = await response.json()
-      if (data.connected) { setAuthStatus("connected"); setAuthUser(data.user || null) }
-      else { setAuthStatus("disconnected"); setAuthUser(null) }
-    } catch { setAuthStatus("error"); setAuthUser(null) }
-    finally { setAuthConnecting(false) }
-  }, [])
-
   const fetchPostmanStatus = useCallback(async () => {
     try {
       const response = await fetch("/api/postman-auth")
@@ -223,37 +200,22 @@ export default function SettingsPage() {
     } catch { setPostmanStatus("error"); setPostmanUser(null) }
   }, [])
 
-  const handleAuthErrorFromQuery = useCallback(() => {
-    try {
-      const params = new URLSearchParams(window.location.search)
-      const authErrorParam = params.get("auth_error")
-      if (authErrorParam) {
-        setAuthError(authErrorParam)
-        toast({ title: "Erreur d'authentification", description: authErrorParam, variant: "destructive" })
-        params.delete("auth_error")
-        window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash}`)
-      }
-    } catch { /* ignore */ }
-  }, [])
-
   // Initial status fetch
   useEffect(() => {
     const statusTimeout = window.setTimeout(() => {
-      void Promise.all([fetchGithubStatus(), fetchPostmanStatus(), fetchAuthStatus()])
-      handleAuthErrorFromQuery()
+      void Promise.all([fetchGithubStatus(), fetchPostmanStatus()])
     }, 0)
     return () => window.clearTimeout(statusTimeout)
-  }, [fetchGithubStatus, fetchPostmanStatus, fetchAuthStatus, handleAuthErrorFromQuery])
+  }, [fetchGithubStatus, fetchPostmanStatus])
 
   useEffect(() => {
     const onFocus = () => {
       fetchGithubStatus()
       fetchPostmanStatus()
-      fetchAuthStatus()
     }
     window.addEventListener("focus", onFocus)
     return () => window.removeEventListener("focus", onFocus)
-  }, [fetchGithubStatus, fetchPostmanStatus, fetchAuthStatus])
+  }, [fetchGithubStatus, fetchPostmanStatus])
 
   // Postman handlers
   const connectPostman = useCallback(async () => {
@@ -290,118 +252,6 @@ export default function SettingsPage() {
     } catch { toast({ title: "Erreur", description: "Impossible de déconnecter Postman", variant: "destructive" }) }
   }, [])
 
-  // Auth handlers
-  const connectGoogle = useCallback(async () => {
-    setAuthConnecting(true); setAuthStatus("loading")
-    try {
-      const supabase = getSupabaseBrowserClient()
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: isTauriAvailable()
-            ? `${window.location.origin}/auth/callback?source=desktop`
-            : `${window.location.origin}/auth/callback`,
-          skipBrowserRedirect: true,
-        },
-      })
-      if (oauthError || !data?.url) {
-        throw oauthError || new Error("URL OAuth manquante")
-      }
-      if (isTauriAvailable()) {
-        const { invoke } = await import("@tauri-apps/api/core")
-        await invoke("open_external", { url: data.url })
-      } else {
-        window.location.href = data.url
-      }
-    } catch {
-      setAuthStatus("error"); setAuthConnecting(false)
-      toast({ title: "Erreur OAuth", description: "Impossible de lancer la connexion Google", variant: "destructive" })
-    }
-  }, [])
-
-  const connectGithubAuth = useCallback(async () => {
-    setAuthConnecting(true); setAuthStatus("loading")
-    try {
-      const supabase = getSupabaseBrowserClient()
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: isTauriAvailable()
-            ? `${window.location.origin}/auth/callback?source=desktop`
-            : `${window.location.origin}/auth/callback`,
-          skipBrowserRedirect: true,
-        },
-      })
-      if (oauthError || !data?.url) {
-        throw oauthError || new Error("URL OAuth manquante")
-      }
-      if (isTauriAvailable()) {
-        const { invoke } = await import("@tauri-apps/api/core")
-        await invoke("open_external", { url: data.url })
-      } else {
-        window.location.href = data.url
-      }
-    } catch {
-      setAuthStatus("error"); setAuthConnecting(false)
-      toast({ title: "Erreur OAuth", description: "Impossible de lancer la connexion GitHub", variant: "destructive" })
-    }
-  }, [])
-
-  const signupWithEmail = useCallback(async () => {
-    setAuthConnecting(true); setAuthError(null)
-    try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: authEmail.trim(), password: authPassword }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        setAuthStatus("error"); setAuthError(data.message || "Impossible de créer un compte")
-        toast({ title: "Erreur", description: data.message || "Impossible de créer un compte", variant: "destructive" })
-        return
-      }
-      if (data.connected) {
-        setAuthStatus("connected"); setAuthUser(data.user); setAuthEmail(""); setAuthPassword("")
-        toast({ title: "Compte créé", description: `Bienvenue ${data.user.name}` })
-      } else {
-        setAuthStatus("disconnected"); setAuthError(data.message)
-        toast({ title: "Inscription requise", description: data.message })
-      }
-    } catch {
-      setAuthStatus("error"); setAuthError("Impossible de créer un compte")
-      toast({ title: "Erreur", description: "Impossible de créer un compte", variant: "destructive" })
-    } finally { setAuthConnecting(false) }
-  }, [authEmail, authPassword])
-
-  const loginWithEmail = useCallback(async () => {
-    setAuthConnecting(true); setAuthError(null)
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: authEmail.trim(), password: authPassword }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        setAuthStatus("error"); setAuthError(data.message || "Impossible de se connecter")
-        toast({ title: "Erreur", description: data.message || "Impossible de se connecter", variant: "destructive" })
-        return
-      }
-      setAuthStatus("connected"); setAuthUser(data.user); setAuthEmail(""); setAuthPassword("")
-      toast({ title: "Connecté", description: `Bienvenue ${data.user.name}` })
-    } catch {
-      setAuthStatus("error"); setAuthError("Impossible de se connecter")
-      toast({ title: "Erreur", description: "Impossible de se connecter", variant: "destructive" })
-    } finally { setAuthConnecting(false) }
-  }, [authEmail, authPassword])
-
-  const logoutAuth = useCallback(async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" })
-      setAuthStatus("disconnected"); setAuthUser(null)
-      toast({ title: "Déconnecté", description: "Vous êtes maintenant déconnecté." })
-    } catch { toast({ title: "Erreur", description: "Impossible de se déconnecter", variant: "destructive" }) }
-  }, [])
-
   // Notification handlers
   const togglePushEnabled = useCallback(async () => {
     const next = !pushEnabled
@@ -426,24 +276,7 @@ export default function SettingsPage() {
     try { toast({ title: "Test de notification (toast)", meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0]) } catch { /* ignore */ }
   }, [])
 
-  // Profile handlers
-  const saveUserSettings = useCallback(() => {
-    try {
-      void persistence.setItem("probe_user_email", email || "")
-      void persistence.setItem("probe_two_factor_enabled", twoFactorEnabled ? "true" : "false")
-      setSaveStatus("Paramètres utilisateur enregistrés")
-    } catch { /* ignore */ }
-  }, [email, twoFactorEnabled])
-
-  const handleToggle2FA = useCallback(() => setTwoFactorEnabled((v) => !v), [])
-
-  const handleDeactivateAccount = useCallback(() => {
-    if (window.confirm("Confirmer la désactivation du compte ?")) setSaveStatus("Compte désactivé (simulation)")
-  }, [])
-
-  const handleDeleteAccount = useCallback(() => {
-    if (window.confirm("Supprimer définitivement le compte ? Cette action est irréversible.")) setSaveStatus("Compte supprimé (simulation)")
-  }, [])
+  // Profile handlers moved into ProfileSection (self-contained)
 
   return (
     <div className="flex h-screen bg-background bg-dot-pattern">
@@ -485,13 +318,19 @@ export default function SettingsPage() {
             {/* Section content */}
             <div className="flex-1 space-y-6">
               {activeSection === "profile" ? (
-                <ProfileSection
-                  email={email}
-                  twoFactorEnabled={twoFactorEnabled}
-                  onEmailChange={setEmail}
-                  onSave={saveUserSettings}
-                  onToggle2FA={handleToggle2FA}
-                />
+                authUser ? (
+                  <ProfileSection user={authUser} />
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Profil</CardTitle>
+                      <CardDescription>Connectez-vous pour voir et gérer votre profil.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button onClick={() => router.push("/login")}>Se connecter</Button>
+                    </CardContent>
+                  </Card>
+                )
               ) : null}
               {activeSection === "ai" ? (
                 <AISection
@@ -525,17 +364,6 @@ export default function SettingsPage() {
                   setPostmanApiKey={setPostmanApiKey}
                   onConnectPostman={connectPostman}
                   onDisconnectPostman={disconnectPostman}
-                />
-              ) : null}
-              {activeSection === "account" ? (
-                <AccountSection
-                  authStatus={authStatus} authUser={authUser}
-                  authEmail={authEmail} authPassword={authPassword}
-                  authError={authError} authConnecting={authConnecting}
-                  onEmailChange={setAuthEmail} onPasswordChange={setAuthPassword}
-                  onLogin={loginWithEmail} onSignup={signupWithEmail}
-                  onConnectGoogle={connectGoogle} onConnectGithub={connectGithubAuth}
-                  onLogout={logoutAuth} onDeactivate={handleDeactivateAccount} onDelete={handleDeleteAccount}
                 />
               ) : null}
             </div>
