@@ -11,8 +11,13 @@ const TOOLS: Tool[] = [
     name: "Postman",
     description: "Import et export de collections Postman.",
     logoEmoji: "📮",
-    scopes: ["Lecture de vos collections", "Création de collections"],
-    oauthUrl: "/api/postman-auth",
+    scopes: [],
+    apiKey: {
+      endpoint: "/api/postman-auth",
+      placeholder: "PMAK-xxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      instructions:
+        "Allez sur go.postman.co → Settings → API Keys → Generate API Key. Copiez la clé (elle commence par PMAK-).",
+    },
   },
   {
     id: "github",
