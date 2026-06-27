@@ -37,7 +37,7 @@ const TOOLS: Tool[] = [
   },
 ]
 
-function useToolStatus(toolId: string): "connected" | "disconnected" | "loading" {
+function useToolStatus(toolId: string, refreshKey = 0): "connected" | "disconnected" | "loading" {
   const [status, setStatus] = useState<"connected" | "disconnected" | "loading">("loading")
   useEffect(() => {
     let cancelled = false
@@ -62,12 +62,12 @@ function useToolStatus(toolId: string): "connected" | "disconnected" | "loading"
     return () => {
       cancelled = true
     }
-  }, [toolId])
+  }, [toolId, refreshKey])
   return status
 }
 
-function ToolCard({ tool, onAssociate }: { tool: Tool; onAssociate: () => void }) {
-  const status = useToolStatus(tool.id)
+function ToolCard({ tool, refreshKey, onAssociate }: { tool: Tool; refreshKey: number; onAssociate: () => void }) {
+  const status = useToolStatus(tool.id, refreshKey)
   return (
     <Card className="flex flex-col gap-3 p-5 transition-all hover:border-primary/30 hover:shadow-md">
       <div className="flex items-center gap-3">
@@ -105,6 +105,7 @@ function ToolCard({ tool, onAssociate }: { tool: Tool; onAssociate: () => void }
 export function ToolsSection() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null)
   const [open, setOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   return (
     <div className="space-y-6">
       <div>
@@ -118,6 +119,7 @@ export function ToolsSection() {
           <ToolCard
             key={tool.id}
             tool={tool}
+            refreshKey={refreshKey}
             onAssociate={() => {
               setActiveTool(tool)
               setOpen(true)
@@ -125,7 +127,12 @@ export function ToolsSection() {
           />
         ))}
       </div>
-      <ToolAssociationModal tool={activeTool} open={open} onOpenChange={setOpen} />
+      <ToolAssociationModal
+        tool={activeTool}
+        open={open}
+        onOpenChange={setOpen}
+        onConnected={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   )
 }
