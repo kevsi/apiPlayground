@@ -744,3 +744,21 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Respect user animation preference (accessibility) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Manual animation toggle (set by useAnimations hook) */
+body[data-animations="off"] *,
+body[data-animations="off"] *::before,
+body[data-animations="off"] *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
