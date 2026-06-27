@@ -13,18 +13,22 @@ import {
   FlaskConical,
   ChevronsLeft,
   ChevronsRight,
+  LogIn,
 } from "lucide-react"
 import { AppIcon } from "@/components/app-icon"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ToolsSection } from "@/components/sidebar/tools-section"
+import { UserMenu } from "@/components/sidebar/user-menu"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
 import { WorkspaceInviteDialog } from "@/components/workspace-invite-dialog"
 import { WorkspaceCreateDialog } from "@/components/workspace-create-dialog"
 import { useSyncState } from "@/hooks/store/sync-state"
 import { useRequestStore } from "@/hooks/use-request-store"
+import { useAuth } from "@/hooks/use-auth"
 import { WORKSPACE_PERSONAL_ID } from "@/hooks/store/types"
 
 const navItems = [
@@ -83,6 +87,10 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
       window.clearInterval(interval)
     }
   }, [])
+
+  const { status, user, logout } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
 
   return (
     <aside
@@ -207,27 +215,47 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
         </Link>
       </div>
 
-      {/* User Profile */}
+      {/* User widget — dynamic based on auth state */}
       <div className="border-t border-sidebar-border px-2 py-3">
-        {!collapsed ? (
-          <div className="group/profile flex items-center gap-3 rounded-lg px-2 py-2 transition-all duration-200 hover:bg-accent/30 cursor-pointer">
-            <Avatar className="size-8 shrink-0 ring-2 ring-transparent transition-all duration-200 group-hover/profile:ring-primary/30">
-              <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=nurul" alt="Nurul" />
-              <AvatarFallback>NZ</AvatarFallback>
-            </Avatar>
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-medium text-foreground">Nurul&apos;s Zone</span>
-              <span className="truncate text-xs text-muted-foreground">nurul@reqly.com</span>
+        {status === "loading" ? (
+          <div
+            className={cn("h-9 rounded-lg bg-muted/60", collapsed ? "w-9" : "w-full")}
+            aria-hidden="true"
+          />
+        ) : status === "connected" && user ? (
+          collapsed ? (
+            <div className="flex justify-center">
+              <Avatar className="size-8">
+                <AvatarImage
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.email.split("@")[0])}`}
+                  alt={user.name}
+                />
+                <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
             </div>
-            <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground/60 transition-transform duration-200 group-hover/profile:translate-y-0.5" />
-          </div>
+          ) : (
+            <UserMenu user={user} onLogout={logout} />
+          )
+        ) : collapsed ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/login?redirect=${encodeURIComponent(pathname)}`)}
+            aria-label="Se connecter"
+            title="Se connecter"
+          >
+            <LogIn className="size-4" />
+          </Button>
         ) : (
-          <div className="flex justify-center">
-            <Avatar className="size-8 ring-2 ring-transparent transition-all duration-200 hover:ring-primary/30 hover:scale-105 cursor-pointer">
-              <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=nurul" alt="Nurul" />
-              <AvatarFallback>NZ</AvatarFallback>
-            </Avatar>
-          </div>
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full"
+            onClick={() => router.push(`/login?redirect=${encodeURIComponent(pathname)}`)}
+          >
+            <LogIn className="mr-2 size-4" />
+            Se connecter
+          </Button>
         )}
       </div>
 
