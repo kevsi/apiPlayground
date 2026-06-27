@@ -3,7 +3,9 @@
 import { ApiSidebar } from "@/components/api-sidebar"
 import { ApiHeader } from "@/components/api-header"
 import { CollectionsPanel } from "@/components/collections-panel"
-import { ImportPostmanModal } from "@/components/import-postman-modal"
+import { ImportPostmanModal as LegacyImportPostmanModal } from "@/components/import-postman-modal"
+import { PostmanManageModal } from "@/components/postman/manage-modal"
+import { PostmanImportModal } from "@/components/postman/import-modal"
 import { ExportPostmanModal } from "@/components/export-postman-modal"
 import { ImportOpenApiModal } from "@/components/import-openapi-modal"
 import { OpenApiExportModal } from "@/components/openapi-export-modal"
@@ -44,6 +46,9 @@ export default function CollectionsPage() {
   
 
   const [postmanImportOpen, setPostmanImportOpen] = useState(false)
+  const [postmanManageOpen, setPostmanManageOpen] = useState(false)
+  const [postmanImportPreviewOpen, setPostmanImportPreviewOpen] = useState(false)
+  const [selectedPostmanCollection, setSelectedPostmanCollection] = useState<{ id: string; name: string } | null>(null)
   const [postmanConnected, setPostmanConnected] = useState(false)
   const [postmanExportOpen, setPostmanExportOpen] = useState(false)
   const [openApiImportOpen, setOpenApiImportOpen] = useState(false)
@@ -344,7 +349,7 @@ export default function CollectionsPage() {
                 <Button variant="secondary" onClick={() => setOpenApiImportOpen(true)}>
                 Importer OpenAPI
               </Button>
-              <Button variant="secondary" onClick={() => setPostmanImportOpen(true)}>
+              <Button variant="secondary" onClick={() => setPostmanManageOpen(true)}>
                 From Postman
               </Button>
               <Button variant="secondary" onClick={() => setPostmanExportOpen(true)} disabled={!postmanConnected || exportingPostman}>
@@ -375,11 +380,31 @@ export default function CollectionsPage() {
             }}
           />
 
-          <ImportPostmanModal
+          <LegacyImportPostmanModal
             open={postmanImportOpen}
             onClose={() => setPostmanImportOpen(false)}
             onImport={handleImportPostmanCollection}
             isConnected={postmanConnected}
+          />
+          <PostmanManageModal
+            open={postmanManageOpen}
+            onOpenChange={setPostmanManageOpen}
+            isConnected={postmanConnected}
+            onSelectCollection={(col) => {
+              setSelectedPostmanCollection({ id: col.id, name: col.name })
+              setPostmanManageOpen(false)
+              setPostmanImportPreviewOpen(true)
+            }}
+            onGoToSettings={() => {
+              setPostmanManageOpen(false)
+              router.push("/settings#integrations")
+            }}
+          />
+          <PostmanImportModal
+            open={postmanImportPreviewOpen}
+            onOpenChange={setPostmanImportPreviewOpen}
+            collectionId={selectedPostmanCollection?.id ?? null}
+            collectionName={selectedPostmanCollection?.name ?? ""}
           />
 
           <ExportPostmanModal
