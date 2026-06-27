@@ -18,12 +18,15 @@ import { useSidebar } from "@/contexts/sidebar-context"
 import { ImportExportModal } from "@/components/import-export-modal"
 import { toast } from '@/hooks/use-toast'
 import { useAuth } from "@/hooks/use-auth"
+import { SettingsLayout } from "@/components/settings/settings-layout"
+import type { SettingsSection } from "@/components/settings/settings-sidebar"
+import { ApparenceSection } from "@/components/settings/sections/apparence-section"
+import { ToolsSection } from "@/components/settings/sections/tools-section"
 
 const ProfileSection = dynamic(() => import("@/components/settings/profile-section").then((m) => ({ default: m.ProfileSection })), { ssr: false })
 const AISection = dynamic(() => import("@/components/settings/ai-section"), { ssr: false })
 const NotificationsSection = dynamic(() => import("@/components/settings/notifications-section"), { ssr: false })
 const SyncSection = dynamic(() => import("@/components/settings/sync-section"), { ssr: false })
-const IntegrationsSection = dynamic(() => import("@/components/settings/integrations-section"), { ssr: false })
 
 const AI_PROVIDERS: Array<{ value: AIProvider; label: string }> = [
   { value: "openai", label: "OpenAI" },
@@ -34,23 +37,9 @@ const AI_PROVIDERS: Array<{ value: AIProvider; label: string }> = [
   { value: "opencode-zen", label: "Opencode Zen" },
 ]
 
-type SectionItem = {
-  key: string
-  label: string
-  icon: LucideIcon
-  destructive?: true
-}
+type SectionKey = SettingsSection
 
-const SECTION_ITEMS: SectionItem[] = [
-  { key: "profile", label: "Profil & Sécurité", icon: User },
-  { key: "ai", label: "Assistant IA", icon: Sparkles },
-  { key: "notifications", label: "Notifications", icon: Bell },
-  { key: "sync", label: "Import / Export", icon: Cloud },
-  { key: "integrations", label: "Outils connectés", icon: Plug },
-  { key: "account", label: "Actions du compte", destructive: true, icon: ShieldAlert },
-]
-
-type SectionKey = (typeof SECTION_ITEMS)[number]["key"]
+const SECTION_KEYS: SectionKey[] = ["apparence", "profile", "ai", "notifications", "sync", "integrations", "account"]
 
 export default function SettingsPage() {
   const { isCollapsed, toggleSidebar } = useSidebar()
@@ -82,7 +71,7 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SectionKey>(() => {
     if (typeof window !== 'undefined') {
       const h = window.location.hash?.replace("#", "") as SectionKey
-      if (SECTION_ITEMS.some((item) => item.key === h)) return h
+      if (SECTION_KEYS.includes(h)) return h
     }
     return "profile"
   })
@@ -109,7 +98,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const onHashChange = () => {
       const h = window.location.hash?.replace("#", "") as SectionKey
-      if (SECTION_ITEMS.some((item) => item.key === h)) setActiveSection(h)
+      if (SECTION_KEYS.includes(h)) setActiveSection(h)
       else setActiveSection("profile")
     }
     window.addEventListener("hashchange", onHashChange)
@@ -286,38 +275,9 @@ export default function SettingsPage() {
         <ApiHeader />
 
         <div className="flex-1 min-h-0 overflow-y-auto space-y-6 p-6">
-          <div className="flex gap-6">
-            {/* Navigation sidebar */}
-            <aside className="w-56 shrink-0 rounded-2xl border border-border bg-card p-4">
-              <nav className="flex flex-col gap-1">
-                {SECTION_ITEMS.map(({ key, label, destructive, icon: Icon }) => {
-                  const isActive = activeSection === key
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setActiveSection(key)}
-                      className={cn(
-                        "relative flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-all duration-150",
-                        isActive
-                          ? "bg-primary/10 font-medium text-primary"
-                          : "text-foreground hover:bg-muted",
-                        destructive && !isActive && "text-destructive"
-                      )}
-                    >
-                      {isActive && (
-                        <div className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
-                      )}
-                      <Icon className="size-4 shrink-0" />
-                      <span>{label}</span>
-                    </button>
-                  )
-                })}
-              </nav>
-            </aside>
-
-            {/* Section content */}
-            <div className="flex-1 space-y-6">
-              {activeSection === "profile" ? (
+          <SettingsLayout active={activeSection} onChange={setActiveSection}>
+            {activeSection === "apparence" ? <ApparenceSection /> : null}
+            {activeSection === "profile" ? (
                 authUser ? (
                   <ProfileSection user={authUser} />
                 ) : (
@@ -355,19 +315,8 @@ export default function SettingsPage() {
               {activeSection === "sync" ? (
                 <SyncSection onOpenSyncModal={() => setSyncModalOpen(true)} />
               ) : null}
-              {activeSection === "integrations" ? (
-                <IntegrationsSection
-                  githubStatus={githubStatus} githubUser={githubUser} githubConnecting={githubConnecting}
-                  postmanStatus={postmanStatus} postmanUser={postmanUser}
-                  postmanApiKey={postmanApiKey} postmanConnecting={postmanConnecting}
-                  onConnectGithub={connectGithub} onDisconnectGithub={disconnectGithub}
-                  setPostmanApiKey={setPostmanApiKey}
-                  onConnectPostman={connectPostman}
-                  onDisconnectPostman={disconnectPostman}
-                />
-              ) : null}
-            </div>
-          </div>
+              {activeSection === "integrations" ? <ToolsSection /> : null}
+          </SettingsLayout>
         </div>
       </div>
 
