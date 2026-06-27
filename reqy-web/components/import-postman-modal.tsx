@@ -43,7 +43,7 @@ export function ImportPostmanModal({
     setCollectionsLoading(true)
     setCollectionsError(null)
     try {
-      const response = await fetch("/api/postman-auth/collections")
+      const response = await fetch("/api/postman-auth/collections", { credentials: "include" })
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         setCollectionsError(
@@ -86,6 +86,7 @@ export function ImportPostmanModal({
       const response = await fetch("/api/postman-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           collectionId: selectedCollectionId,
         }),

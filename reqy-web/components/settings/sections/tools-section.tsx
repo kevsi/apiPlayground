@@ -4,9 +4,6 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ToolAssociationModal, type Tool } from "./tool-association-modal"
-import { PostmanManageModal } from "./postman-manage-modal"
-import { PostmanImportModal } from "./postman-import-modal"
-import { useAuth } from "@/hooks/use-auth"
 
 const TOOLS: Tool[] = [
   {
@@ -109,20 +106,6 @@ export function ToolsSection() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null)
   const [open, setOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [manageOpen, setManageOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
-  const [selectedCollection, setSelectedCollection] = useState<{ id: string; name: string } | null>(null)
-  const postmanStatus = useToolStatus("postman", refreshKey)
-  const { user: authUser } = useAuth()
-
-  function handleAssociate(tool: Tool) {
-    if (tool.id === "postman" && postmanStatus === "connected") {
-      setManageOpen(true)
-    } else {
-      setActiveTool(tool)
-      setOpen(true)
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -138,7 +121,10 @@ export function ToolsSection() {
             key={tool.id}
             tool={tool}
             refreshKey={refreshKey}
-            onAssociate={() => handleAssociate(tool)}
+            onAssociate={() => {
+              setActiveTool(tool)
+              setOpen(true)
+            }}
           />
         ))}
       </div>
@@ -147,26 +133,6 @@ export function ToolsSection() {
         open={open}
         onOpenChange={setOpen}
         onConnected={() => setRefreshKey((k) => k + 1)}
-      />
-      <PostmanManageModal
-        open={manageOpen}
-        onOpenChange={setManageOpen}
-        user={authUser}
-        onDisconnected={() => setRefreshKey((k) => k + 1)}
-        onSelectCollection={(col) => {
-          setSelectedCollection({ id: col.id, name: col.name })
-          setManageOpen(false)
-          setImportOpen(true)
-        }}
-      />
-      <PostmanImportModal
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        collectionId={selectedCollection?.id ?? null}
-        collectionName={selectedCollection?.name ?? ""}
-        onImported={() => {
-          /* toast already shown by the modal */
-        }}
       />
     </div>
   )
