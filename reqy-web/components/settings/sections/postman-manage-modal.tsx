@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -44,27 +44,54 @@ export function PostmanManageModal({
   const [bulkImporting, setBulkImporting] = useState(false)
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null)
 
-  async function fetchCollections() {
+  // Guard contre les fetches en double (React Strict Mode dev + remounts rapides)
+  const fetchedForOpenRef = useRef(false)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const fetchCollections = useCallback(async () => {
+    // Annule la requête précédente si toujours en vol
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/postman-auth/collections", { credentials: "include" })
-      const data = await res.json()
+      const res = await fetch("/api/postman-auth/collections", {
+        credentials: "include",
+        signal: controller.signal,
+      })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setError(data.message ?? "Erreur de chargement")
         return
       }
       setCollections(data.collections ?? [])
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return
       setError("Erreur réseau")
     } finally {
-      setLoading(false)
+      if (abortRef.current === controller) {
+        setLoading(false)
+        abortRef.current = null
+      }
     }
-  }
+  }, [])
 
   useEffect(() => {
-    if (open) void fetchCollections()
-  }, [open])
+    if (open && !fetchedForOpenRef.current) {
+      fetchedForOpenRef.current = true
+      void fetchCollections()
+    } else if (!open) {
+      // Reset le guard pour la prochaine ouverture + annule tout en vol
+      fetchedForOpenRef.current = false
+      abortRef.current?.abort()
+      abortRef.current = null
+    }
+    // Cleanup final quand le composant unmount
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [open, fetchCollections])
 
   async function handleDisconnect() {
     setDisconnecting(true)

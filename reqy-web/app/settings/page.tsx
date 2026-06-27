@@ -181,7 +181,7 @@ export default function SettingsPage() {
 
   const fetchPostmanStatus = useCallback(async () => {
     try {
-      const response = await fetch("/api/postman-auth")
+      const response = await fetch("/api/postman-auth/status")
       if (!response.ok) throw new Error("Échec")
       const data = await response.json()
       if (data.connected) { setPostmanStatus("connected"); setPostmanUser(data.user || null) }
