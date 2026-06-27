@@ -6,6 +6,7 @@ import { CollectionsPanel } from "@/components/collections-panel"
 import { ImportPostmanModal } from "@/components/import-postman-modal"
 import { ExportPostmanModal } from "@/components/export-postman-modal"
 import { ImportOpenApiModal } from "@/components/import-openapi-modal"
+import { OpenApiExportModal } from "@/components/openapi-export-modal"
 import { Button } from "@/components/ui/button"
 import { useRequestStore, type Collection, type RequestItem } from "@/hooks/use-request-store"
 import { useSidebar } from "@/contexts/sidebar-context"
@@ -24,6 +25,7 @@ export default function CollectionsPage() {
   const { isCollapsed, toggleSidebar } = useSidebar()
   const {
     collections,
+    history,
     addCollection,
     updateCollection,
     deleteCollection,
@@ -47,12 +49,13 @@ export default function CollectionsPage() {
   const [openApiImportOpen, setOpenApiImportOpen] = useState(false)
   const [exportingPostman, setExportingPostman] = useState(false)
   const [exportingOpenApi, setExportingOpenApi] = useState(false)
+  const [openApiExportOpen, setOpenApiExportOpen] = useState(false)
 
-  // Check Postman connection status
+  // Check Postman connection status (re-check on focus to catch login from other tabs/sections)
   useEffect(() => {
     const checkPostmanStatus = async () => {
       try {
-        const response = await fetch("/api/postman-auth")
+        const response = await fetch("/api/postman-auth/status")
         const data = await response.json()
         setPostmanConnected(data.connected || false)
       } catch {
@@ -61,6 +64,9 @@ export default function CollectionsPage() {
     }
 
     checkPostmanStatus()
+    const onFocus = () => { void checkPostmanStatus() }
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
   }, [])
 
   const handleImportPostmanCollection = (collection: { name: string; description?: string; routes: any[] }) => {
@@ -273,9 +279,15 @@ export default function CollectionsPage() {
     })
   }
 
-  const handleExportOpenApi = async () => {
+  const handleExportOpenApi = async (exportOptions?: { inferFromHistory?: boolean }) => {
     setExportingOpenApi(true)
-    const spec = generateOpenApiSpec(collections)
+    const historyItems = exportOptions?.inferFromHistory
+      ? history.map((h) => ({ requestId: h.id, responseBody: h.responseBody }))
+      : undefined
+    const spec = generateOpenApiSpec(collections, {
+      enableInference: exportOptions?.inferFromHistory,
+      historyItems,
+    })
     const contents = JSON.stringify(spec, null, 2)
 
     if (typeof window !== "undefined" && 'showSaveFilePicker' in window) {
@@ -339,7 +351,7 @@ export default function CollectionsPage() {
                 {exportingPostman ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {exportingPostman ? "Export..." : "Export to Postman"}
               </Button>
-              <Button variant="secondary" onClick={handleExportOpenApi} disabled={exportingOpenApi}>
+              <Button variant="secondary" onClick={() => setOpenApiExportOpen(true)}>
                 {exportingOpenApi ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {exportingOpenApi ? "Export..." : "Exporter OpenAPI"}
               </Button>
@@ -351,6 +363,16 @@ export default function CollectionsPage() {
             onClose={() => setOpenApiImportOpen(false)}
             onImport={handleImportOpenApi}
             existingCollectionNames={collections.map((c) => c.name)}
+          />
+
+          <OpenApiExportModal
+            open={openApiExportOpen}
+            onClose={() => setOpenApiExportOpen(false)}
+            collections={collections}
+            historyItems={history.map((h) => ({ requestId: h.id, responseBody: h.responseBody }))}
+            onExport={async ({ inferFromHistory }) => {
+              await handleExportOpenApi({ inferFromHistory })
+            }}
           />
 
           <ImportPostmanModal
