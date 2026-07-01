@@ -1,9 +1,43 @@
 /** @type {import('next').NextConfig} */
+import withBundleAnalyzer from "@next/bundle-analyzer"
+
+// Build-time env validation. Fails `next build` early when AUTH_SIGNING_SECRET
+// is missing or too short, instead of crashing silently at runtime.
+const AUTH_SIGNING_SECRET = process.env.AUTH_SIGNING_SECRET
+if (!AUTH_SIGNING_SECRET || AUTH_SIGNING_SECRET.length < 32) {
+  throw new Error(
+    "[env:build] AUTH_SIGNING_SECRET must be set and at least 32 characters before building. " +
+      "Add it to .env.local or your deployment platform.",
+  )
+}
+
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "geolocation=(), microphone=(), camera=()" }
+  { key: "Permissions-Policy", value: "geolocation=(), microphone=(), camera=()" },
+  {
+    key: "Content-Security-Policy",
+    // `'unsafe-inline'` for script-src is needed because Next.js dev mode and
+    // several components (CM6 editor, GraphiQL) inject inline scripts. In
+    // production this should be replaced by a nonce-based CSP.
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https: wss:",
+      "font-src 'self' data:",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
+  // HSTS only in production — breaks dev over plain HTTP otherwise.
+  ...(process.env.NODE_ENV === "production"
+    ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
+    : []),
 ]
 
 // Desktop build is triggered by setting BUILD_TARGET=desktop in the env.
@@ -50,4 +84,7 @@ const nextConfig = {
   }),
 }
 
-export default nextConfig
+// Bundle analyzer: enable with `ANALYZE=true pnpm build`.
+// Disabled by default so CI builds stay fast and the report file isn't
+// generated unless someone explicitly asks for it.
+export default withBundleAnalyzer({ enabled: process.env.ANALYZE === "true" })(nextConfig)

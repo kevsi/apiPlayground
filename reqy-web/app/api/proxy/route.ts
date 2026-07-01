@@ -5,20 +5,118 @@ import { resolveMockMatch, applyMockDelay, buildMockHeaders } from "@/lib/mock-r
 import { validateProxyPayload } from "@/lib/schemas/proxy"
 import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils"
 import { isBoolean, isHttpMethod } from "@/lib/type-guards"
-import { InMemoryRateLimiter } from "@/lib/rate-limiter"
+import { InMemoryRateLimiter, UpstashRateLimiter, type DistributedRateLimiter, type RateLimitResult } from "@/lib/rate-limiter"
+import { getServerEnv } from "@/lib/env"
 import dns from "node:dns/promises"
+import { isIP } from "node:net"
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
 
-const PRIVATE_HOSTS = [
-  "127.0.0.1", "127.", "::1", "localhost",
-  "0.0.0.0", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
-  "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
-  "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
-  "192.168.", "169.254.",
+const PRIVATE_CIDRS_V4: Array<[string, number]> = [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],   // CGNAT (RFC 6598)
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],  // link-local
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.0.2.0", 24],    // TEST-NET-1
+  ["192.88.99.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],   // benchmarking
+  ["198.51.100.0", 24], // TEST-NET-2
+  ["203.0.113.0", 24],  // TEST-NET-3
+  ["224.0.0.0", 4],     // multicast
+  ["240.0.0.0", 4],     // reserved / broadcast
 ]
 
-const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 100 })
+const PRIVATE_CIDRS_V6: Array<[string, number]> = [
+  ["::", 128],
+  ["::1", 128],
+  ["::ffff:0:0", 96],   // IPv4-mapped
+  ["64:ff9b::", 96],    // NAT64
+  ["100::", 64],
+  ["2001::", 32],
+  ["2001:db8::", 32],
+  ["fc00::", 7],        // ULA
+  ["fe80::", 10],       // link-local
+]
+
+function ipToBigInt(ip: string): bigint {
+  const v = isIP(ip)
+  if (v === 4) {
+    const parts = ip.split(".").map(Number)
+    const n =
+      ((parts[0] << 24) >>> 0) +
+      ((parts[1] << 16) >>> 0) +
+      ((parts[2] << 8) >>> 0) +
+      parts[3]
+    return BigInt(n >>> 0)
+  }
+  const groups = ip.split(":")
+  let head: number[] = []
+  let tail: number[] = []
+  let hasEmpty = false
+  for (const g of groups) {
+    if (g === "") {
+      hasEmpty = true
+    } else {
+      (hasEmpty ? tail : head).push(parseInt(g, 16))
+    }
+  }
+  const fill = 8 - head.length - tail.length
+  const full = hasEmpty ? [...head, ...new Array(fill).fill(0), ...tail] : [...head, ...tail]
+  let acc = BigInt(0)
+  for (const g of full) acc = (acc << BigInt(16)) + BigInt(g)
+  return acc
+}
+
+function ipInCidr(ip: string, cidr: [string, number]): boolean {
+  const v = isIP(ip)
+  const v6 = isIP(cidr[0])
+  if (v !== v6) return false
+  const ipN = ipToBigInt(ip)
+  const netN = ipToBigInt(cidr[0])
+  const bits = BigInt(v === 4 ? 32 - cidr[1] : 128 - cidr[1])
+  if (bits === BigInt(0)) return ipN === netN
+  return (ipN >> bits) === (netN >> bits)
+}
+
+function isBlockedIp(ip: string): boolean {
+  const v = isIP(ip)
+  if (v === 4) return PRIVATE_CIDRS_V4.some((c) => ipInCidr(ip, c))
+  if (v === 6) {
+    if (ip.toLowerCase().startsWith("::ffff:")) {
+      const v4 = ip.substring(7)
+      if (isIP(v4) === 4 && isBlockedIp(v4)) return true
+    }
+    return PRIVATE_CIDRS_V6.some((c) => ipInCidr(ip, c))
+  }
+  return true // unknown literal — fail-closed
+}
+
+const rateLimiter: DistributedRateLimiter = (() => {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return new UpstashRateLimiter({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      windowMs: 60_000,
+      maxRequests: 100,
+    })
+  }
+  if (process.env.NODE_ENV === "production") {
+    console.warn(
+      "[proxy] UPSTASH_REDIS_REST_URL not set — falling back to in-memory rate limiter. " +
+        "On serverless/Edge this is per-instance and effectively ineffective.",
+    )
+  }
+  const inner = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 100 })
+  return {
+    async check(key: string): Promise<RateLimitResult> {
+      return inner.check(key)
+    },
+  }
+})()
 
 function getRateLimitKey(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for")
@@ -28,14 +126,11 @@ function getRateLimitKey(request: NextRequest): string {
 
 function isPrivateHost(hostname: string): boolean {
   const lower = hostname.toLowerCase()
-
-  // Detect IPv6-mapped IPv4 (::ffff:x.x.x.x) — extract and re-check the IPv4 portion
-  if (lower.startsWith("::ffff:")) {
-    const mappedIpv4 = lower.substring(7)
-    if (isPrivateHost(mappedIpv4)) return true
-  }
-
-  return PRIVATE_HOSTS.some((prefix) => lower === prefix || lower.startsWith(prefix))
+  if (lower === "localhost") return true
+  // If hostname is itself an IP literal, test directly.
+  if (isIP(lower)) return isBlockedIp(lower)
+  // Otherwise: rely on DNS pre-resolution in the caller. Fail-closed here too.
+  return true
 }
 
 function isRouteServerEnabled(route: { serverId?: string }): boolean {
@@ -87,13 +182,14 @@ export async function POST(request: NextRequest) {
   let targetUrl = ""
   let debugMode = false
   let workspaceId: string | undefined
+  let hostOverride: string | undefined
 
   // ── Timing metrics ────────────────────────────────────────────────────
   const timings = { dnsMs: 0, connectMs: 0, ttfbMs: 0 }
 
   try {
     const rateKey = getRateLimitKey(request)
-    const rateResult = rateLimiter.check(rateKey)
+    const rateResult = await rateLimiter.check(rateKey)
     if (!rateResult.allowed) {
       return structuredError(
         "Rate limit exceeded. Try again later.",
@@ -202,10 +298,13 @@ export async function POST(request: NextRequest) {
 
     // ── SSRF protection ──────────────────────────────────────────────────
     // Allow local testing in development mode or if explicitly enabled
-    const allowLocal = process.env.NODE_ENV === "development" || process.env.ALLOW_LOCAL_HOSTS === "true"
+    const env = getServerEnv()
+    const allowLocal =
+      process.env.NODE_ENV === "development" || env.ALLOW_LOCAL_HOSTS === "true"
 
     if (!allowLocal) {
-      if (isPrivateHost(parsedUrl.hostname)) {
+      // 1) Reject bare IP literals that are themselves private.
+      if (isIP(parsedUrl.hostname) && isBlockedIp(parsedUrl.hostname)) {
         return structuredError(
           "Requests to private/internal hosts are not allowed",
           "SSRF_BLOCKED",
@@ -213,20 +312,34 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // 2) Resolve DNS once, check the resolved address, and PIN it in the
+      //    outbound URL so DNS rebinding between check and fetch cannot
+      //    redirect to a private IP.
+      let resolvedIp: string
       try {
         const dnsStart = Date.now()
-        const lookupResult = await dns.lookup(parsedUrl.hostname)
+        const { address } = await dns.lookup(parsedUrl.hostname, { all: false })
         timings.dnsMs = Date.now() - dnsStart
-        if (isPrivateHost(lookupResult.address)) {
-           return structuredError(
-            "Requests to private/internal hosts are not allowed (DNS Rebinding prevention)",
-            "SSRF_BLOCKED",
-            403,
-          )
-        }
-      } catch (e) {
+        resolvedIp = address
+      } catch {
         return structuredError("DNS resolution failed", "DNS_ERROR", 400)
       }
+
+      if (isBlockedIp(resolvedIp)) {
+        return structuredError(
+          "Requests to private/internal hosts are not allowed (DNS rebinding prevention)",
+          "SSRF_BLOCKED",
+          403,
+        )
+      }
+
+      // 3) Rewrite the target URL to use the literal IP, but keep the
+      //    original `Host` header so virtualhosts / SNI still match.
+      const portPart = parsedUrl.port ? `:${parsedUrl.port}` : ""
+      const hostLiteral = isIP(resolvedIp) === 6 ? `[${resolvedIp}]` : resolvedIp
+      targetUrl = `${parsedUrl.protocol}//${hostLiteral}${portPart}${parsedUrl.pathname}${parsedUrl.search}`
+      // Capture the original Host to apply after `finalHeaders` is created.
+      hostOverride = parsedUrl.host
     }
 
     // ── Prepare headers and body ─────────────────────────────────────────
@@ -237,6 +350,11 @@ export async function POST(request: NextRequest) {
     const targetIsLocalMock = parsedUrl.origin === request.nextUrl.origin && parsedUrl.pathname.startsWith("/mock/")
     if (targetIsLocalMock && workspaceId) {
       finalHeaders["x-workspace-id"] = workspaceId
+    }
+
+    // SSRF protection: pin Host header to original hostname when IP was rewritten.
+    if (hostOverride) {
+      finalHeaders["Host"] = hostOverride
     }
 
     // debug mode can be requested either via header `x-proxy-debug: 1` or via
@@ -295,25 +413,52 @@ export async function POST(request: NextRequest) {
     let encoding = "utf8"
     let size = 0
 
-    const MAX_RESPONSE_BODY_SIZE = 5 * 1024 * 1024; // 5 MB
+    const MAX_RESPONSE_BODY_SIZE = 5 * 1024 * 1024 // 5 MB
+    const truncationSuffix = "\n\n...<Response truncated>"
 
-    if (isBinary) {
-      const arrayBuffer = await response.arrayBuffer()
-      size = arrayBuffer.byteLength
-      if (size > MAX_RESPONSE_BODY_SIZE) {
-        body = "<Response too large to display>";
-        encoding = "utf8";
-      } else {
-        body = Buffer.from(arrayBuffer).toString("base64")
-        encoding = "base64"
-      }
+    // Stream the response body and cancel as soon as the cap is reached,
+    // so we don't waste memory buffering a multi-GB payload just to throw
+    // 99% of it away.
+    const reader = response.body?.getReader()
+    if (!reader) {
+      body = ""
+      size = 0
     } else {
-      const textBody = await response.text()
-      size = new Blob([textBody]).size
-      if (size > MAX_RESPONSE_BODY_SIZE) {
-         body = textBody.substring(0, MAX_RESPONSE_BODY_SIZE) + "\n\n...<Response truncated>";
+      const chunks: Uint8Array[] = []
+      let received = 0
+      let truncated = false
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          if (!value) continue
+          const remaining = MAX_RESPONSE_BODY_SIZE - received
+          if (value.byteLength > remaining) {
+            chunks.push(value.subarray(0, Math.max(0, remaining)))
+            received += remaining
+            truncated = true
+            try { await reader.cancel() } catch { /* ignore */ }
+            break
+          }
+          chunks.push(value)
+          received += value.byteLength
+        }
+      } finally {
+        // Ensure the reader lock is released even on error paths
+        try { reader.releaseLock() } catch { /* ignore */ }
+      }
+      const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)))
+      size = buf.byteLength
+      if (isBinary) {
+        body = buf.toString("base64")
+        encoding = "base64"
       } else {
-         body = textBody;
+        let text = buf.toString("utf8")
+        if (truncated) text += truncationSuffix
+        body = text
+      }
+      if (truncated) {
+        responseHeaders["x-proxy-truncated"] = "1"
       }
     }
 
