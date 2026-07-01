@@ -29,6 +29,16 @@ function truncate(value: unknown): string {
   return s.slice(0, MAX_BODY_CHARS) + `…(truncated ${s.length - MAX_BODY_CHARS} chars)`;
 }
 
+// SECURITY FIX H9: XML escape helper to prevent prompt injection
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 export function buildContextSummary(ctx: RequestContext): string {
   const r = ctx.request;
   const lines: string[] = [];
@@ -43,12 +53,16 @@ export function buildContextSummary(ctx: RequestContext): string {
     const res = ctx.response;
     lines.push(`Réponse : ${res.status} ${res.statusText} (${res.duration}ms, ${res.size} bytes)`);
     if (Object.keys(res.headers).length > 0) {
-      lines.push(`Response headers : ${JSON.stringify(res.headers, null, 2)}`);
+      // FIX H9: Wrap response headers in XML delimiter
+      lines.push(`Response headers :\n<response_headers>\n${JSON.stringify(res.headers, null, 2)}\n</response_headers>`);
     }
-    lines.push(`Response body : ${truncate(res.body)}`);
+    // FIX H9: Wrap response body in XML delimiter
+    lines.push(`Response body :\n<response_body>\n${escapeXml(truncate(res.body))}\n</response_body>`);
   }
   if (ctx.error) {
-    lines.push(`Erreur réseau : ${ctx.error.code} — ${ctx.error.message}`);
+    // FIX H9: Wrap error message in XML delimiter with escaping
+    const escapedMsg = escapeXml(ctx.error.message);
+    lines.push(`<error_message>\nErreur réseau : ${ctx.error.code} — ${escapedMsg}\n</error_message>`);
   }
   return lines.join("\n");
 }

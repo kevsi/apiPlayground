@@ -94,6 +94,19 @@ fn export_json(content: String, default_name: String) -> Result<String, String> 
 
 #[tauri::command]
 fn open_external(url: String) -> Result<(), String> {
+  // SECURITY FIX H4: Whitelist allowed URL schemes to prevent RCE via file://, ms-settings:, etc.
+  let scheme = url
+    .split("://")
+    .next()
+    .unwrap_or("")
+    .to_lowercase();
+  
+  let allowed_schemes = vec!["http", "https", "mailto"];
+  
+  if !allowed_schemes.contains(&scheme.as_str()) {
+    return Err(format!("Blocked dangerous scheme: {}. Only http, https, mailto are allowed.", scheme));
+  }
+  
   open::that(&url).map_err(|e| e.to_string())
 }
 

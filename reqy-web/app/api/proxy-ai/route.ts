@@ -104,15 +104,23 @@ export async function POST(req: NextRequest) {
     }
 
     if (provider === "openai" || provider === "openrouter" || provider === "opencode-zen" || provider === "custom" || provider === "grok") {
-      const url = provider === "openai" || provider === "custom" || provider === "grok"
-        ? body.openaiUrl && body.openaiUrl.trim()
-          ? body.openaiUrl.trim().replace(/\/+$/, "").endsWith("/chat/completions")
-            ? body.openaiUrl.trim().replace(/\/+$/, "")
-            : body.openaiUrl.trim().replace(/\/+$/, "") + "/chat/completions"
-          : "https://api.openai.com/v1/chat/completions"
+      // SECURITY FIX C2: Never use client-supplied openaiUrl.
+      // Always use official endpoints. API keys are backend-managed only.
+      const url = provider === "openai"
+        ? "https://api.openai.com/v1/chat/completions"
         : provider === "openrouter"
         ? "https://openrouter.ai/api/v1/chat/completions"
-        : "https://opencode.ai/zen/v1/chat/completions"
+        : provider === "opencode-zen"
+        ? "https://opencode.ai/zen/v1/chat/completions"
+        : provider === "grok"
+        ? "https://api.x.ai/v1/chat/completions"
+        : "https://api.openai.com/v1/chat/completions"
+       
+      // Validate provider against allowlist; reject custom/malicious URLs
+      if (!["openai", "openrouter", "opencode-zen", "grok"].includes(provider)) {
+        return NextResponse.json({ error: "Invalid provider" }, { status: 400 })
+      }
+       
       const res = await abortableFetch(url, {
         method: "POST",
         headers: {

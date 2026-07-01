@@ -39,9 +39,9 @@ export function buildFollowUpPrompt(item: HistoryItem): string {
   if (item.responseBody instanceof Blob) {
     responsePreview = "[binary data]"
   } else if (item.responseBody && item.responseBody.length > 6000) {
-    responsePreview = `${item.responseBody.slice(0, 6000)}\n…(truncated)`
+    responsePreview = escapeXml(`${item.responseBody.slice(0, 6000)}\n…(truncated)`)
   } else {
-    responsePreview = item.responseBody || "(empty)"
+    responsePreview = escapeXml(item.responseBody || "(empty)")
   }
 
   return `You are an API testing assistant. Based on the HTTP request and response below, propose ONE logical follow-up request (e.g. use a token, fetch a nested resource, paginate, confirm creation).
@@ -72,7 +72,19 @@ Response:
 - Status: ${item.responseStatus ?? "unknown"}
 - Time: ${item.responseTime ?? "?"}ms
 - Body:
-${responsePreview}`
+<response_body>
+${responsePreview}
+</response_body>`
+}
+
+// SECURITY FIX H9: XML escape helper to prevent prompt injection
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 export function parseGeneratedRequest(text: string): GeneratedRequest | null {
