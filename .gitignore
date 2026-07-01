@@ -19,3 +19,30 @@ node_modules
 target/
 src-tauri/target/
 *.log
+
+# ── Security: never commit secrets ────────────────────────────────
+keys.txt
+secrets.txt
+*.pem
+*.key
+
+# ── Build artifacts & generated files ──────────────────────────────
+**/tsconfig.tsbuildinfo
+**/lint-output.txt
+**/package-lock.json
+reqy-web/out/
+**/test-results/
+*.tsbuildinfo
+
+# ── Agent/tooling working directories (keep .kimchi/ docs) ─────────
+.kilo/
+.claude/
+.imgtool-tmp/
+autoresearch/
+tasks/
+
+# ── Misc temp/debug files ──────────────────────────────────────────
+test.txt
+featurres.txt
+settings_tiny.jpg
+"debug auth/"

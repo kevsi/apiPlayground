@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
+    "generate": "node scripts/build-desktop.mjs",
     "start": "next start",
     "lint": "eslint .",
     "dev:local": "cd reqy-web && next dev",
@@ -51,6 +52,7 @@
     "@tauri-apps/plugin-deep-link": "^2.4.9",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "@uiw/react-codemirror": "^4.25.10",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",

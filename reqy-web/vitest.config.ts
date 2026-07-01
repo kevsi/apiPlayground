@@ -10,6 +10,7 @@ export default defineConfig({
       'src/ai/**/__tests__/**/*.test.{ts,tsx}',
       'src/ai/**/*.test.{ts,tsx}',
       'hooks/**/__tests__/**/*.test.{ts,tsx}',
+      'app/api/postman-import/__tests__/**/*.test.ts',
     ],
     exclude: ['node_modules', '.next'],
   },
