@@ -1,32 +1,48 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 
 /**
- * Note: env.ts uses module-level caching (`cachedServerEnv`, `cachedPublicEnv`).
- * We have to reset that cache between tests by re-importing with a fresh
- * `process.env`. Vitest's `vi.resetModules()` handles that for us.
+ * env.ts caches its parsed schemas at module scope (`cachedServerEnv`,
+ * `cachedPublicEnv`). To test different process.env values per case we
+ * MUST reset the module between tests — otherwise the cache from a prior
+ * test will be returned regardless of subsequent env changes.
+ *
+ * `vi.resetModules()` clears the module registry so the next dynamic
+ * `await import(...)` returns a fresh module instance with fresh state.
+ *
+ * Note: env.ts also has a `warnedEdge` flag that latches to true after the
+ * first Edge warning. This is fine — `vi.resetModules()` also resets that.
  */
 describe("lib/env", () => {
   beforeEach(() => {
-    // Wipe modules so cached server env is recreated from the new process.env.
-    // Also ensure the documented defaults are present.
+    vi.resetModules()
+    // Clean baseline so each test starts from a known state.
     delete process.env.AUTH_SIGNING_SECRET
+    delete process.env.NEXT_PUBLIC_APP_URL
   })
 
-  it("validateBuildTimeEnv: accepts a 32-char secret (the minimum)", async () => {
-    process.env.AUTH_SIGNING_SECRET = "a".repeat(32)
+  it("validateBuildTimeEnv: no-op (current behaviour)", async () => {
+    // As of the v0.2.0-security-hardening revert, validateBuildTimeEnv
+    // intentionally throws nothing because auth is disabled and there are
+    // no other required server-side env vars. This test locks in the
+    // current contract — change it back to an assertion of missing-var
+    // error when auth is re-enabled.
     const { validateBuildTimeEnv } = await import("../env")
     expect(() => validateBuildTimeEnv()).not.toThrow()
   })
 
-  it("validateBuildTimeEnv: rejects missing secret", async () => {
-    const { validateBuildTimeEnv } = await import("../env")
-    expect(() => validateBuildTimeEnv()).toThrow(/AUTH_SIGNING_SECRET/)
+  it("getServerEnv: returns parsed env without requiring AUTH_SIGNING_SECRET", async () => {
+    // AUTH_SIGNING_SECRET is now optional in the schema (auth disabled).
+    const { getServerEnv } = await import("../env")
+    const env = getServerEnv()
+    expect(env).toBeDefined()
+    expect(env.AUTH_SIGNING_SECRET).toBeUndefined()
   })
 
-  it("validateBuildTimeEnv: rejects secret shorter than 32 chars", async () => {
-    process.env.AUTH_SIGNING_SECRET = "tooshort"
-    const { validateBuildTimeEnv } = await import("../env")
-    expect(() => validateBuildTimeEnv()).toThrow(/at least 32 characters/)
+  it("getServerEnv: accepts AUTH_SIGNING_SECRET when present (any length)", async () => {
+    process.env.AUTH_SIGNING_SECRET = "short"
+    const { getServerEnv } = await import("../env")
+    const env = getServerEnv()
+    expect(env.AUTH_SIGNING_SECRET).toBe("short")
   })
 
   it("getServerEnv: caches after first call (returns same instance)", async () => {
@@ -38,11 +54,30 @@ describe("lib/env", () => {
     expect(a.AUTH_SIGNING_SECRET).toHaveLength(40)
   })
 
-  it("getServerEnv: throws on short secret outside Edge runtime", async () => {
-    process.env.AUTH_SIGNING_SECRET = "short"
+  it("getServerEnv: returns fresh instance after vi.resetModules()", async () => {
+    process.env.AUTH_SIGNING_SECRET = "first-value"
+    const { getServerEnv: get1 } = await import("../env")
+    const first = get1()
+
+    // Mutate process.env, reset module, re-import.
+    process.env.AUTH_SIGNING_SECRET = "second-value"
+    vi.resetModules()
+    const { getServerEnv: get2 } = await import("../env")
+    const second = get2()
+
+    expect(first).not.toBe(second)
+    expect(first.AUTH_SIGNING_SECRET).toBe("first-value")
+    expect(second.AUTH_SIGNING_SECRET).toBe("second-value")
+  })
+
+  it("getServerEnv: short-circuits on Edge runtime without throwing", async () => {
+    process.env.NEXT_RUNTIME = "edge"
+    delete process.env.AUTH_SIGNING_SECRET
     const { getServerEnv } = await import("../env")
-    // Outside Edge (process.env.NEXT_RUNTIME !== "edge") the strict validator runs.
-    expect(() => getServerEnv()).toThrow(/invalid server environment/)
+    // On Edge, the validator is skipped — env returned as-is.
+    const env = getServerEnv()
+    expect(env).toBeDefined()
+    delete process.env.NEXT_RUNTIME
   })
 
   it("getPublicEnv: defaults NEXT_PUBLIC_APP_URL when missing", async () => {

@@ -14,7 +14,10 @@ import { z } from "zod"
  */
 
 const ServerEnvSchema = z.object({
-  AUTH_SIGNING_SECRET: z.string().min(32, "AUTH_SIGNING_SECRET must be at least 32 characters"),
+  // Optional because the auth flow that consumes this secret is currently
+  // disabled (see middleware.ts). When auth is re-enabled, restore the
+  // .min(32, ...) constraint.
+  AUTH_SIGNING_SECRET: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   GITHUB_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GITHUB_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
@@ -91,20 +94,11 @@ export function getPublicEnv(): PublicEnv {
 }
 
 /**
- * Synchronous, build-time validator. Call from next.config.mjs so missing
- * required vars fail `next build` rather than `next start`.
+ * Synchronous, build-time validator. Currently a no-op because the only
+ * env var it used to require (AUTH_SIGNING_SECRET) is optional while auth
+ * is disabled. When auth is re-enabled, add AUTH_SIGNING_SECRET back to
+ * the required list.
  */
 export function validateBuildTimeEnv(): void {
-  const required = ["AUTH_SIGNING_SECRET"] as const
-  const missing: string[] = []
-  for (const key of required) {
-    const v = process.env[key]
-    if (!v || v.length < 32) missing.push(key)
-  }
-  if (missing.length > 0) {
-    throw new Error(
-      `[env:build] missing or invalid required env vars: ${missing.join(", ")}. ` +
-        "Set them in your deployment platform or .env.local before building.",
-    )
-  }
+  // Reserved for future build-time env requirements.
 }

@@ -1,14 +1,20 @@
 /** @type {import('next').NextConfig} */
 import withBundleAnalyzer from "@next/bundle-analyzer"
 
-// Build-time env validation. Fails `next build` early when AUTH_SIGNING_SECRET
-// is missing or too short, instead of crashing silently at runtime.
+// Soft build-time warning for AUTH_SIGNING_SECRET. Previously a hard throw.
+// Downgraded because the auth flow that consumes this secret is currently
+// disabled (Supabase auth is non-functional and `/login` / `/signup` pages
+// don't exist). When auth is re-enabled, restore the hard throw here so
+// missing secrets are caught at build, not runtime.
 const AUTH_SIGNING_SECRET = process.env.AUTH_SIGNING_SECRET
 if (!AUTH_SIGNING_SECRET || AUTH_SIGNING_SECRET.length < 32) {
-  throw new Error(
-    "[env:build] AUTH_SIGNING_SECRET must be set and at least 32 characters before building. " +
-      "Add it to .env.local or your deployment platform.",
-  )
+  if (process.env.NODE_ENV === "production") {
+    console.warn(
+      "[env:build] AUTH_SIGNING_SECRET is missing or too short. The auth flow " +
+        "is currently disabled, so this is non-fatal. If you re-enable auth " +
+        "(see middleware.ts), restore the hard throw in next.config.mjs.",
+    )
+  }
 }
 
 const securityHeaders = [
