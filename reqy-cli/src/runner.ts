@@ -1,6 +1,5 @@
 import type {
   ExportBundle,
-  Environment,
   RunResult,
   RunnerOptions,
   RequestItem,

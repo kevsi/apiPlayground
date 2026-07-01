@@ -77,7 +77,7 @@ OAuth dédié (accès API GitHub), récupération des repositories, import de co
 - **État : Complet**
 
 ### ⚠️ 15. Intégration Postman
-Récupération des collections, import par ID, export format Postman v2.1.0. Mais le point d'entrée OAuth (`postman-auth/route.ts`) est une **ébauche non implémentée** qui retourne systématiquement `{ authenticated: false }`. L'authentification se fait côté client via cookie API key.
+Récupération des collections, import par ID, export format Postman v2.1.0. Authentification par API key (`PMAK-...`) validée côté serveur via `validatePostmanApiKey()`, stockée en cookie `postman_api_key` (`HttpOnly`, `SameSite=Lax`, `Secure` en prod).
 - **Fichiers :** `app/api/postman-auth/*`, `app/api/postman-import/route.ts`, `app/api/postman-export/route.ts`
 - **État : Partiel** — la route d'auth OAuth est un stub
 
@@ -132,7 +132,7 @@ Fenêtres natives, boîtes de dialogue de fichiers, système de fichiers natif, 
 
 | Problème | Fichier | Sévérité |
 |---|---|---|
-| `postman-auth/route.ts` retourne stub "not configured" | `app/api/postman-auth/route.ts` | Moyenne |
+| ~~`postman-auth/route.ts` retourne stub "not configured"~~ (corrigé : la route valide l'API key et set le cookie) | `app/api/postman-auth/route.ts` | ✅ |
 | Chargement IA : `use-ai-engine.ts` utilise `@/lib/projects-store` alors que `ai-config.ts` utilise `@/lib/config` | `use-ai-engine.ts` | Faible |
 | Type-safety : `unknown as AIRequestStore` avec méthodes potentiellement absentes (`patchRequest`, `setVariable`, `setDoc`) | `use-ai-engine.ts` | Faible |
 | Stale closure : `closeTab` lit `tabs` depuis la closure sans dépendance | `use-request-tabs-state.ts` | Faible |
@@ -143,7 +143,7 @@ Fenêtres natives, boîtes de dialogue de fichiers, système de fichiers natif, 
 | Extraction de variables fragile : échoue sur réponses non-JSON, chemins invalides non validés | `lib/variable-mapping.ts` | Moyenne |
 | Export OpenAPI : schémas de réponse génériques, non basés sur l'historique | `lib/openapi-export.ts` | Faible |
 | Store `executeRequest` : `bodyType: "json"` et `authType: "none"` en dur | `store/history.ts` | Faible |
-| Pas de synchronisation cloud / partage multi-utilisateur | — | Élevée (manquant) |
+| ~~Pas de synchronisation cloud / partage multi-utilisateur~~ (corrigé : `sync-server/` Hono + SQLite + WebSocket, workspaces, invitations, LWW) | `sync-server/src/` | ✅ |
 | Pas de résolution de conflits lors du merge d'import/export | — | Moyenne |
 | Code dupliqué : `buildGithubHeaders` défini dans deux routes | `github-auth/repos/route.ts` et `status/route.ts` | Faible |
 

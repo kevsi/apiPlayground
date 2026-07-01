@@ -4,7 +4,7 @@ import { parseJsonSafe } from "@/lib/utils"
 
 export interface RunnerExecutorOptions {
   workspaceId?: string | null
-  /** Use direct fetch (server-side API routes — no CORS). */
+  /** Use direct fetch (server-side API routes ï¿½ no CORS). */
   serverSide?: boolean
 }
 
@@ -112,4 +112,52 @@ export function createRunnerExecutor(options: RunnerExecutorOptions = {}) {
     }
     return executeViaProxy(req, options.workspaceId)
   }
+}
+
+export interface RequestInput {
+  method: string
+  url: string
+  headers: Record<string, string>
+  body?: unknown
+}
+
+/**
+ * Run a batch of requests with bounded concurrency.
+ *
+ * Returns one entry per input request, in the same order, even if execution
+ * is interleaved. Failures are caught and surfaced as a rejected promise on
+ * the per-request entry â€” one bad request does NOT abort the whole batch.
+ *
+ * `concurrency` defaults to 4, which is a good balance between throughput
+ * and not overwhelming the proxy / target server.
+ */
+export async function runRequestsConcurrent(
+  requests: RequestInput[],
+  options: RunnerExecutorOptions & { concurrency?: number } = {},
+): Promise<Array<{ ok: true; response: RequestResponse } | { ok: false; error: string }>> {
+  const concurrency = Math.max(1, options.concurrency ?? 4)
+  const execute = createRunnerExecutor(options)
+
+  const results: Array<{ ok: true; response: RequestResponse } | { ok: false; error: string }> =
+    new Array(requests.length)
+
+  let cursor = 0
+  async function worker(): Promise<void> {
+    while (true) {
+      const idx = cursor++
+      if (idx >= requests.length) return
+      try {
+        const response = await execute(requests[idx])
+        results[idx] = { ok: true, response }
+      } catch (e) {
+        results[idx] = { ok: false, error: e instanceof Error ? e.message : String(e) }
+      }
+    }
+  }
+
+  const workers: Array<Promise<void>> = []
+  const n = Math.min(concurrency, requests.length)
+  for (let i = 0; i < n; i++) workers.push(worker())
+  await Promise.all(workers)
+  return results
 }

@@ -1,6 +1,11 @@
 import { readFileSync, existsSync } from "fs"
 import { join } from "path"
-import { Parser, Language, Query, Tree } from "web-tree-sitter"
+// Lazy-loaded: web-tree-sitter pulls ~2 MB of WASM at runtime. Importing the
+// value (not just the type) at module load would force every consumer of
+// this file to pay that cost, even if they never parse anything (e.g. the
+// main `request-panel` page). Keep type-only imports up here and load the
+// real bindings on first use inside `initTreeSitter()`.
+import type { Parser, Language, Query, Tree } from "web-tree-sitter"
 
 export interface ParsedRoute {
   method: string
@@ -56,6 +61,15 @@ let initPromise: Promise<void> | null = null
 const loadedLangs = new Map<string, Language>()
 const parserCache = new Map<string, Parser>()
 
+// Cached dynamic import — the real bindings are loaded once on first use.
+let treeSitterModule: typeof import("web-tree-sitter") | null = null
+async function getTreeSitter(): Promise<typeof import("web-tree-sitter")> {
+  if (!treeSitterModule) {
+    treeSitterModule = await import("web-tree-sitter")
+  }
+  return treeSitterModule
+}
+
 const MODULE_DIR = __dirname
 
 function findWasmPath(grammar: string, wasmFile: string): string | null {
@@ -95,11 +109,12 @@ function findWasmPath(grammar: string, wasmFile: string): string | null {
 export async function initTreeSitter(): Promise<void> {
   if (initPromise) return initPromise
   initPromise = (async () => {
+    const ts = await getTreeSitter()
     const wasmPath = findWasmPath("web-tree-sitter", "web-tree-sitter.wasm")
     if (wasmPath) {
-      await Parser.init(readFileSync(wasmPath).buffer as ArrayBuffer)
+      await ts.Parser.init(readFileSync(wasmPath).buffer as ArrayBuffer)
     } else {
-      await Parser.init()
+      await ts.Parser.init()
     }
   })()
   return initPromise
@@ -115,8 +130,9 @@ export async function loadLanguage(lang: GrammarId): Promise<Language | null> {
   if (!wasmPath) return null
 
   try {
+    const ts = await getTreeSitter()
     const wasmBytes = readFileSync(wasmPath)
-    const language = await Language.load(wasmBytes)
+    const language = await ts.Language.load(wasmBytes)
     loadedLangs.set(lang, language)
     return language
   } catch {
@@ -129,7 +145,11 @@ function getParser(lang: GrammarId): Parser | null {
   if (p) return p
   const language = loadedLangs.get(lang)
   if (!language) return null
-  p = new Parser()
+  // Tree is bundled in the cached module — safe to use the value form here.
+  // We need a Parser instance synchronously, so use the cached module directly.
+  const ts = treeSitterModule
+  if (!ts) return null
+  p = new ts.Parser()
   p.setLanguage(language)
   parserCache.set(lang, p)
   return p
@@ -408,6 +428,11 @@ export async function detectRoutesWithTreeSitter(
   if (!grammarId) return []
 
   await initTreeSitter()
+  // `initTreeSitter` guarantees `treeSitterModule` is populated. Use the
+  // local `ts` reference for `Query` so we don't have to keep the bare
+  // type-only `Query` import in sync.
+  const ts = treeSitterModule
+  if (!ts) return []
 
   const language = loadedLangs.get(grammarId) || (await loadLanguage(grammarId))
   if (!language) return []
@@ -431,7 +456,7 @@ export async function detectRoutesWithTreeSitter(
 
   for (const rq of relevantQueries) {
     try {
-      const query = new Query(language, rq.query)
+      const query = new ts.Query(language, rq.query)
       const matches = query.matches(tree.rootNode)
 
       for (const match of matches) {
@@ -470,7 +495,7 @@ export async function detectRoutesWithTreeSitter(
   // Post-process: prepend class-level @RequestMapping prefix for Java frameworks
   if (["spring", "micronaut", "quarkus"].includes(framework) && results.length > 0) {
     try {
-      const classQuery = new Query(language, `(annotation name: (identifier)@annot (annotation_argument_list (string_literal)@path)) @full`)
+      const classQuery = new ts.Query(language, `(annotation name: (identifier)@annot (annotation_argument_list (string_literal)@path)) @full`)
       const classMatches = classQuery.matches(tree.rootNode)
       let classPrefix = ""
       for (const m of classMatches) {

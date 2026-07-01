@@ -750,7 +750,7 @@ Passé via `options.body` :
 
 - **MVP** : TypeScript seulement
 - **Prochainement** : Python (httpx + pydantic) et Go (net/http + structs)
-- L'architecture est extensible — voir `lib/sdk-codegen/typescript-generator.ts`
+- L'architecture est extensible — voir `lib/openapi-gen/generator.ts`
 
 ---
 
@@ -1145,7 +1145,7 @@ rm sync-server/data/reqly-sync.db
 | La logique des assertions | `reqy-web/lib/test-runner/assertions.ts` |
 | Le sandbox des scripts | `reqy-web/lib/test-runner/scripts.ts` |
 | L'inférence OpenAPI | `reqy-web/lib/openapi-inference/` |
-| Le générateur SDK | `reqy-web/lib/sdk-codegen/` |
+| Le générateur SDK | `reqy-web/lib/openapi-gen/generator.ts` |
 | La résolution de conflits | `reqy-web/lib/import-merge/` |
 | Le serveur sync | `sync-server/src/` |
 | Le WebSocket sync | `sync-server/src/ws-hub.ts` + `reqy-web/hooks/use-sync-socket.ts` |
