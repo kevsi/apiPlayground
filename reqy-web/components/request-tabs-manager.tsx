@@ -15,6 +15,7 @@ import { useRequestTabsState } from "@/hooks/use-request-tabs-state"
 import { useRequestTabExecution } from "@/hooks/use-request-tab-execution"
 import { useRequestStore, type RequestItem } from "@/hooks/use-request-store"
 import { cn } from "@/lib/utils"
+import { useShallow } from "zustand/react/shallow"
 import { getMethodPanelClass } from "@/lib/request-tab-utils"
 
 export function RequestTabsManager() {
@@ -90,6 +91,10 @@ export function RequestTabsManager() {
     setSaveModalCollectionId,
   } = execution
 
+  // All of these are stable action references from the Zustand store. We pick
+  // them with `useShallow` so this component only re-renders when one of the
+  // picked references actually changes (never for state mutations, since the
+  // actions themselves are stable).
   const {
     clearHistory,
     removeFromHistory,
@@ -107,7 +112,26 @@ export function RequestTabsManager() {
     addVariableMapping,
     updateVariableMapping,
     removeVariableMapping,
-  } = useRequestStore()
+  } = useRequestStore(
+    useShallow((s) => ({
+      clearHistory: s.clearHistory,
+      removeFromHistory: s.removeFromHistory,
+      addCollection: s.addCollection,
+      updateCollection: s.updateCollection,
+      deleteCollection: s.deleteCollection,
+      addRequestToCollection: s.addRequestToCollection,
+      removeRequestFromCollection: s.removeRequestFromCollection,
+      duplicateCollection: s.duplicateCollection,
+      addFolder: s.addFolder,
+      renameFolder: s.renameFolder,
+      deleteFolder: s.deleteFolder,
+      moveRequestToFolder: s.moveRequestToFolder,
+      moveFolder: s.moveFolder,
+      addVariableMapping: s.addVariableMapping,
+      updateVariableMapping: s.updateVariableMapping,
+      removeVariableMapping: s.removeVariableMapping,
+    })),
+  )
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

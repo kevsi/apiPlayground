@@ -8,12 +8,7 @@ import {
   buildQueryFromSelections,
   type SelectionNode,
 } from "@/lib/graphql/query-builder"
-
-interface SchemaFieldType {
-  kind?: string
-  name?: string
-  ofType?: SchemaFieldType | null
-}
+import { typeLabel, type SchemaFieldType } from "@/lib/graphql/format"
 
 interface SchemaField {
   name: string
@@ -61,15 +56,10 @@ function unwrapType(type: SchemaFieldType | undefined): string | undefined {
   if (!type) return undefined
   if (type.kind === "NON_NULL" && type.ofType) return unwrapType(type.ofType)
   if (type.kind === "LIST" && type.ofType) return unwrapType(type.ofType)
-  return type.name
+  return type.name ?? undefined
 }
 
-function typeLabel(type: SchemaFieldType | undefined): string {
-  if (!type) return "Unknown"
-  if (type.kind === "NON_NULL" && type.ofType) return `${typeLabel(type.ofType)}!`
-  if (type.kind === "LIST" && type.ofType) return `[${typeLabel(type.ofType)}]`
-  return type.name ?? "Unknown"
-}
+/* typeLabel is imported from @/lib/graphql/format — see top of file. */
 
 function isCompositeTypeName(schema: SchemaData, typeName: string | undefined): boolean {
   if (!typeName) return false

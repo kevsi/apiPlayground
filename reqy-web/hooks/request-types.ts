@@ -47,6 +47,5 @@ export interface RequestStore {
   aiAudit?: Array<{ id: string; actionType: string; detail?: any; result?: any; timestamp: number }>
   workspaces: Workspace[]
   activeWorkspaceId: string | null
-  notificationPreferences?: Record<string, boolean>
   datasets?: Dataset[]
 }

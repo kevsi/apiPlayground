@@ -2,8 +2,8 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Code2, Loader2 } from "lucide-react"
-import { generateTypeScriptSdk } from "@/lib/sdk-codegen/typescript-generator"
 import { generateOpenApiSpec } from "@/lib/openapi-export"
+import { generateSdk } from "@/lib/openapi-gen/generator"
 import type { Collection } from "@/hooks/use-request-store"
 
 interface HistoryLikeItem {
@@ -41,18 +41,46 @@ export function SdkDownloadButton({
         enableInference: inferFromHistory && !!mappedHistory,
         historyItems: mappedHistory,
       })
-      const files = generateTypeScriptSdk(spec)
-      const combined = files
-        .map((f) => `// === ${f.path} ===\n\n${f.content}`)
-        .join("\n\n")
-      const blob = new Blob([combined], { type: "text/typescript" })
-      const url = URL.createObjectURL(blob)
+      const result = await generateSdk(spec, "typescript-fetch", defaultName)
+
+      if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
+        try {
+          const handle = await (window as unknown as {
+            showSaveFilePicker: (opts: {
+              suggestedName?: string
+              types?: Array<{
+                description: string
+                accept: Record<string, string[]>
+              }>
+            }) => Promise<{
+              createWritable: () => Promise<{
+                write: (chunk: BufferSource | Blob) => Promise<void>
+                close: () => Promise<void>
+              }>
+            }>
+          }).showSaveFilePicker({
+            suggestedName: result.filename,
+            types: [
+              {
+                description: "ZIP archive",
+                accept: { "application/zip": [".zip"] },
+              },
+            ],
+          })
+          const writable = await handle.createWritable()
+          await writable.write(result.blob)
+          await writable.close()
+          return
+        } catch {
+          // User cancelled
+          return
+        }
+      }
+
+      const url = URL.createObjectURL(result.blob)
       const a = document.createElement("a")
       a.href = url
-      const collectionName =
-        defaultName ||
-        (collections.length === 1 ? collections[0].name : "reqly")
-      a.download = `${collectionName.replace(/\s+/g, "-").toLowerCase()}-sdk.ts`
+      a.download = result.filename
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -83,7 +111,7 @@ export function SdkDownloadButton({
       </Button>
       {error && <p className="text-xs text-red-500">{error}</p>}
       <p className="text-xs text-muted-foreground">
-        Generates a fetch-based TypeScript client from your OpenAPI spec.
+        Generates a TypeScript client via OpenAPI Generator (ZIP).
       </p>
     </div>
   )

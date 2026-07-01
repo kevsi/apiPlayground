@@ -5,7 +5,7 @@ import { useSSE, type SSEEvent } from "@/hooks/use-sse"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Wifi, WifiOff, Loader2, Trash2, Activity } from "lucide-react"
+import { Wifi, WifiOff, Loader2, Trash2, Activity, Radio } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 function formatTimestamp(ts: number): string {
@@ -114,6 +114,20 @@ export function SSEPanel() {
 
   return (
     <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+            <Radio className="size-3.5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground tracking-tight leading-none">SSE</h3>
+            <p className="text-[10px] text-muted-foreground/40 leading-none mt-1">
+              Monitor Server-Sent Events streams
+            </p>
+          </div>
+        </div>
+      </div>
       {/* Connection Bar */}
       <div className="p-3 pb-1">
         <div className="flex items-center gap-2 rounded-lg border border-input/50 px-3 py-1.5 transition-all duration-200">
@@ -166,8 +180,8 @@ export function SSEPanel() {
       </div>
 
       {/* Events Area */}
-      <div className="flex-1 min-h-0 px-3 pb-3">
-        <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-1 min-h-0 flex-col px-3 pb-3">
+        <div className="flex items-center justify-between mb-2 shrink-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
             Events
             {events.length > 0 && (
@@ -189,7 +203,7 @@ export function SSEPanel() {
           )}
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 h-[calc(100vh-280px)] border border-border rounded-lg bg-muted/10">
+        <ScrollArea className="flex-1 min-h-0 border border-border rounded-lg bg-muted/10">
           <div className="flex flex-col gap-2 p-3">
             {events.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-xs text-muted-foreground/50">

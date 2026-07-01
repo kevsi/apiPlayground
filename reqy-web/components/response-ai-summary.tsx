@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -9,7 +10,7 @@ interface ResponseAiSummaryProps {
   aiIsLoading?: boolean
 }
 
-export function ResponseAiSummary({
+export const ResponseAiSummary = memo(function ResponseAiSummary({
   aiSummary,
   aiError,
   aiIsLoading = false,
@@ -59,4 +60,4 @@ export function ResponseAiSummary({
       </div>
     </div>
   )
-}
+})

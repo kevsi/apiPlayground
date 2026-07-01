@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonTextarea } from "@/components/json-textarea"
+import { createJsonKeyDownHandler } from "@/lib/json-textarea-utils"
 import { Label } from "@/components/ui/label"
 import { Select, SelectItem, SelectTrigger, SelectValue, SelectContent } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -362,12 +363,13 @@ export function MockRouteEditor({ open, onOpenChange, onSave, initialData }: Moc
             {/* Response body */}
             <div className="grid gap-2">
               <Label htmlFor="mock-body">Corps de la réponse par défaut</Label>
-              <Textarea
+              <JsonTextarea
                 id="mock-body"
                 placeholder='{ "message": "Hello" }'
                 value={responseBody}
                 onChange={(e) => setResponseBody(e.target.value)}
-                className="min-h-[180px] font-mono text-xs"
+                pairing={contentType.includes("json")}
+                className="min-h-[180px] text-xs"
               />
             </div>
 
@@ -506,7 +508,17 @@ export function MockRouteEditor({ open, onOpenChange, onSave, initialData }: Moc
                     </div>
                     <div className="grid gap-1">
                       <Label className="text-[10px] text-muted-foreground">Corps de la réponse</Label>
-                      <textarea value={v.body} onChange={(e) => updateVariant(i, "body", e.target.value)} className="min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-xs font-mono resize-y" />
+                      <textarea
+                        value={v.body}
+                        onChange={(e) => updateVariant(i, "body", e.target.value)}
+                        onKeyDown={
+                          v.contentType.includes("json")
+                            ? createJsonKeyDownHandler(v.body, (next) => updateVariant(i, "body", next))
+                            : undefined
+                        }
+                        spellCheck={false}
+                        className="min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-xs font-mono resize-y"
+                      />
                     </div>
                   </div>
                 ))}

@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { useRequestStore, type Workspace } from "@/hooks/use-request-store"
+import { useShallow } from "zustand/react/shallow"
 
 const workspaceIcons: Record<string, typeof Folder> = {
   folder: Folder,
@@ -42,14 +43,20 @@ const workspaceColors: Record<string, string> = {
 }
 
 export function WorkspaceSelector() {
-  const {
-    workspaces,
-    activeWorkspaceId,
-    addWorkspace,
-    updateWorkspace,
-    deleteWorkspace,
-    setActiveWorkspace,
-  } = useRequestStore()
+  // Atomic selectors — re-render only when the workspaces list or the active
+  // workspace id actually changes, not on unrelated mutations.
+  const workspaces = useRequestStore((s) => s.workspaces)
+  const activeWorkspaceId = useRequestStore((s) => s.activeWorkspaceId)
+  // Action refs are stable; group them under one useShallow subscription.
+  const { addWorkspace, updateWorkspace, deleteWorkspace, setActiveWorkspace } =
+    useRequestStore(
+      useShallow((s) => ({
+        addWorkspace: s.addWorkspace,
+        updateWorkspace: s.updateWorkspace,
+        deleteWorkspace: s.deleteWorkspace,
+        setActiveWorkspace: s.setActiveWorkspace,
+      })),
+    )
 
   const [createOpen, setCreateOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)

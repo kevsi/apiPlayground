@@ -5,7 +5,7 @@
 -- (https://supabase.com/dashboard/project/xqshyabkvdmuthsklqpb/sql/new)
 --
 -- Ce script est idempotent : il peut être relancé sans erreur.
--- Il consolide les 3 migrations du projet en un seul bloc.
+-- Il consolide les migrations du projet en un seul bloc.
 -- ============================================================
 
 -- ────────────────────────────────────────────────────────────
@@ -18,34 +18,7 @@ create extension if not exists "vector" with schema extensions;
 -- 2. Tables
 -- ────────────────────────────────────────────────────────────
 
--- 2.1 sync_items : stockage CRDT-like pour la synchro cloud
-create table if not exists public.sync_items (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  item_type text not null,
-  item_id text not null,
-  workspace_id text,
-  payload jsonb not null default '{}',
-  updated_at timestamptz not null default now(),
-  deleted boolean not null default false,
-  unique(user_id, item_type, item_id)
-);
-
-create index if not exists idx_sync_items_query
-  on public.sync_items(user_id, workspace_id, item_type, updated_at);
-
-create index if not exists idx_sync_items_item_id
-  on public.sync_items(user_id, item_type, item_id);
-
--- 2.2 sync_metadata : tracking device par utilisateur
-create table if not exists public.sync_metadata (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid not null references auth.users(id) on delete cascade unique,
-  device_id text not null,
-  last_sync_at timestamptz not null default now()
-);
-
--- 2.3 knowledge_chunks : vector store RAG (pgvector)
+-- 2.1 knowledge_chunks : vector store RAG (pgvector)
 create table if not exists public.knowledge_chunks (
   id uuid default gen_random_uuid() primary key,
   content text not null,
@@ -130,29 +103,7 @@ grant execute on function public.match_knowledge_chunks to service_role;
 -- 4. Row-Level Security (RLS)
 -- ────────────────────────────────────────────────────────────
 
--- 4.1 sync_items : chaque user gère ses propres items
-alter table public.sync_items enable row level security;
-
-drop policy if exists "Allow users to manage their own sync items" on public.sync_items;
-create policy "Allow users to manage their own sync items"
-  on public.sync_items
-  for all
-  to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
--- 4.2 sync_metadata : idem
-alter table public.sync_metadata enable row level security;
-
-drop policy if exists "Allow users to manage their own sync metadata" on public.sync_metadata;
-create policy "Allow users to manage their own sync metadata"
-  on public.sync_metadata
-  for all
-  to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
--- 4.3 knowledge_chunks : base de connaissance globale en lecture, service_role pour écriture
+-- 4.1 knowledge_chunks : base de connaissance globale en lecture, service_role pour écriture
 alter table public.knowledge_chunks enable row level security;
 
 drop policy if exists "Allow authenticated users to read knowledge_chunks" on public.knowledge_chunks;
@@ -176,8 +127,6 @@ create policy "Users can manage their own chat history"
 -- ────────────────────────────────────────────────────────────
 -- 5. Grants pour service_role (API routes côté serveur)
 -- ────────────────────────────────────────────────────────────
-grant insert, update, delete, select on public.sync_items      to service_role;
-grant insert, update, delete, select on public.sync_metadata  to service_role;
 grant insert, update, delete, select on public.knowledge_chunks to service_role;
 grant insert, update, delete, select on public.chat_history    to service_role;
 

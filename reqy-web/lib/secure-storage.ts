@@ -199,4 +199,25 @@ class EphemeralStore {
   }
 }
 
-export const secureKeys = new EphemeralStore()
+/**
+ * SSR-safe stub for the EphemeralStore.
+ *
+ * Secure storage only exists in the browser (Web Crypto + IndexedDB +
+ * localStorage). Importing this module during SSR would otherwise call
+ * IndexedDB at module-evaluation time and pollute the server logs (and
+ * eventually crash if Node lacks the global). We substitute a no-op stub
+ * whose methods silently succeed/return undefined.
+ */
+function createNoOpStore(): EphemeralStore {
+  const noop = () => {}
+  return {
+    set: noop,
+    get: () => undefined,
+    delete: noop,
+    clear: noop,
+    waitForReady: async () => {},
+  } as unknown as EphemeralStore
+}
+
+export const secureKeys: EphemeralStore =
+  typeof window !== "undefined" ? new EphemeralStore() : createNoOpStore()

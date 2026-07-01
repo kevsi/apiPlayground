@@ -1,6 +1,13 @@
 "use client"
-import CodeMirror from "@uiw/react-codemirror"
+import dynamic from "next/dynamic"
 import { javascript } from "@codemirror/lang-javascript"
+
+// CodeMirror is a ~200 KB chunk; only needed when the GraphQL playground is
+// open. Lazy-load it so the main bundle stays lean.
+const CodeMirror = dynamic(
+  () => import("@uiw/react-codemirror").then((m) => m.default),
+  { ssr: false, loading: () => null },
+)
 
 interface Props {
   value: string

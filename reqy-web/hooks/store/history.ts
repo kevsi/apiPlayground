@@ -46,7 +46,8 @@ export function createHistoryMutations(commit: CommitFn) {
           title: `Request ${item.method} ${item.endpoint}`,
           description: `Status: ${item.responseStatus ?? "-"} — ${item.responseTime ?? "-"}ms`,
           variant: "default",
-        } as any)
+          meta: { event: "requestComplete" },
+        })
       } catch {
         // intentionally empty
       }

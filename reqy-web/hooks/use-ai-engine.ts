@@ -77,7 +77,7 @@ function parseAiConfig(override?: Partial<AIConfig>): AIConfig {
     provider,
     apiKey: apiKey.trim(),
     model: modelOverride?.trim() || (provider === "ollama" ? ollamaConfig.model : undefined),
-    openaiUrl: provider === "openai" ? openaiUrl?.trim() || undefined : undefined,
+    openaiUrl: provider === "openai" || provider === "custom" || provider === "grok" ? openaiUrl?.trim() || undefined : undefined,
     ollamaUrl:
       provider === "ollama"
         ? `http://${ollamaConfig.host || "127.0.0.1"}:${ollamaConfig.port ?? 11434}`
@@ -109,7 +109,37 @@ function getHandlers(store: AIRequestStore) {
   }
 }
 
-export function useAIEngine(): UseAIEngineResult {
+export interface AIEngineHandlers {
+  setRequest?: (patch: Partial<CurrentRequest>, reason?: string) => void | Promise<void>
+  addAssertions?: (assertions: TestAssertion[], autoApply?: boolean) => void | Promise<void>
+  setVariable?: (name: string, value: string, description?: string) => void | Promise<void>
+  applyFix?: (patch: Partial<CurrentRequest>) => void | Promise<void>
+  setDoc?: (markdown: string, title?: string) => void | Promise<void>
+  notify?: (message: string) => void | Promise<void>
+  executeRequest?: (request: Partial<CurrentRequest> | CurrentRequest) => Promise<unknown> | void
+  runBatch?: (requests: Array<Partial<CurrentRequest>>) => Promise<unknown[]> | void
+  audit?: (entry: { actionType: string; detail?: unknown; result?: unknown }) => void | Promise<void>
+}
+
+function mergeHandlers(store: AIRequestStore, overrides?: AIEngineHandlers) {
+  const base = getHandlers(store)
+  if (!overrides) return base
+  return {
+    ...base,
+    ...overrides,
+    setRequest: overrides.setRequest ?? base.setRequest,
+    addAssertions: overrides.addAssertions ?? base.addAssertions,
+    setVariable: overrides.setVariable ?? base.setVariable,
+    applyFix: overrides.applyFix ?? base.applyFix,
+    setDoc: overrides.setDoc ?? base.setDoc,
+    notify: overrides.notify ?? base.notify,
+    executeRequest: overrides.executeRequest ?? base.executeRequest,
+    runBatch: overrides.runBatch ?? base.runBatch,
+    audit: overrides.audit ?? base.audit,
+  }
+}
+
+export function useAIEngine(handlerOverrides?: AIEngineHandlers): UseAIEngineResult {
   // The flat useRequestStore() does not expose every method listed in
   // AIRequestStore (e.g. patchRequest, addAssertions, setDoc) — those live
   // on action helpers imported elsewhere. The cast lets the AI engine call
@@ -139,10 +169,12 @@ export function useAIEngine(): UseAIEngineResult {
     async (prompt: string, ctx: AIContext): Promise<AIResponse> => {
       const config = parseAiConfig()
       const aiRes = await callAI(prompt, config)
-      await dispatchAIActions(aiRes.actions, getHandlers(store), ctx, { allowAutoApply: Boolean((store as AIRequestStore).aiAutoApply) })
+      await dispatchAIActions(aiRes.actions, mergeHandlers(store, handlerOverrides), ctx, {
+        allowAutoApply: Boolean((store as AIRequestStore).aiAutoApply),
+      })
       return aiRes
     },
-    [store]
+    [store, handlerOverrides]
   )
 
   const analyzeAfterRequest = useCallback(

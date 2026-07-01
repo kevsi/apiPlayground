@@ -1,5 +1,6 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
-import { getActiveMockRoutesForWorkspace, getMockServers, isMockEnabledForWorkspace } from "@/app/api/mock/config/route"
+import { getActiveMockRoutesForWorkspace, getMockServers, isMockEnabledForWorkspace } from "@/lib/mock-store"
 import { resolveMockMatch, applyMockDelay, buildMockHeaders } from "@/lib/mock-resolver"
 import { validateProxyPayload } from "@/lib/schemas/proxy"
 import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils"

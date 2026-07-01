@@ -159,7 +159,7 @@ export function BatchRunProgress({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Play className="size-4 text-primary" />
-            Batch: {collection.name}
+            Send collection: {collection.name}
           </DialogTitle>
         </DialogHeader>
 

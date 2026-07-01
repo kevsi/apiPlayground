@@ -10,23 +10,18 @@ export interface KeyboardShortcut {
   alt?: boolean
   action: () => void
   description: string
+  /** Allow the shortcut to fire even when focus is in an input/textarea. */
+  allowInInputs?: boolean
 }
 
 export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      // Ignore if typing in an input/textarea
       const target = event.target as HTMLElement
-      if (
+      const inInput =
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable
-      ) {
-        // Allow Escape to work in inputs
-        if (event.key !== "Escape") {
-          return
-        }
-      }
 
       for (const shortcut of shortcuts) {
         const ctrlMatch = shortcut.ctrl
@@ -36,6 +31,10 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
         const altMatch = shortcut.alt ? event.altKey : !event.altKey
 
         if (event.key.toLowerCase() === shortcut.key.toLowerCase() && ctrlMatch && shiftMatch && altMatch) {
+          // Skip if focus is in an input field unless the shortcut explicitly allows it
+          if (inInput && !shortcut.allowInInputs && event.key !== "Escape") {
+            continue
+          }
           event.preventDefault()
           shortcut.action()
           return

@@ -1,10 +1,18 @@
 "use client"
 
 import { useMemo, useCallback } from "react"
-import CodeMirror, { EditorView } from "@uiw/react-codemirror"
+import dynamic from "next/dynamic"
+import { EditorView } from "@uiw/react-codemirror"
 import { graphql } from "cm6-graphql"
 import { autocompletion, type CompletionContext } from "@codemirror/autocomplete"
 import { buildClientSchema, type GraphQLSchema } from "graphql"
+
+// Lazy-load CodeMirror (default export) — EditorView stays static because
+// it's used in extensions below.
+const CodeMirror = dynamic(
+  () => import("@uiw/react-codemirror").then((m) => m.default),
+  { ssr: false, loading: () => null },
+)
 
 interface Props {
   value: string

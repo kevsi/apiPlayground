@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
 import { validatePostmanApiKey, PostmanApiError } from "@/lib/postman"
 import { buildApiKeyCookie, buildClearApiKeyCookie } from "./cookies"

@@ -16,6 +16,8 @@ const MODEL_MAP: Record<AIProvider, string> = {
   deepseek: "deepseek-chat",
   ollama: "llama2",
   "opencode-zen": "gpt-5",
+  custom: "gpt-4o-mini",
+  grok: "grok-2",
 }
 
 export function isAiConfigured(): boolean {

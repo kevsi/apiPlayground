@@ -20,6 +20,7 @@
         "$APPDATA/**"
       ]
     },
-    "deep-link:default"
+    "deep-link:default",
+    "notification:default"
   ]
 }

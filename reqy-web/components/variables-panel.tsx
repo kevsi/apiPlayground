@@ -12,10 +12,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useRequestStore } from "@/hooks/use-request-store"
+import { useShallow } from "zustand/react/shallow"
 import { interpolate } from "@/lib/utils"
 
 export function VariablesPanel() {
-  const { environments, activeEnvironmentId } = useRequestStore()
+  const environments = useRequestStore((s) => s.environments)
+  const activeEnvironmentId = useRequestStore((s) => s.activeEnvironmentId)
   const [open, setOpen] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState("")

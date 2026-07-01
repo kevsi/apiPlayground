@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Trash2, Plus } from "lucide-react"
 import type { Assertion } from "@/lib/test-runner/types"
+import { createJsonKeyDownHandler } from "@/lib/json-textarea-utils"
 
 interface Props {
   assertions: Assertion[]
@@ -131,6 +132,9 @@ function AssertionFields({ assertion, onChange }: { assertion: Assertion; onChan
         onChange={(e) => {
           try { onChange({ ...assertion, schema: JSON.parse(e.target.value) }) } catch { /* ignore */ }
         }}
+        onKeyDown={createJsonKeyDownHandler(JSON.stringify(assertion.schema), (next) => {
+          try { onChange({ ...assertion, schema: JSON.parse(next) }) } catch { /* ignore */ }
+        })}
         className="flex-1 font-mono text-xs"
       />
     )

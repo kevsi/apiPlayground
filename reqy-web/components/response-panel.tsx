@@ -6,17 +6,30 @@ import { useToast } from "@/hooks/use-toast"
 import { DiffDialog } from "@/components/diff-dialog"
 import { analyze } from "@/src/ai/local-engine/analyzer"
 import { buildRequestContext } from "@/src/ai/local-engine/context"
-import { AIModal } from "@/src/ai/components/AIModal"
 import type { RequestPayload } from "@/src/ai/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ResponseStatusBar } from "@/components/response-status-bar"
 import { ResponseTimeline } from "@/components/response-timeline"
-import { ResponseContentRenderer } from "@/components/response-content-renderer"
 import { ResponseAiSummary } from "@/components/response-ai-summary"
 import { ResponseHeadersTab } from "@/components/response-headers-tab"
 import { CodeSnippet } from "@/components/response-code-snippet"
+import dynamic from "next/dynamic"
+
+// Heavy dependencies — only loaded on demand (response received, AI opened).
+const ResponseContentRenderer = dynamic(
+  () =>
+    import("@/components/response-content-renderer").then(
+      (m) => ({ default: m.ResponseContentRenderer }),
+    ),
+  { ssr: false, loading: () => null },
+)
+const AIModal = dynamic(
+  () =>
+    import("@/src/ai/components/AIModal").then((m) => ({ default: m.AIModal })),
+  { ssr: false, loading: () => null },
+)
 import { type ResponseFormat, isJson, isXml, isHtml, isImage, isPdf, isAudio, isVideo, isBinary, extractVideoUrls, extractImageUrls, getContentType } from "@/components/response-utils"
 import type { HistoryItem, TestResult } from "@/lib/types"
 
@@ -243,7 +256,7 @@ export function ResponsePanel({
     }
   }, [responseBody, responseHeaders])
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     if (!responseBody) return
     try {
       const blob = new Blob([responseBody], { type: 'application/json' })
@@ -256,13 +269,16 @@ export function ResponsePanel({
     } catch {
       // ignore
     }
-  }
+  }, [responseBody])
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     if (!onRun) return
     await onRun()
     setActiveTab("response")
-  }
+  }, [onRun])
+
+  const handleOpenDiff = useCallback(() => setDiffDialogOpen(true), [])
+  const handleOpenAi = useCallback(() => setAiModalOpen(true), [])
 
   // P4.6: Ctrl+Shift+F — re-apply last fix without re-clicking
   useEffect(() => {
@@ -305,7 +321,7 @@ export function ResponsePanel({
         onRunAndDownload={onRunAndDownload}
         onExport={handleExport}
         onCreateMock={onCreateMock}
-        onDiff={() => setDiffDialogOpen(true)}
+        onDiff={handleOpenDiff}
       />
 
       {/* Response Timing Gauge — full-width animation bar */}
@@ -381,7 +397,7 @@ export function ResponsePanel({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setAiModalOpen(true)}
+              onClick={handleOpenAi}
               className="ml-auto inline-flex items-center gap-1.5 h-auto px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-primary hover:bg-primary/10"
               data-testid="btn-ai-open"
             >

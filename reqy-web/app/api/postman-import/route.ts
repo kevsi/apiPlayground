@@ -1,9 +1,34 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
-import { formatZodError, postmanImportBodySchema, postmanImportResponseSchema } from "@/lib/import-schemas"
-import { postmanFetch } from "@/lib/postman-api"
+import {
+  formatZodError,
+  postmanImportBodySchema,
+  postmanImportResponseSchema,
+} from "@/lib/import-schemas"
+import { postmanFetchJson, PostmanApiError } from "@/lib/postman-api"
+import { extractPostmanCollection } from "@/lib/postman-collection"
 
+/**
+ * Legacy Postman import endpoint.
+ *
+ * Kept for the older `components/import-postman-modal.tsx` flow which expects
+ * a flat `routes[]` shape. Internally we now share the same extraction logic
+ * as `/api/postman-import/save` so behaviour stays consistent across both
+ * modals (body modes, auth, folder traversal, disabled params).
+ *
+ * The response also includes the modern `folders` + `requests` arrays for any
+ * future caller that prefers the rich shape. The Zod schema only validates
+ * the legacy fields and lets the extra ones pass through.
+ */
 export async function POST(request: NextRequest) {
-  const bodyResult = postmanImportBodySchema.safeParse(await request.json())
+  let raw: unknown
+  try {
+    raw = await request.json()
+  } catch {
+    return NextResponse.json({ message: "Body JSON invalide" }, { status: 400 })
+  }
+
+  const bodyResult = postmanImportBodySchema.safeParse(raw)
   if (!bodyResult.success) {
     return NextResponse.json(
       { message: formatZodError(bodyResult.error) },
@@ -16,94 +41,57 @@ export async function POST(request: NextRequest) {
   if (!apiKey) {
     return NextResponse.json(
       { message: "Non connecté à Postman" },
-      { status: 401 }
-    )
-  }
-
-  if (!collectionId) {
-    return NextResponse.json(
-      { message: "ID collection requis" },
-      { status: 400 }
+      { status: 401 },
     )
   }
 
   try {
-    const response = await postmanFetch(apiKey, `/collections/${collectionId}`)
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { message: "Collection Postman non trouvée" },
-        { status: response.status }
-      )
-    }
-
-    const data = await response.json()
+    const data = await postmanFetchJson<any>(apiKey, `/collections/${collectionId}`)
     const collection = data.collection
+    const { folders, requests } = extractPostmanCollection(collection?.item ?? [])
 
-    // Extract routes from Postman collection items
-    const routes: any[] = []
-
-    function extractRequests(items: any[], parentPath = "") {
-      if (!items) return
-
-      for (const item of items) {
-        if (item.item) {
-          // Folder
-          const folderName = item.name || "Folder"
-          extractRequests(item.item, parentPath ? `${parentPath}/${folderName}` : folderName)
-        } else if (item.request) {
-          // Request
-          const method = item.request.method || "GET"
-          const url = typeof item.request.url === "string" 
-            ? item.request.url 
-            : item.request.url?.raw || ""
-          
-          // Extract path from URL (remove domain)
-          let path = url
-          try {
-            const urlObj = new URL(url)
-            path = urlObj.pathname || "/"
-          } catch {
-            // If not a valid URL, use as is
-            if (!url.startsWith("/")) {
-              path = "/" + url
-            }
-          }
-
-          routes.push({
-            method: method.toUpperCase(),
-            path: path,
-            name: item.name || method,
-            description: item.request.description || "",
-            sourceFile: `postman:${item.name}`,
-          })
-        }
-      }
-    }
-
-    extractRequests(collection.item || [])
+    // Map the rich extracted requests down to the legacy flat `routes` shape.
+    // The legacy modal expects only method/path/name/description/sourceFile,
+    // so we strip the domain off full URLs to mirror the original behaviour.
+    const routes = requests.map((r) => ({
+      method: r.method,
+      path: stripDomain(r.url),
+      name: r.name,
+      description: "",
+      sourceFile: `postman:${r.name}`,
+    }))
 
     const payload = {
-      name: collection.info?.name || "Postman Collection",
+      name: collection?.info?.name ?? "Postman Collection",
       framework: "postman",
       language: "postman",
       routes,
       metadata: {
         collectionId,
-        description: collection.info?.description || "",
+        description: collection?.info?.description ?? "",
       },
+      // Modern (rich) shape — not part of the Zod schema but accepted as
+      // additional properties by default.
+      folders,
+      requests,
     }
 
     const validated = postmanImportResponseSchema.safeParse(payload)
     if (!validated.success) {
       return NextResponse.json(
-        { message: "Réponse Postman invalide", details: formatZodError(validated.error) },
+        {
+          message: "Réponse Postman invalide",
+          details: formatZodError(validated.error),
+        },
         { status: 502 },
       )
     }
 
-    return NextResponse.json(validated.data)
+    return NextResponse.json(payload)
   } catch (error) {
+    if (error instanceof PostmanApiError) {
+      return NextResponse.json({ message: error.message }, { status: error.status === 401 ? 401 : 400 })
+    }
     console.error("Postman import error:", error)
     return NextResponse.json(
       {
@@ -112,7 +100,16 @@ export async function POST(request: NextRequest) {
             ? error.message
             : "Erreur lors de l'import de la collection",
       },
-      { status: 500 }
+      { status: 500 },
     )
+  }
+}
+
+function stripDomain(rawUrl: string): string {
+  if (!rawUrl) return "/"
+  try {
+    return new URL(rawUrl).pathname || "/"
+  } catch {
+    return rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`
   }
 }

@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.reqly.app",
   "build": {
-    "frontendDist": "../reqy-web/.next",
+    "frontendDist": "../reqy-web/out",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npx pnpm --dir ./reqy-web dev",
-    "beforeBuildCommand": "npx pnpm --dir ./reqy-web build"
+    "beforeDevCommand": "pnpm --dir reqy-web dev",
+    "beforeBuildCommand": "pnpm generate"
   },
   "app": {
     "windows": [
@@ -18,11 +18,12 @@
         "minWidth": 960,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "devtools": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:*; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none';"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost tauri: https://tauri.localhost; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none';"
     }
   },
   "plugins": {

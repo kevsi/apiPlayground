@@ -11,6 +11,25 @@ export const generatedRequestSchema = z.object({
   body: z.string().optional(),
   queryParams: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
   rationale: z.string().optional(),
+  /**
+   * Optional Postman-style assertions the AI suggests to validate the
+   * follow-up request. Each item is a { code, label } pair using the
+   * pm.test(...) / pm.response.* JavaScript DSL. The handler converts
+   * them to both legacy (`assertions`) and runner (`runnerAssertions`)
+   * formats so they show up in the Tests and Assertions tabs.
+   */
+  assertions: z
+    .array(
+      z.object({
+        code: z.string(),
+        label: z.string().optional(),
+      }),
+    )
+    .optional(),
+  /** Optional JS executed before the request is sent (uses the pm.* sandbox). */
+  preRequestScript: z.string().optional(),
+  /** Optional JS executed after the response is received (uses the pm.* sandbox). */
+  postResponseScript: z.string().optional(),
 })
 
 export type GeneratedRequest = z.infer<typeof generatedRequestSchema>
@@ -27,7 +46,7 @@ export function buildFollowUpPrompt(item: HistoryItem): string {
 
   return `You are an API testing assistant. Based on the HTTP request and response below, propose ONE logical follow-up request (e.g. use a token, fetch a nested resource, paginate, confirm creation).
 
-Return ONLY valid JSON with this shape:
+Return ONLY valid JSON with this shape (all fields after "rationale" are OPTIONAL — include them only if relevant):
 {
   "name": "short label",
   "method": "GET|POST|PUT|PATCH|DELETE",
@@ -36,7 +55,10 @@ Return ONLY valid JSON with this shape:
   "headers": { "Header-Name": "value" },
   "body": "string or empty",
   "queryParams": [{ "key": "k", "value": "v" }],
-  "rationale": "one sentence why this follow-up makes sense"
+  "rationale": "one sentence why this follow-up makes sense",
+  "assertions": [{ "code": "pm.response.to.have.status(200)", "label": "Status is 200" }],
+  "preRequestScript": "optional JS run before send (pm.environment, pm.variables, etc.)",
+  "postResponseScript": "optional JS run after response (pm.response.json(), pm.environment.set, etc.)"
 }
 
 Original request:

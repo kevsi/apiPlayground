@@ -53,7 +53,7 @@ async function runOne(
   // Pre script
   const preScript = (req as unknown as { preRequestScript?: string }).preRequestScript
   if (preScript) {
-    const out = runScript(preScript, ctx, { phase: "pre", timeoutMs: options.scriptTimeoutMs })
+    const out = await runScript(preScript, ctx, { phase: "pre", timeoutMs: options.scriptTimeoutMs })
     if (out.error) {
       result.status = "errored"
       result.error = `Pre-script error: ${out.error}`
@@ -82,7 +82,7 @@ async function runOne(
   // Post script
   const postScript = (req as unknown as { postResponseScript?: string }).postResponseScript
   if (postScript) {
-    const out = runScript(postScript, ctx, { phase: "post", response, timeoutMs: options.scriptTimeoutMs })
+    const out = await runScript(postScript, ctx, { phase: "post", response, timeoutMs: options.scriptTimeoutMs })
     if (out.error) {
       result.status = "errored"
       result.error = `Post-script error: ${out.error}`
@@ -92,7 +92,7 @@ async function runOne(
   }
 
   // Assertions
-  const assertions = ((req as unknown as { assertions?: Assertion[] }).assertions ?? []) as Assertion[]
+  const assertions = ((req as unknown as { runnerAssertions?: Assertion[] }).runnerAssertions ?? []) as Assertion[]
   result.assertionResults = evaluateAssertions(assertions, response)
   result.status = result.assertionResults.every((r) => r.passed) ? "pass" : "fail"
   return result

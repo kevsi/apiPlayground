@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 
 // Re-export all types for backward compatibility
 export type {
@@ -33,7 +33,6 @@ import type { CurrentRequest, LastResponse } from "@/lib/ai-engine"
 import type { SavedProject } from "@/types"
 import { runProactiveAnalysis } from "./store-analysis"
 import { withCrossTabSync } from "@/lib/store/middleware/with-cross-tab-sync"
-import { setSyncState, setRetryHandler } from "@/hooks/use-sync-state"
 import { storageAdapter } from "@/lib/storage-adapter"
 import { WORKSPACE_PERSONAL_ID } from "./store/types"
 import { createNotificationsMutations } from "./store/notifications"
@@ -47,6 +46,14 @@ import { createWorkspacesMutations } from "./store/workspaces"
 import { createDatasetsMutations } from "./store/datasets"
 
 const STORAGE_KEY = "reqly-request-store"
+
+/** Lit la permission système de notification directement depuis le navigateur. */
+function getBrowserNotificationPermission(): string {
+  if (typeof window !== "undefined" && "Notification" in window) {
+    return Notification.permission
+  }
+  return "unsupported"
+}
 
 const defaultEnvironments: Environment[] = [
   {
@@ -70,24 +77,13 @@ const defaultWorkspace: Workspace = {
   updatedAt: Date.now(),
 }
 
-const DEFAULT_NOTIFICATION_PREFERENCES: Record<string, boolean> = {
-  requestComplete: true,
-  collectionComplete: true,
-  aiResponse: true,
-  aiError: true,
-  importExport: true,
-}
-
 const initialStore: RequestStore = {
   history: [],
   collections: [],
   environments: defaultEnvironments,
   notifications: [],
   variableMappings: [],
-  systemNotificationPermission:
-    typeof window !== "undefined" && "Notification" in window
-      ? Notification.permission
-      : "default",
+  systemNotificationPermission: getBrowserNotificationPermission(),
   activeEnvironmentId: "env-global",
   projects: [],
   selectedProjectId: null,
@@ -100,7 +96,6 @@ const initialStore: RequestStore = {
   aiAudit: [],
   workspaces: [defaultWorkspace],
   activeWorkspaceId: WORKSPACE_PERSONAL_ID,
-  notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
   datasets: [],
 }
 
@@ -150,11 +145,7 @@ async function loadFromStorageAsync(): Promise<RequestStore> {
       environments: parsed.environments || defaultEnvironments,
       notifications: parsed.notifications || [],
       variableMappings: parsed.variableMappings || [],
-      systemNotificationPermission:
-        parsed.systemNotificationPermission ??
-        (typeof window !== "undefined" && "Notification" in window
-          ? Notification.permission
-          : "unsupported"),
+      systemNotificationPermission: getBrowserNotificationPermission(),
       activeEnvironmentId:
         parsed.activeEnvironmentId !== undefined
           ? parsed.activeEnvironmentId
@@ -171,10 +162,10 @@ async function loadFromStorageAsync(): Promise<RequestStore> {
       aiAutoApply:
         typeof parsed.aiAutoApply === "boolean" ? parsed.aiAutoApply : false,
       aiAudit: Array.isArray(parsed.aiAudit) ? parsed.aiAudit : [],
-      workspaces: parsed.workspaces || [defaultWorkspace],
+      workspaces: Array.isArray(parsed.workspaces) && parsed.workspaces.length > 0
+        ? parsed.workspaces
+        : [defaultWorkspace],
       activeWorkspaceId: parsed.activeWorkspaceId ?? WORKSPACE_PERSONAL_ID,
-      notificationPreferences:
-        parsed.notificationPreferences ?? { ...DEFAULT_NOTIFICATION_PREFERENCES },
       datasets: parsed.datasets || [],
     })
   } catch (e) {
@@ -195,10 +186,7 @@ async function loadFallback(): Promise<RequestStore> {
       collections: [],
       environments: defaultEnvironments,
       notifications: [],
-      systemNotificationPermission:
-        typeof window !== "undefined" && "Notification" in window
-          ? Notification.permission
-          : "unsupported",
+      systemNotificationPermission: getBrowserNotificationPermission(),
       variableMappings: [],
       activeEnvironmentId: "env-global",
       projects: fallbackProjects,
@@ -212,7 +200,6 @@ async function loadFallback(): Promise<RequestStore> {
       aiAudit: [],
       workspaces: [defaultWorkspace],
       activeWorkspaceId: WORKSPACE_PERSONAL_ID,
-      notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
       datasets: [],
     }
   } catch {
@@ -221,10 +208,7 @@ async function loadFallback(): Promise<RequestStore> {
       collections: [],
       environments: defaultEnvironments,
       notifications: [],
-      systemNotificationPermission:
-        typeof window !== "undefined" && "Notification" in window
-          ? Notification.permission
-          : "unsupported",
+      systemNotificationPermission: getBrowserNotificationPermission(),
       variableMappings: [],
       activeEnvironmentId: "env-global",
       projects: [],
@@ -238,7 +222,6 @@ async function loadFallback(): Promise<RequestStore> {
       aiAudit: [],
       workspaces: [defaultWorkspace],
       activeWorkspaceId: WORKSPACE_PERSONAL_ID,
-      notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
       datasets: [],
     }
   }
@@ -250,19 +233,14 @@ let saveAttempts = 0;
 const MAX_SAVE_RETRIES = 3;
 const SAVE_DEBOUNCE_MS = 300;
 
-let lastStoreSnapshot: string | null = null;
-
 async function flushSave() {
   const store = pendingStore;
   if (!store) return;
   pendingStore = null;
-  setSyncState("syncing");
   for (let attempt = 0; attempt < MAX_SAVE_RETRIES; attempt++) {
     try {
       await storageAdapter.save(STORAGE_KEY, JSON.stringify(store))
       saveAttempts = 0;
-      lastStoreSnapshot = JSON.stringify(store);
-      setSyncState("synced");
       return
     } catch (e) {
       saveAttempts++
@@ -272,36 +250,19 @@ async function flushSave() {
       }
     }
   }
-  setSyncState("error");
 }
 
 function saveToStorageAsync(store: RequestStore) {
   pendingStore = store
-  lastStoreSnapshot = JSON.stringify(store)
   if (saveTimeout) clearTimeout(saveTimeout)
   saveTimeout = setTimeout(flushSave, SAVE_DEBOUNCE_MS)
 }
-
-setRetryHandler(() => {
-  if (lastStoreSnapshot) {
-    const store = JSON.parse(lastStoreSnapshot) as RequestStore;
-    saveToStorageAsync(store);
-  }
-});
 
 export let globalStore: RequestStore = initialStore;
 let globalIsLoaded = false;
 let initPromise: Promise<void> | null = null;
 const storeListeners = new Set<() => void>();
-const storeChangeListeners = new Set<(store: RequestStore) => void>();
 
-/** Register a callback invoked after every store mutation. Used by cloud sync. */
-export function addStoreChangeListener(fn: (store: RequestStore) => void): () => void {
-  storeChangeListeners.add(fn);
-  return () => {
-    storeChangeListeners.delete(fn);
-  };
-}
 
 let storeGen = 0;
 let lastSyncGen = 0;
@@ -316,19 +277,12 @@ syncMiddleware.onMessage(async (payload) => {
   }
 });
 
-function moduleLevelCommit(updater: (prev: RequestStore) => RequestStore) {
+export function moduleLevelCommit(updater: (prev: RequestStore) => RequestStore) {
   globalStore = updater(globalStore);
   storeGen++;
   saveToStorageAsync(globalStore);
   notifyListeners();
-  storeChangeListeners.forEach((fn) => fn(globalStore));
   syncMiddleware.broadcast({ type: "update", gen: storeGen });
-}
-
-export { moduleLevelCommit as forceCommit };
-
-export function getGlobalStore(): RequestStore {
-  return globalStore;
 }
 
 function notifyListeners() {
@@ -373,50 +327,9 @@ async function initStore() {
   return initPromise;
 }
 
-export function useRequestStore() {
-  const [store, setStore] = useState<RequestStore>(globalStore)
-  const [isLoaded, setIsLoaded] = useState(globalIsLoaded)
+type MergedState = ReturnType<typeof computeMergedState>
 
-  useEffect(() => {
-    const listener = () => {
-      setStore(globalStore);
-      setIsLoaded(globalIsLoaded);
-    };
-    storeListeners.add(listener);
-
-    const removeStorageListener = syncMiddleware.listenStorage(STORAGE_KEY, (value) => {
-      const loaded = JSON.parse(value) as RequestStore;
-      globalStore = loaded;
-      notifyListeners();
-    });
-
-    if (!globalIsLoaded) {
-      initStore();
-    } else {
-      listener();
-    }
-
-    return () => {
-      storeListeners.delete(listener);
-      removeStorageListener();
-    };
-  }, []);
-
-  // ── commit: core mutation helper ────────────────────────────────────
-  const commit = moduleLevelCommit;
-
-  // ── Domain mutations (extracted to store/ files) ─────────────────────
-  const notificationsMutations = createNotificationsMutations(commit)
-  const historyMutations = createHistoryMutations(commit)
-  const collectionsMutations = createCollectionsMutations(commit)
-  const foldersMutations = createFoldersMutations(commit)
-  const variableMappingsMutations = createVariableMappingsMutations(commit)
-  const projectsMutations = createProjectsMutations(commit)
-  const environmentsMutations = createEnvironmentsMutations(commit)
-  const workspacesMutations = createWorkspacesMutations(commit)
-  const datasetsMutations = createDatasetsMutations(commit)
-
-  // ── Filtered getters ────────────────────────────────────────────────
+function computeMergedState(store: RequestStore) {
   const activeWorkspaceId = store.activeWorkspaceId
 
   const workspaceCollections = activeWorkspaceId
@@ -469,20 +382,7 @@ export function useRequestStore() {
       auth: undefined,
     }))
 
-  // ── Composite methods ───────────────────────────────────────────────
-  const getFoldersForCollection = useCallback(
-    (collectionId: string): CollectionFolder[] => {
-      const col = globalStore.collections?.find(
-        (c) => c.id === collectionId
-      )
-      return col?.folders ?? []
-    },
-    []
-  )
-
-  // ── Return merged API ───────────────────────────────────────────────
   return {
-    // Raw state
     history: workspaceHistory,
     collections: workspaceCollections,
     environments: workspaceEnvironments,
@@ -500,49 +400,120 @@ export function useRequestStore() {
         ? store.collectionHistory
         : computedCollectionHistory,
     activeCollection: store.activeCollection ?? null,
-    isLoaded,
     notifications: store.notifications,
     variableMappings: workspaceVariableMappings,
     systemNotificationPermission: store.systemNotificationPermission,
-    notificationPreferences: store.notificationPreferences ?? {},
     aiAutoApply: store.aiAutoApply,
     aiAudit: store.aiAudit,
     workspaces: store.workspaces,
     activeWorkspaceId,
     datasets: workspaceDatasets,
-
-    // Notifications
-    ...notificationsMutations,
-
-    // History
-    ...historyMutations,
-
-    // Collections
-    ...collectionsMutations,
-
-    // Folders
-    addFolder: foldersMutations.addFolder,
-    renameFolder: foldersMutations.renameFolder,
-    deleteFolder: foldersMutations.deleteFolder,
-    moveRequestToFolder: foldersMutations.moveRequestToFolder,
-    moveFolder: foldersMutations.moveFolder,
-    reorderRequestsInCollection: foldersMutations.reorderRequestsInCollection,
-    reorderFolders: foldersMutations.reorderFolders,
-    getFoldersForCollection,
-
-    // Variable mappings
-    ...variableMappingsMutations,
-
-    // Projects
-    ...projectsMutations,
-
-    // Environments
-    ...environmentsMutations,
-
-    // Workspaces
-    ...workspacesMutations,
-
-    // Datasets
-    ...datasetsMutations,
   }
+}
+
+type MutationMethods = ReturnType<typeof createNotificationsMutations>
+  & ReturnType<typeof createHistoryMutations>
+  & ReturnType<typeof createCollectionsMutations>
+  & ReturnType<typeof createFoldersMutations>
+  & ReturnType<typeof createVariableMappingsMutations>
+  & ReturnType<typeof createProjectsMutations>
+  & ReturnType<typeof createEnvironmentsMutations>
+  & ReturnType<typeof createWorkspacesMutations>
+  & ReturnType<typeof createDatasetsMutations>
+
+type FullStore = MergedState & MutationMethods & { isLoaded: boolean }
+
+export function useRequestStore(): FullStore
+export function useRequestStore<T>(selector: (state: FullStore) => T): T
+export function useRequestStore<T = MergedState>(
+  selector?: (state: FullStore) => T,
+): T {
+  const [store, setStore] = useState<RequestStore>(globalStore)
+  const [isLoaded, setIsLoaded] = useState(globalIsLoaded)
+
+  useEffect(() => {
+    const listener = () => {
+      setStore(globalStore);
+      setIsLoaded(globalIsLoaded);
+    };
+    storeListeners.add(listener);
+
+    const removeStorageListener = syncMiddleware.listenStorage(STORAGE_KEY, (value) => {
+      const loaded = JSON.parse(value) as RequestStore;
+      globalStore = loaded;
+      notifyListeners();
+    });
+
+    if (!globalIsLoaded) {
+      initStore();
+    } else {
+      listener();
+    }
+
+    return () => {
+      storeListeners.delete(listener);
+      removeStorageListener();
+    };
+  }, []);
+
+  // ── commit: core mutation helper (stable module-level function) ───
+  const commit = moduleLevelCommit;
+
+  // ── Domain mutations memoized on `commit` (stable once per hook lifetime).
+  //    The `commit` reference never changes, so deps are []. This prevents
+  //    downstream useEffect / React.memo busting in consumers (audit 1.1).
+  const mutations = useMemo(
+    () => {
+      const folders = createFoldersMutations(commit)
+      return {
+        ...createNotificationsMutations(commit),
+        ...createHistoryMutations(commit),
+        ...createCollectionsMutations(commit),
+        addFolder: folders.addFolder,
+        renameFolder: folders.renameFolder,
+        deleteFolder: folders.deleteFolder,
+        moveRequestToFolder: folders.moveRequestToFolder,
+        moveFolder: folders.moveFolder,
+        reorderRequestsInCollection: folders.reorderRequestsInCollection,
+        reorderFolders: folders.reorderFolders,
+        ...createVariableMappingsMutations(commit),
+        ...createProjectsMutations(commit),
+        ...createEnvironmentsMutations(commit),
+        ...createWorkspacesMutations(commit),
+        ...createDatasetsMutations(commit),
+      }
+    },
+    [],
+  )
+
+  // ── Composite methods ───────────────────────────────────────────────
+  const getFoldersForCollection = useCallback(
+    (collectionId: string): CollectionFolder[] => {
+      const col = globalStore.collections?.find(
+        (c) => c.id === collectionId
+      )
+      return col?.folders ?? []
+    },
+    []
+  )
+
+  // ── Build merged state & apply optional selector ────────────────────
+  //    `merged` identity only changes when `store` reference changes.
+  const merged = useMemo(() => computeMergedState(store), [store])
+
+  const full = useMemo(
+    () => ({
+      ...merged,
+      isLoaded,
+      ...mutations,
+      getFoldersForCollection,
+    }),
+    [merged, isLoaded, mutations, getFoldersForCollection],
+  )
+
+  if (selector) {
+    return selector(full)
+  }
+
+  return full as T
 }

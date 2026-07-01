@@ -3,16 +3,15 @@ use reqwest::Client;
 use rfd::FileDialog;
 use serde::Serialize;
 use serde::Deserialize;
-use dirs::data_dir;
 
 use std::fs;
 
-use std::net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, Mutex};
 use std::time::Instant;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tiny_http::{Header, Response, Server};
 
@@ -38,6 +37,7 @@ fn decode_html_entities(text: &str) -> String {
 mod mock_matcher;
 mod mock_store;
 mod mock_types;
+mod websocket;
 
 use mock_store::MockStore;
 use mock_types::MockRoute;
@@ -59,9 +59,18 @@ fn get_mock_store() -> &'static MockStore {
   MOCK_STORE.get().expect("MockStore not initialized")
 }
 
-fn parse_mock_store_path() -> PathBuf {
-  let dir = data_dir().unwrap_or_else(|| PathBuf::from("."));
-  let dir = dir.join("reqly");
+fn parse_mock_store_path(app: &AppHandle) -> PathBuf {
+  // Use Tauri's app_data_dir (resolves to the per-app isolated directory:
+  // ~/.local/share/reqly on Linux, ~/Library/Application Support/reqly on macOS,
+  // %APPDATA%/reqly on Windows). The previous dirs::data_dir() call returned
+  // the *parent* of the app directory, which forced "forbidden path" errors
+  // and a silent IDB fallback whenever the frontend wrote to $APPDATA/reqly
+  // while the backend wrote to $APPDATA/mock-routes.json (mismatch).
+  let base = app
+    .path()
+    .app_data_dir()
+    .unwrap_or_else(|_| PathBuf::from("."));
+  let dir = base.join("reqly");
   let path = dir.join("mock-routes.json");
   let _ = fs::create_dir_all(&dir);
   path
@@ -111,6 +120,7 @@ fn update_mock_route(id: String, route: MockRoute) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[allow(dead_code)]
 fn delete_mock_route(id: String) {
   get_mock_store().delete_route(&id);
 }
@@ -130,72 +140,12 @@ fn set_mock_enabled_globally(enabled: bool) {
   get_mock_store().set_mock_enabled_globally(enabled);
 }
 
-// ── SSRF protection ──
-
-fn is_private_ipv6(v6: Ipv6Addr) -> bool {
-  if v6.is_loopback() || v6.is_unspecified() {
-    return true;
-  }
-  let segments = v6.segments();
-  // Unique local (fc00::/7)
-  if (segments[0] & 0xfe00) == 0xfc00 {
-    return true;
-  }
-  // Link-local (fe80::/10)
-  if (segments[0] & 0xffc0) == 0xfe80 {
-    return true;
-  }
-  false
-}
-
-fn is_private_ip(ip: IpAddr) -> bool {
-  match ip {
-    IpAddr::V4(v4) => {
-      v4.is_private() || v4.is_loopback() || v4.is_link_local() || v4.is_unspecified()
-    }
-    IpAddr::V6(v6) => is_private_ipv6(v6),
-  }
-}
-
-fn is_private_host(hostname: &str) -> bool {
-  let lower = hostname.to_lowercase();
-
-  // IPv6-mapped IPv4 (::ffff:x.x.x.x)
-  if lower.starts_with("::ffff:") {
-    let mapped = &lower[7..];
-    if let Ok(ip) = mapped.parse::<IpAddr>() {
-      return is_private_ip(ip);
-    }
-  }
-
-  if let Ok(ip) = hostname.parse::<IpAddr>() {
-    return is_private_ip(ip);
-  }
-
-  lower == "localhost"
-    || lower == "localhost.localdomain"
-    || lower == "0.0.0.0"
-    || lower.ends_with(".local")
-    || lower.ends_with(".internal")
-}
-
-async fn host_resolves_to_private(hostname: &str) -> Result<bool, String> {
-  let host = hostname.to_string();
-  let addrs = tokio::task::spawn_blocking(move || {
-    (host.as_str(), 0)
-      .to_socket_addrs()
-      .map_err(|e| e.to_string())
-  })
-  .await
-  .map_err(|e| e.to_string())??;
-
-  for addr in addrs {
-    if is_private_ip(addr.ip()) {
-      return Ok(true);
-    }
-  }
-  Ok(false)
-}
+// Note: SSRF protection is intentionally absent from the desktop Tauri binary.
+// Reqly is an API client (like Postman/Insomnia) that runs entirely on the
+// user's own machine. Blocking localhost or LAN addresses would prevent the
+// primary use-case: testing APIs that run locally or on a private network.
+// The SSRF guard remains in place on the web-only Next.js proxy route
+// (reqy-web/app/api/proxy/route.ts), which can be exposed publicly on Vercel.
 
 #[tauri::command]
 async fn fetch_proxy(
@@ -222,25 +172,9 @@ async fn fetch_proxy(
   // Parse and validate URL
   let parsed_url = reqwest::Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
 
-  // SSRF protection: block requests to private/internal hosts
-  #[cfg(not(debug_assertions))]
-  let is_dev = false;
-  #[cfg(debug_assertions)]
-  let is_dev = true;
-
-  if let Some(host) = parsed_url.host_str() {
-    if !is_dev {
-      if is_private_host(host) {
-        return Err("Requests to private/internal hosts are not allowed".to_string());
-      }
-      if host_resolves_to_private(host).await? {
-        return Err(
-          "Requests to private/internal hosts are not allowed (DNS rebinding prevention)"
-            .to_string(),
-        );
-      }
-    }
-  } else {
+  // Validate that a host is present — no SSRF blocking here (see comment above
+  // the fetch_proxy function for the rationale).
+  if parsed_url.host_str().is_none() {
     return Err("Invalid URL: missing host".to_string());
   }
   let start = Instant::now();
@@ -329,29 +263,6 @@ fn get_capture_proxy_state() -> Option<&'static Mutex<CaptureProxyState>> {
   CAPTURE_PROXY_STATE.get()
 }
 
-/// Check if a hostname resolves to a private IP (sync, no DNS lookup).
-/// Returns true if the hostname is clearly private without DNS resolution.
-fn hostname_is_private_sync(hostname: &str) -> bool {
-  let lower = hostname.to_lowercase();
-
-  // IPv6-mapped IPv4 (::ffff:x.x.x.x)
-  if lower.starts_with("::ffff:") {
-    let mapped = &lower[7..];
-    if let Ok(ip) = mapped.parse::<IpAddr>() {
-      return is_private_ip(ip);
-    }
-  }
-
-  if let Ok(ip) = hostname.parse::<IpAddr>() {
-    return is_private_ip(ip);
-  }
-
-  lower == "localhost"
-    || lower == "localhost.localdomain"
-    || lower == "0.0.0.0"
-    || lower.ends_with(".local")
-    || lower.ends_with(".internal")
-}
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -418,14 +329,10 @@ fn forward_request_sync(
 ) -> Result<(u16, Vec<(String, String)>, String), String> {
   let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
   rt.block_on(async {
-    let parsed_url = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+    let _parsed_url = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
 
-    // SSRF protection
-    if let Some(host) = parsed_url.host_str() {
-      if hostname_is_private_sync(host) {
-        return Err("Cannot forward to private/internal host".to_string());
-      }
-    }
+    // No SSRF blocking here — same rationale as fetch_proxy: Reqly is a
+    // desktop client, testing local/LAN APIs is a core use case.
 
     let client = Client::builder()
       .timeout(std::time::Duration::from_secs(30))
@@ -588,7 +495,7 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
 
 #[tauri::command]
 fn start_capture_proxy(app_handle: AppHandle, port: u16) -> Result<(), String> {
-  if port < 1024 || port > 65535 {
+  if port < 1024 {
     return Err("Port must be between 1024 and 65535".to_string());
   }
 
@@ -627,6 +534,8 @@ pub fn run() {
 
   builder
     .plugin(tauri_plugin_deep_link::init())
+    .plugin(tauri_plugin_notification::init())
+    .manage(websocket::manager::ConnectionManager::new())
     .invoke_handler(tauri::generate_handler![
       fetch_proxy,
       export_json,
@@ -635,16 +544,19 @@ pub fn run() {
       set_mock_routes,
       add_mock_route,
       update_mock_route,
-      delete_mock_route,
       toggle_mock_enabled,
       is_mock_enabled_globally,
       set_mock_enabled_globally,
       start_capture_proxy,
       stop_capture_proxy,
+      websocket::commands::ws_connect,
+      websocket::commands::ws_send,
+      websocket::commands::ws_disconnect,
+      websocket::commands::ws_get_status,
     ])
     .setup(|app| {
       // Initialize mock store (file-persisted, survives restarts)
-      let store_path = parse_mock_store_path();
+      let store_path = parse_mock_store_path(app.handle());
       let store = MockStore::new(store_path);
       let _ = MOCK_STORE.set(store);
 

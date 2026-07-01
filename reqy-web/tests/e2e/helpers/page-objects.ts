@@ -39,9 +39,6 @@ export const inviteWorkspaceButton = (page: Page): Locator =>
 export const activeWorkspaceDisplay = (page: Page): Locator =>
   page.locator('[data-testid="active-workspace"]').first()
 
-export const syncStatusBanner = (page: Page): Locator =>
-  page.locator('[data-testid="sync-status-banner"]').first()
-
 export const runButton = (page: Page): Locator =>
   page.locator('[data-testid="run-button"]').first()
 

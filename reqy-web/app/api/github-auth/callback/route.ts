@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
 
 const TOKEN_URL = "https://github.com/login/oauth/access_token"
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.redirect(new URL("/settings#integrations", request.url))
   response.cookies.set("github_token", accessToken, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
     sameSite: "lax",

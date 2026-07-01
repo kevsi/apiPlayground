@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
 
 type ProviderBody = {
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing message" }, { status: 400 })
   }
 
-  const PROVIDERS_WITH_API_KEY = new Set(["openai", "openrouter", "anthropic", "gemini", "deepseek", "opencode-zen"])
+  const PROVIDERS_WITH_API_KEY = new Set(["openai", "openrouter", "anthropic", "gemini", "deepseek", "opencode-zen", "custom", "grok"])
   if (PROVIDERS_WITH_API_KEY.has(provider) && !apiKey) {
     return NextResponse.json({ error: "Missing API key" }, { status: 400 })
   }
@@ -102,8 +103,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ content })
     }
 
-    if (provider === "openai" || provider === "openrouter" || provider === "opencode-zen") {
-      const url = provider === "openai"
+    if (provider === "openai" || provider === "openrouter" || provider === "opencode-zen" || provider === "custom" || provider === "grok") {
+      const url = provider === "openai" || provider === "custom" || provider === "grok"
         ? body.openaiUrl && body.openaiUrl.trim()
           ? body.openaiUrl.trim().replace(/\/+$/, "").endsWith("/chat/completions")
             ? body.openaiUrl.trim().replace(/\/+$/, "")
@@ -123,7 +124,9 @@ export async function POST(req: NextRequest) {
             ? "openai/gpt-5.2"
             : provider === "opencode-zen"
               ? "gpt-5"
-              : "gpt-3.5-turbo"),
+              : provider === "grok"
+                ? "grok-2"
+                : "gpt-4o-mini"),
           stream: Boolean(body.stream),
           messages: [
             { role: "system", content: system },
@@ -131,18 +134,26 @@ export async function POST(req: NextRequest) {
           ],
         }),
       })
+      if (!res.ok) {
+        const rawText = await res.text()
+        let data: any
+        try {
+          data = JSON.parse(rawText)
+        } catch {
+          data = { error: rawText }
+        }
+        return NextResponse.json({ error: data.error?.message ?? data.error ?? `${provider} error` }, { status: res.status })
+      }
+      // Phase 2.5: stream passthrough
+      if (body.stream && res.body) return passthroughSSE(res)
+      
       const rawText = await res.text()
       let data: any
       try {
         data = JSON.parse(rawText)
       } catch {
-        data = { error: rawText }
+        data = {}
       }
-      if (!res.ok) {
-        return NextResponse.json({ error: data.error?.message ?? data.error ?? `${provider} error` }, { status: res.status })
-      }
-      // Phase 2.5: stream passthrough
-      if (body.stream && res.body) return passthroughSSE(res)
       return NextResponse.json({ content: data.choices?.[0]?.message?.content ?? data.choices?.[0]?.text ?? "" })
     }
 
@@ -161,18 +172,26 @@ export async function POST(req: NextRequest) {
           ],
         }),
       })
+      if (!res.ok) {
+        const rawText = await res.text()
+        let data: any
+        try {
+          data = JSON.parse(rawText)
+        } catch {
+          data = { error: rawText }
+        }
+        return NextResponse.json({ error: data.error?.message ?? data.error ?? "DeepSeek error" }, { status: res.status })
+      }
+      // Phase 2.5: stream passthrough
+      if (body.stream && res.body) return passthroughSSE(res)
+      
       const rawText = await res.text()
       let data: any
       try {
         data = JSON.parse(rawText)
       } catch {
-        data = { error: rawText }
+        data = {}
       }
-      if (!res.ok) {
-        return NextResponse.json({ error: data.error?.message ?? data.error ?? "DeepSeek error" }, { status: res.status })
-      }
-      // Phase 2.5: stream passthrough
-      if (body.stream && res.body) return passthroughSSE(res)
       return NextResponse.json({ content: data.choices?.[0]?.message?.content ?? data.choices?.[0]?.text ?? "" })
     }
 

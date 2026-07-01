@@ -26,6 +26,7 @@ import type { Assertion } from "@/lib/test-runner/types"
 import { Switch } from "@/components/ui/switch"
 import { AssertionEditor } from "@/components/assertion-editor"
 import { ScriptEditor } from "@/components/script-editor"
+import { createJsonKeyDownHandler } from "@/lib/json-textarea-utils"
 
 interface RequestPanelProps {
   method: HttpMethod
@@ -366,6 +367,28 @@ ${bodyPart}})
               </select>
             </div>
           )}
+          
+          <Button
+            disabled={!hasUrl || isLoading}
+            data-testid="send-button"
+            onClick={async () => {
+              if (!hasUrl) return
+              await onSend()
+            }}
+            className={cn(
+              "h-8 shrink-0 gap-2 px-4 text-sm font-semibold transition-all duration-200",
+              methodBgMap[method],
+              "text-white hover:opacity-85",
+            )}
+            title={!hasUrl ? 'URL required to send' : 'Send request'}
+          >
+            {isLoading ? (
+              <Loader2 className="size-4 animate-spin fill-current" />
+            ) : (
+              <Play className="size-4 fill-current" />
+            )}
+            <span>{isLoading ? "Sending..." : "Send"}</span>
+          </Button>
         </div>
 
         {/* Variables in URL */}
@@ -394,31 +417,9 @@ ${bodyPart}})
           <p className="mt-1 text-xs text-muted-foreground/70">Enter a valid URL to enable sending.</p>
         )}
 
-        {/* Send & Export row — Send as prominent primary action */}
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <Button
-            disabled={!hasUrl || isLoading}
-            data-testid="send-button"
-            onClick={async () => {
-              if (!hasUrl) return
-              await onSend()
-            }}
-            className={cn(
-              "h-8 gap-2 px-4 text-sm font-semibold transition-all duration-200",
-              methodBgMap[method],
-              "text-white hover:opacity-85",
-            )}
-            title={!hasUrl ? 'URL required to send' : 'Send request'}
-          >
-            {isLoading ? (
-              <Loader2 className="size-4 animate-spin fill-current" />
-            ) : (
-              <Play className="size-4 fill-current" />
-            )}
-            <span>{isLoading ? "Sending..." : "Send"}</span>
-          </Button>
-
-          <div className="flex items-center gap-1.5 ml-auto">
+        {/* Export row */}
+        <div className="mt-2 flex items-center justify-end gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5">
             <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as "curl" | "fetch")}>
               <SelectTrigger className="h-8 w-auto gap-2 border-input bg-muted/30 text-xs font-medium text-muted-foreground transition-all duration-200 hover:border-muted-foreground/30">
                 <Code className="size-3.5" />
@@ -633,9 +634,11 @@ ${bodyPart}})
                   <textarea
                     value={body}
                     onChange={(e) => onBodyChange(e.target.value)}
+                    onKeyDown={bodyType === "json" ? createJsonKeyDownHandler(body, onBodyChange) : undefined}
                     className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
                     spellCheck={false}
                     placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
+                    data-testid="request-body-textarea"
                   />
                 </div>
             </AccordionContent>

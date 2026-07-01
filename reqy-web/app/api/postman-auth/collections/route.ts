@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
 import { postmanFetchJson, PostmanApiError } from "@/lib/postman-api"
 
@@ -20,9 +21,7 @@ function countCollectionItems(collection: any): number {
     }, 0)
   }
   if (Array.isArray(collection.item)) {
-    const nestedCount = countItems(collection.item)
-    if (nestedCount > 0) return nestedCount
-    return collection.item.length
+    return countItems(collection.item)
   }
   if (collection.summary?.totalRequests != null) return collection.summary.totalRequests
   if (collection.summary?.requestCount != null) return collection.summary.requestCount

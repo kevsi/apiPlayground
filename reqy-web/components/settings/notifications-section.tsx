@@ -9,20 +9,24 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 interface NotificationsSectionProps {
   pushEnabled: boolean
   notifyEvents: Record<string, boolean>
-  notificationPreferences: Record<string, boolean>
+  systemPushEnabled: boolean
   systemNotificationPermission: string | undefined
   onTogglePush: () => void
   onToggleEvent: (key: string) => void
+  onToggleSystemPush: () => void
+  onRequestSystemPermission: () => void
   onTestPush: () => void
-  setNotificationPreference: (key: string, value: boolean) => void
 }
 
 export default function NotificationsSection({
-  pushEnabled, notifyEvents, notificationPreferences,
+  pushEnabled, notifyEvents, systemPushEnabled,
   systemNotificationPermission,
-  onTogglePush, onToggleEvent, onTestPush,
-  setNotificationPreference,
+  onTogglePush, onToggleEvent, onToggleSystemPush, onRequestSystemPermission,
+  onTestPush,
 }: NotificationsSectionProps) {
+  const permission = systemNotificationPermission ?? "unavailable"
+  const canToggleSystem = permission === "granted"
+
   return (
     <Card>
       <CardHeader>
@@ -32,7 +36,7 @@ export default function NotificationsSection({
           </div>
           <div className="space-y-1">
             <CardTitle className="text-base">Notifications</CardTitle>
-            <CardDescription>Gérez l'accès aux notifications système de votre navigateur.</CardDescription>
+            <CardDescription>Gérez les toasts dans l'interface et les notifications natives du navigateur.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -45,15 +49,71 @@ export default function NotificationsSection({
           <Switch checked={pushEnabled} onCheckedChange={() => onTogglePush()} />
         </div>
 
+        <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm">Notifications natives du navigateur</p>
+              <p className="text-xs text-muted-foreground">
+                Reçoit une notification OS quand un événement important se produit et que vous n'êtes pas sur l'onglet.
+              </p>
+            </div>
+            <Switch
+              checked={systemPushEnabled && canToggleSystem}
+              disabled={!canToggleSystem}
+              onCheckedChange={() => onToggleSystemPush()}
+            />
+          </div>
+
+          {permission === "default" && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3">
+              <p className="text-xs text-muted-foreground">
+                Permission du navigateur : <span className="font-medium text-foreground">non demandée</span>.
+              </p>
+              <Button size="sm" variant="secondary" onClick={onRequestSystemPermission}>
+                Demander la permission
+              </Button>
+            </div>
+          )}
+
+          {permission === "denied" && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              <p className="text-xs text-destructive">
+                Notifications bloquées par le navigateur. Réactivez-les via l'icône cadenas à gauche de l'URL (Notifications → Autoriser), puis rechargez la page.
+              </p>
+            </div>
+          )}
+
+          {permission === "granted" && !systemPushEnabled && (
+            <p className="text-xs text-muted-foreground">
+              Permission accordée — activez le toggle ci-dessus pour recevoir des notifications natives.
+            </p>
+          )}
+
+          {permission === "granted" && systemPushEnabled && (
+            <p className="text-xs text-muted-foreground">
+              Permission accordée. Les notifications natives sont actives pour les événements cochés ci-dessous.
+            </p>
+          )}
+
+          {permission === "unsupported" && (
+            <p className="text-xs text-muted-foreground">
+              Votre navigateur ne supporte pas les notifications natives.
+            </p>
+          )}
+        </div>
+
         <div className="rounded-xl border border-border bg-muted/40 p-4">
-          <p className="text-sm font-medium">Événements déclenchant des toasts</p>
+          <p className="text-sm font-medium">Événements notifiés</p>
+          <p className="text-xs text-muted-foreground mt-1 mb-3">
+            Cochez les événements pour lesquels vous voulez être notifié (toast + notification native). Décochez pour les masquer complètement.
+          </p>
           <div className="mt-3 space-y-2">
             {[
-              { key: 'requestComplete', label: 'Requête terminée', desc: 'Affiche un toast quand une requête se termine.' },
-              { key: 'collectionComplete', label: 'Exécution de collection terminée', desc: "Toast à la fin d'une exécution de collection." },
-              { key: 'aiResponse', label: 'Réponse IA reçue', desc: "Toast quand l'assistant IA renvoie une réponse." },
-              { key: 'aiError', label: 'Erreur IA', desc: 'Toast pour les erreurs renvoyées par le proxy IA.' },
-              { key: 'importExport', label: 'Import / Export terminé', desc: "Toast après import/export des collections." },
+              { key: 'requestComplete', label: 'Requête terminée', desc: 'Notification quand une requête se termine.' },
+              { key: 'collectionComplete', label: 'Exécution de collection terminée', desc: "Notification à la fin d'une exécution de collection (surtout utile en background)." },
+              { key: 'aiResponse', label: 'Réponse IA reçue', desc: "Notification quand l'assistant IA renvoie une réponse." },
+              { key: 'aiError', label: 'Erreur IA', desc: 'Notification pour les erreurs renvoyées par le proxy IA.' },
+              { key: 'importExport', label: 'Import / Export terminé', desc: "Notification après import/export des collections." },
             ].map(({ key, label, desc }) => (
               <div key={key} className="flex items-center justify-between">
                 <div>
@@ -65,29 +125,13 @@ export default function NotificationsSection({
             ))}
           </div>
         </div>
-
-        <div className="rounded-xl border border-border bg-muted/40 p-4">
-          <p className="text-sm font-medium">System notification events</p>
-          <p className="text-xs text-muted-foreground mt-1 mb-3">Control which events trigger browser notifications.</p>
-          <div className="space-y-2">
-            {Object.keys(notificationPreferences).map((key) => (
-              <div key={key} className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                </div>
-                <Checkbox
-                  checked={notificationPreferences[key] ?? true}
-                  onCheckedChange={(checked) => setNotificationPreference(key, !!checked)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
       </CardContent>
       <CardFooter className="border-t pt-5">
         <div className="flex items-center gap-3">
           <Button variant="secondary" onClick={onTestPush}>Tester un toast</Button>
-          <span className="text-sm text-muted-foreground">Browser permission: {systemNotificationPermission ?? "unavailable"}</span>
+          <span className="text-sm text-muted-foreground">
+            Permission navigateur : <span className="font-medium text-foreground">{permission}</span>
+          </span>
         </div>
       </CardFooter>
     </Card>

@@ -1,8 +1,33 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
 import { runCollection } from "@/lib/test-runner/runner"
 import { toJUnitXml } from "@/lib/test-runner/junit-export"
 import { loadJsonDataset, loadCsvDataset } from "@/lib/test-runner/data-driven"
 import type { Collection } from "@/hooks/request-types"
+
+async function proxyFetch(req: { method: string; url: string; headers: Record<string, string>; body?: unknown }) {
+  const started = Date.now()
+  const proxyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/proxy`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: req.url,
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+    }),
+  })
+  const proxyResult = await proxyRes.json()
+  const text = proxyResult.body ?? ""
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch { parsed = text }
+  return {
+    statusCode: proxyResult.status ?? proxyRes.status,
+    responseTimeMs: Date.now() - started,
+    body: parsed,
+    headers: proxyResult.headers || {},
+  }
+}
 
 interface RunBody {
   collection: Collection
@@ -22,24 +47,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing collection" }, { status: 400 })
   }
 
-  const executor = async (r: { method: string; url: string; headers: Record<string, string>; body?: unknown }) => {
-    const started = Date.now()
-    const res = await fetch(r.url, {
-      method: r.method,
-      headers: r.headers,
-      body: r.body as BodyInit | undefined,
-    })
-    const text = await res.text()
-    let parsed: unknown
-    try { parsed = JSON.parse(text) } catch { parsed = text }
-    return {
-      statusCode: res.status,
-      responseTimeMs: Date.now() - started,
-      body: parsed,
-      headers: Object.fromEntries(res.headers.entries()),
-    }
-  }
-
   let iterations
   if (body.dataset) {
     const rows = body.dataset.format === "json"
@@ -56,7 +63,7 @@ export async function POST(req: NextRequest) {
   const report = await runCollection(
     body.collection,
     { environment: body.environment ?? {}, iterationData: {}, iterationIndex: 0, log: () => {} },
-    { executor, iterations }
+    { executor: proxyFetch, iterations }
   )
 
   const url = new URL(req.url)

@@ -328,14 +328,18 @@ export async function callAI(
     ? "deepseek-chat"
     : provider === "opencode-zen"
     ? "gpt-5"
+    : provider === "custom"
+    ? "gpt-4o-mini"
+    : provider === "grok"
+    ? "grok-2"
     : "llama3";
 
   const system = SYSTEM_PROMPT;
 
   try {
-    if (provider === "anthropic" || provider === "openai") {
+    if (provider === "anthropic" || provider === "openai" || provider === "custom" || provider === "grok") {
       if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
-      const extra = provider === "openai" && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {};
+    const extra = (provider === "openai" || provider === "custom" || provider === "grok") && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {};
       const res = await fetchWithTimeout("/api/proxy-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -464,13 +468,17 @@ export async function callAIText(
     ? "deepseek-chat"
     : provider === "opencode-zen"
     ? "gpt-5"
+    : provider === "custom"
+    ? "gpt-4o-mini"
+    : provider === "grok"
+    ? "grok-2"
     : "llama3";
 
   const system = config.system ?? SYSTEM_PROMPT;
 
-  if (provider === "anthropic" || provider === "openai") {
+  if (provider === "anthropic" || provider === "openai" || provider === "custom" || provider === "grok") {
     if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
-    const extra = provider === "openai" && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {};
+    const extra = (provider === "openai" || provider === "custom" || provider === "grok") && config.openaiUrl ? { openaiUrl: config.openaiUrl } : {};
     const res = await fetchWithTimeout("/api/proxy-ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

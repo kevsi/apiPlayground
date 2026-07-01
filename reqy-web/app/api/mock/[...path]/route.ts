@@ -1,3 +1,7 @@
+export const dynamic = 'force-dynamic';
+export async function generateStaticParams() {
+  return [{ path: ['placeholder'] }];
+}
 import { NextResponse } from "next/server"
 import {
   getMockRoutes,
@@ -6,7 +10,7 @@ import {
   getMockServers,
   isMockEnabledForWorkspace,
   addMockLog,
-} from "@/app/api/mock/config/route"
+} from "@/lib/mock-store"
 import {
   resolveMockMatch,
   applyMockDelay,

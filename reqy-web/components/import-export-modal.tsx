@@ -5,6 +5,7 @@ import { Upload, Download, FileJson, X, AlertTriangle, CheckCircle2, Loader2, Us
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRequestStore, type Collection, type Environment, type VariableMapping } from "@/hooks/use-request-store"
+import { useShallow } from "zustand/react/shallow"
 import type { HttpMethod } from "@/lib/types"
 import { exportBundleSchema, formatZodError } from "@/lib/import-schemas"
 import { parseCurlCommand } from "@/lib/curl-parser"
@@ -66,8 +67,30 @@ interface ImportExportModalProps {
 }
 
 export function ImportExportModal({ open, onClose }: ImportExportModalProps) {
-  const { collections, environments, variableMappings, addCollection, addEnvironment, updateCollection, updateEnvironment, addRequestToCollection, addVariableMapping, updateVariableMapping } =
-    useRequestStore()
+  // Atomic selectors for data slices (re-render only when those change).
+  const collections = useRequestStore((s) => s.collections)
+  const environments = useRequestStore((s) => s.environments)
+  const variableMappings = useRequestStore((s) => s.variableMappings)
+  // Grouped action refs via useShallow — single subscription, stable.
+  const {
+    addCollection,
+    addEnvironment,
+    updateCollection,
+    updateEnvironment,
+    addRequestToCollection,
+    addVariableMapping,
+    updateVariableMapping,
+  } = useRequestStore(
+    useShallow((s) => ({
+      addCollection: s.addCollection,
+      addEnvironment: s.addEnvironment,
+      updateCollection: s.updateCollection,
+      updateEnvironment: s.updateEnvironment,
+      addRequestToCollection: s.addRequestToCollection,
+      addVariableMapping: s.addVariableMapping,
+      updateVariableMapping: s.updateVariableMapping,
+    })),
+  )
 
   /* drag state */
   const [dragging, setDragging] = useState(false)

@@ -2,12 +2,10 @@
 
 import {
   Palette,
-  User,
   Sparkles,
   Bell,
-  Cloud,
   Plug,
-  ShieldAlert,
+  Keyboard,
   ChevronsLeft,
   ChevronsRight,
   type LucideIcon,
@@ -16,12 +14,10 @@ import { cn } from "@/lib/utils"
 
 export type SettingsSection =
   | "apparence"
-  | "profile"
   | "ai"
   | "notifications"
-  | "sync"
   | "integrations"
-  | "account"
+  | "keyboard"
 
 interface SectionDef {
   key: SettingsSection
@@ -32,12 +28,10 @@ interface SectionDef {
 
 const SECTIONS: SectionDef[] = [
   { key: "apparence", label: "Apparence", icon: Palette },
-  { key: "profile", label: "Profil & Sécurité", icon: User },
   { key: "ai", label: "Assistant IA", icon: Sparkles },
   { key: "notifications", label: "Notifications", icon: Bell },
-  { key: "sync", label: "Import / Export", icon: Cloud },
   { key: "integrations", label: "Outils connectés", icon: Plug },
-  { key: "account", label: "Actions du compte", icon: ShieldAlert, destructive: true },
+  { key: "keyboard", label: "Raccourcis clavier", icon: Keyboard },
 ]
 
 interface SettingsSidebarProps {

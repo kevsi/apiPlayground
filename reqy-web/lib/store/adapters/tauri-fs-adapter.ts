@@ -40,8 +40,12 @@ export const TauriFsAdapter: StorageAdapter = {
       const text = await readTextFile(filename, { baseDir: BaseDirectory.AppData })
       return text
     } catch (error) {
-      const err = error as Error
-      if (err.message?.includes?.("No such file")) {
+      // Tauri plugin-fs surfaces Rust std::io::ErrorKind via the structured `code`
+      // field (e.g. "ENOENT"). Using the structured code avoids false positives
+      // from substring matching against user-controlled paths or translated
+      // messages. Audit finding 5.1.
+      const code = (error as { code?: string })?.code
+      if (code === "ENOENT") {
         return null
       }
       throw TauriError.fromUnknown(error, { operation: "load", key })

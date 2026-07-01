@@ -83,7 +83,7 @@ export function ResponseContentRenderer({
                 ))}
               </div>
               <pre
-                className="flex-1 p-4 text-sm leading-relaxed font-mono overflow-auto"
+                className="flex-1 p-4 text-sm leading-relaxed font-mono overflow-auto whitespace-pre-wrap break-words"
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightJson(formatted)) }}
               />
             </div>

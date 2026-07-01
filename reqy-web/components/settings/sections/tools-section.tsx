@@ -25,7 +25,7 @@ const TOOLS: Tool[] = [
     description: "Accès à vos repositories et gists.",
     logoEmoji: "🐙",
     scopes: ["Lecture de vos repositories", "Lecture de votre profil", "Création de gists"],
-    oauthUrl: "/api/github-auth",
+    oauthUrl: "/api/github-auth/start",
   },
   {
     id: "linear",

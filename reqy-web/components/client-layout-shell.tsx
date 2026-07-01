@@ -1,20 +1,19 @@
 "use client"
 
-import type { ReactNode } from "react"
-import { SyncStatusBanner } from "@/components/sync-status-banner"
-import { SyncEngineInitializer } from "@/components/sync-engine-initializer"
+import { useEffect, type ReactNode } from "react"
+import { persistence } from "@/lib/persistence"
 
 /**
  * Client-side wrapper mounted inside the server `RootLayout` body.
- * Hosts the sync engine initializer + the sync status banner so both
- * run exactly once per session across all routes.
+ * Also boots the persistence layer (IndexedDB load + localStorage migration)
+ * once on mount so that IDB is authoritative before any subscriber reads.
  */
 export function ClientLayoutShell({ children }: { children: ReactNode }) {
-  return (
-    <>
-      {children}
-      <SyncEngineInitializer />
-      <SyncStatusBanner />
-    </>
-  )
+  useEffect(() => {
+    persistence.waitForReady().catch((err) => {
+      console.error("[persistence] init failed:", err)
+    })
+  }, [])
+
+  return <>{children}</>
 }

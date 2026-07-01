@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { ChevronDown, ChevronRight, AlertCircle } from "lucide-react"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonTextarea } from "@/components/json-textarea"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -44,11 +44,11 @@ export function HeadersPanel({ value, onChange, defaultOpen = false, hideHeader 
       )}
       {open && (
         <div className={cn("p-2 space-y-1", hideHeader && "p-3")}>
-          <Textarea
+          <JsonTextarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder='{ "Authorization": "Bearer token" }'
-            className="font-mono text-xs min-h-20"
+            className="text-xs min-h-20"
             data-testid="graphql-headers-textarea"
           />
           {error && (

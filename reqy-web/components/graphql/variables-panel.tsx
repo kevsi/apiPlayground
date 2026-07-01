@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { ChevronDown, ChevronRight, AlertCircle } from "lucide-react"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonTextarea } from "@/components/json-textarea"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -44,11 +44,11 @@ export function VariablesPanel({ value, onChange, defaultOpen = false, hideHeade
       )}
       {open && (
         <div className={cn("p-2 space-y-1", hideHeader && "p-3")}>
-          <Textarea
+          <JsonTextarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder='{ "id": 1 }'
-            className="font-mono text-xs min-h-24"
+            className="text-xs min-h-24"
             data-testid="graphql-variables-textarea"
           />
           {error && (

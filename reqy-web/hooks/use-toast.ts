@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { persistence } from '@/lib/persistence'
 
 type ToastVariant = 'default' | 'destructive'
 
@@ -11,6 +12,8 @@ export interface Toast {
   variant?: ToastVariant
   duration?: number
   onClick?: () => void
+  /** Metadata used for event-based filtering (e.g., { event: "requestComplete" }). */
+  meta?: Record<string, string>
 }
 
 const TOAST_REMOVE_DELAY = 6000
@@ -46,7 +49,7 @@ function addToRemoveQueue(toastId: string) {
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case 'ADD_TOAST':
-      return { ...state, toasts: [action.toast, ...state.toasts].slice(0, 1) }
+      return { ...state, toasts: [action.toast, ...state.toasts].slice(0, 5) }
     case 'DISMISS_TOAST': {
       const id = action.toastId
       if (id) {
@@ -83,10 +86,35 @@ function genId() {
   return count.toString()
 }
 
+function shouldShowToast(props: Omit<Toast, 'id'>): boolean {
+  try {
+    // Master toggle — supports both string "true"|"false" and parsed boolean
+    const masterRaw = persistence.getItem<string | boolean>('probe_push_enabled')
+    if (masterRaw === false || masterRaw === 'false') return false
+
+    // Per-event filter (only applies to toasts with meta.event)
+    const event = props.meta?.event
+    if (event) {
+      const raw = persistence.getItem<Record<string, boolean> | string>('probe_push_events')
+      if (raw) {
+        const events = typeof raw === 'string' ? JSON.parse(raw) : raw
+        if (events[event] === false) return false
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return true
+}
+
 function toast({ ...props }: Omit<Toast, 'id'>) {
   const id = genId()
-
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id })
+
+  // Respect user preferences before showing
+  if (!shouldShowToast(props)) {
+    return { id, dismiss }
+  }
 
   dispatch({
     type: 'ADD_TOAST',
@@ -117,6 +145,7 @@ function useToast() {
     ...state,
     toast,
     dismiss: (toastId?: string) => dispatch({ type: 'DISMISS_TOAST', toastId }),
+    remove: (toastId?: string) => dispatch({ type: 'REMOVE_TOAST', toastId }),
   }
 }
 

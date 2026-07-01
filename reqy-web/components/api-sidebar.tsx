@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Zap,
   Sparkles,
-  FileText,
   Settings,
   ChevronDown,
   Folder,
@@ -13,33 +12,23 @@ import {
   FlaskConical,
   ChevronsLeft,
   ChevronsRight,
-  LogIn,
 } from "lucide-react"
 import { AppIcon } from "@/components/app-icon"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { ToolsSection } from "@/components/sidebar/tools-section"
-import { UserMenu } from "@/components/sidebar/user-menu"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { WorkspaceJoinDialog } from "@/components/workspace-join-dialog"
-import { WorkspaceInviteDialog } from "@/components/workspace-invite-dialog"
-import { WorkspaceCreateDialog } from "@/components/workspace-create-dialog"
-import { useSyncState } from "@/hooks/store/sync-state"
+import { usePathname } from "next/navigation"
 import { useRequestStore } from "@/hooks/use-request-store"
-import { useAuth } from "@/hooks/use-auth"
-import { WORKSPACE_PERSONAL_ID } from "@/hooks/store/types"
+import { Button } from "@/components/ui/button"
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", key: "dashboard" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/", key: "dashboard" },
   { icon: Zap, label: "API Endpoints", href: "/", key: "api-endpoints" },
-  { icon: Folder, label: "Collections", href: "/collections", key: "collections" },
-  { icon: FolderCode, label: "Projects", href: "/my-projects", key: "projects" },
-  { icon: FlaskConical, label: "Mock Server", href: "/mocks", key: "mocks" },
-  { icon: Sparkles, label: "AI Assistant", href: "/ai-insights", key: "ai-insights" },
-  { icon: FileText, label: "Documentation", href: "/documentation", key: "documentation" },
-  { icon: Settings, label: "Settings", href: "/settings", key: "settings" },
+  { icon: Folder, label: "Collections", href: "/collections/", key: "collections" },
+  { icon: FolderCode, label: "Projects", href: "/my-projects/", key: "projects" },
+  { icon: FlaskConical, label: "Mock Server", href: "/mocks/", key: "mocks" },
+  { icon: Sparkles, label: "AI Assistant", href: "/ai-insights/", key: "ai-insights" },
+  { icon: Settings, label: "Settings", href: "/settings/", key: "settings" },
 ]
 
 interface ApiSidebarProps {
@@ -55,13 +44,10 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
     setInternalCollapsed(v)
     onCollapse?.(v)
   }
-  const syncWorkspaceId = useSyncState((s) => s.workspaceId)
-  const syncEnabled = useSyncState((s) => s.enabled)
-  const requestStore = useRequestStore()
-  const activeWorkspaceId = requestStore.activeWorkspaceId
-  const workspaces = requestStore.workspaces
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-  const activeWorkspaceName: string = activeWorkspace?.name ?? activeWorkspaceId ?? "Workspace"
+  // Atomic selectors: this sidebar no longer re-renders on unrelated store
+  // mutations (tab switches, response updates, etc.) — only when the workspace
+  // list or the active workspace id actually changes.
+  const activeWorkspaceId = useRequestStore((s) => s.activeWorkspaceId)
 
   const [aiHidden, setAiHidden] = useState<boolean>(() => {
     if (typeof window === "undefined") return false
@@ -88,8 +74,6 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
     }
   }, [])
 
-  const { status, user, logout } = useAuth()
-  const router = useRouter()
   const pathname = usePathname()
 
   return (
@@ -163,37 +147,6 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
         <ToolsSection />
       </nav>
 
-      {/* Sync section */}
-      {!collapsed && (
-        <div className="flex flex-col gap-1.5 border-t border-sidebar-border px-2 py-2">
-          {activeWorkspaceId && activeWorkspaceId !== WORKSPACE_PERSONAL_ID && (
-            <div data-testid="active-workspace" className="flex items-center gap-1 truncate px-1 text-[10px] text-muted-foreground">
-              <span className="shrink-0">Workspace:</span>
-              <span className="truncate font-mono" title={activeWorkspaceName}>
-                {activeWorkspaceName}
-              </span>
-            </div>
-          )}
-          <div className="flex items-center gap-1">
-            <span data-testid="create-workspace-button"><WorkspaceCreateDialog /></span>
-            <span data-testid="join-workspace-button"><WorkspaceJoinDialog /></span>
-            {activeWorkspaceId && activeWorkspaceId !== WORKSPACE_PERSONAL_ID && (
-              <span data-testid="invite-workspace-button">
-                <WorkspaceInviteDialog
-                  workspaceId={activeWorkspaceId}
-                  workspaceName={activeWorkspaceName}
-                />
-              </span>
-            )}
-            {syncWorkspaceId && syncEnabled && (
-              <span className="text-[10px] text-muted-foreground truncate" title={syncWorkspaceId}>
-                ws: {syncWorkspaceId.slice(0, 8)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* AI Assistant */}
       <div className={cn("py-2", collapsed ? "px-2" : "px-3")}>
         <Link
@@ -213,50 +166,6 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
             </>
           )}
         </Link>
-      </div>
-
-      {/* User widget — dynamic based on auth state */}
-      <div className="border-t border-sidebar-border px-2 py-3">
-        {status === "loading" ? (
-          <div
-            className={cn("h-9 rounded-lg bg-muted/60", collapsed ? "w-9" : "w-full")}
-            aria-hidden="true"
-          />
-        ) : status === "connected" && user ? (
-          collapsed ? (
-            <div className="flex justify-center">
-              <Avatar className="size-8">
-                <AvatarImage
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.email.split("@")[0])}`}
-                  alt={user.name}
-                />
-                <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-              </Avatar>
-            </div>
-          ) : (
-            <UserMenu user={user} onLogout={logout} />
-          )
-        ) : collapsed ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/login?redirect=${encodeURIComponent(pathname)}`)}
-            aria-label="Se connecter"
-            title="Se connecter"
-          >
-            <LogIn className="size-4" />
-          </Button>
-        ) : (
-          <Button
-            variant="default"
-            size="sm"
-            className="w-full"
-            onClick={() => router.push(`/login?redirect=${encodeURIComponent(pathname)}`)}
-          >
-            <LogIn className="mr-2 size-4" />
-            Se connecter
-          </Button>
-        )}
       </div>
 
       {/* Restore hidden AI chat (only visible when the user has hidden it) */}

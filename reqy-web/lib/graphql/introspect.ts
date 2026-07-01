@@ -1,3 +1,9 @@
+// Deep introspection query: GraphQL wraps non-null/list types via ofType,
+// with up to 4 levels for a type like [Foo!]! — NON_NULL > LIST > NON_NULL >
+// NamedType. We fetch 6 levels of ofType to be safe and avoid the "Unknown!"
+// bug where the leaf OBJECT name falls off the introspection response.
+//
+// Each level is a separate fragment so the response stays readable.
 const INTROSPECTION_QUERY = `query IntrospectionQuery {
   __schema {
     queryType { name }
@@ -8,8 +14,67 @@ const INTROSPECTION_QUERY = `query IntrospectionQuery {
       name
       fields {
         name
-        args { name type { kind name ofType { kind name } } }
-        type { kind name ofType { kind name } }
+        description
+        args {
+          name
+          description
+          type {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                  ofType {
+                    kind
+                    name
+                    ofType {
+                      kind
+                      name
+                      ofType {
+                        kind
+                        name
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        type {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                  ofType {
+                    kind
+                    name
+                    ofType {
+                      kind
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

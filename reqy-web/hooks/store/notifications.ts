@@ -1,6 +1,7 @@
 import type { RequestStore, Notification } from "@/hooks/request-types"
-import { CommitFn, WORKSPACE_PERSONAL_ID } from "./types"
-import { toast } from "@/hooks/use-toast"
+import { isTauriAvailable } from "@/lib/tauri"
+import { resetSystemNotificationPermissionCache } from "@/lib/system-notifications"
+import { CommitFn } from "./types"
 
 export function createNotificationsMutations(commit: CommitFn) {
   const addNotification = (
@@ -21,14 +22,8 @@ export function createNotificationsMutations(commit: CommitFn) {
       ...prev,
       notifications: [...prev.notifications, newNotification],
     }))
-
-    if (newNotification.type && newNotification.type !== "info") {
-      toast({
-        title: newNotification.title,
-        description: newNotification.body,
-        variant: newNotification.type === "error" ? "destructive" : "default",
-      })
-    }
+    // Note: toast is NOT called here — it's the caller's responsibility.
+    // The store notification and toast are intentionally decoupled.
   }
 
   const markNotificationRead = (
@@ -41,30 +36,52 @@ export function createNotificationsMutations(commit: CommitFn) {
       }))
     }
 
-  const clearNotifications = () => {
+  const removeNotification = (id: string) => {
     commit((prev: RequestStore) => ({
       ...prev,
-      notifications: prev.notifications.filter(
-        (n) =>
-          prev.activeWorkspaceId && prev.activeWorkspaceId !== WORKSPACE_PERSONAL_ID
-            ? n.event !== undefined
-            : false,
-      ),
+      notifications: prev.notifications.filter((n) => n.id !== id),
     }))
   }
 
-  const setNotificationPreference = (
-    key: string, value: boolean) => {
-      commit((prev: RequestStore) => ({
-        ...prev,
-        notificationPreferences: {
-          ...(prev.notificationPreferences ?? {}),
-          [key]: value,
-        },
-      }))
-    }
+  const clearNotifications = () => {
+    commit((prev: RequestStore) => ({
+      ...prev,
+      notifications: [],
+    }))
+  }
 
   const requestSystemNotificationPermission = async () => {
+    resetSystemNotificationPermissionCache()
+
+    if (isTauriAvailable()) {
+      try {
+        const { isPermissionGranted, requestPermission } = await import(
+          "@tauri-apps/plugin-notification"
+        )
+        let granted = await isPermissionGranted()
+        let result: NotificationPermission
+        if (granted) {
+          result = "granted"
+        } else {
+          result = await requestPermission()
+          granted = result === "granted"
+        }
+        // Refresh the cache so the next fireSystemNotification picks up the change
+        resetSystemNotificationPermissionCache()
+        commit((prev: RequestStore) => ({
+          ...prev,
+          systemNotificationPermission: granted ? "granted" : (result as string),
+        }))
+        return result
+      } catch {
+        commit((prev: RequestStore) => ({
+          ...prev,
+          systemNotificationPermission: "unsupported",
+        }))
+        return "unsupported" as const
+      }
+    }
+
     if (!("Notification" in window)) {
       commit((prev: RequestStore) => ({
         ...prev,
@@ -84,8 +101,8 @@ export function createNotificationsMutations(commit: CommitFn) {
   return {
     addNotification,
     markNotificationRead,
+    removeNotification,
     clearNotifications,
-    setNotificationPreference,
     requestSystemNotificationPermission,
   }
 }

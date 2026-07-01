@@ -26,9 +26,8 @@ export const metadata: Metadata = {
 
 import { SidebarProvider } from '@/contexts/sidebar-context'
 import { Toaster } from '@/components/ui/toaster'
-import { FloatingAiChat } from '@/components/floating-ai-chat'
+import { FloatingAiChat } from '@/app/floating-ai-chat-client'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { DeepLinkHandler } from '@/components/deep-link-handler'
 import { ClientLayoutShell } from '@/components/client-layout-shell'
 import { AiShortcutBridge } from '@/components/ai-shortcut-bridge'
 
@@ -51,7 +50,6 @@ export default function RootLayout({
         <ThemeProvider defaultTheme="light" storageKey="reqly-theme">
           <ErrorBoundary>
             <SidebarProvider>
-              <DeepLinkHandler />
               <ClientLayoutShell>{children}</ClientLayoutShell>
             </SidebarProvider>
           </ErrorBoundary>

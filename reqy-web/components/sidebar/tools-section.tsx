@@ -1,20 +1,22 @@
 "use client"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Play, Code2, Users, Package } from "lucide-react"
+import { Code2, Package, Wifi, Radio, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
 import { useSidebar } from "@/contexts/sidebar-context"
 
 const TOOLS = [
-  { href: "/runner", label: "Runner", icon: Play, color: "text-blue-500" },
-  { href: "/graphql", label: "GraphQL", icon: Code2, color: "text-purple-500" },
-  { href: "/workspaces", label: "Workspaces", icon: Users, color: "text-green-500" },
-  { href: "/sdks", label: "SDKs", icon: Package, color: "text-orange-500" },
+  { href: "/graphql/", label: "GraphQL", icon: Code2, color: "text-purple-500" },
+  { href: "/sdks/", label: "SDKs", icon: Package, color: "text-orange-500" },
+  { href: "/websocket/", label: "WebSocket", icon: Wifi, color: "text-cyan-500" },
+  // { href: "/sse/", label: "SSE", icon: Radio, color: "text-amber-500" }, // Hidden v1 - feature complete but low priority
+  { href: "/git/", label: "Git", icon: GitBranch, color: "text-rose-500" },
 ]
 
 export function ToolsSection() {
@@ -32,7 +34,7 @@ export function ToolsSection() {
         </div>
       )}
       <nav className={cn("flex flex-col", isCollapsed ? "gap-1" : "gap-0.5")}>
-        {TOOLS.map(({ href, label, icon: Icon, color }) => {
+        {TOOLS.map(({ href, label, icon: Icon, color, badge }: { href: string; label: string; icon: React.ForwardRefExoticComponent<Omit<React.SVGProps<SVGSVGElement>, "ref"> & React.RefAttributes<SVGSVGElement>>; color: string; badge?: string }) => {
           const active = pathname?.startsWith(href) ?? false
           const linkContent = (
             <Link
@@ -48,7 +50,16 @@ export function ToolsSection() {
               )}
             >
               <Icon className={cn(isCollapsed ? "w-5 h-5" : "w-4 h-4", active ? "" : color)} />
-              {!isCollapsed && <span>{label}</span>}
+              {!isCollapsed && (
+                <div className="flex items-center gap-2 flex-1">
+                  <span>{label}</span>
+                  {badge && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                      {badge}
+                    </Badge>
+                  )}
+                </div>
+              )}
             </Link>
           )
 

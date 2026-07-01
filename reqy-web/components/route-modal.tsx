@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react"
 import type { SavedProject } from '../types'
 import { useRequestStore } from "@/hooks/use-request-store"
+import { useShallow } from "zustand/react/shallow"
 import { Layers, CheckCircle, Copy, Shield, ShieldOff, ChevronDown, ChevronRight, FileText, Search, X, Package, Server, Route, Lock, Unlock, List, Code2, Info } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -29,7 +30,12 @@ export function RouteModal({ project, open, onClose }: RouteModalProps) {
   const [expandedPath, setExpandedPath] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
-  const { addCollection, addRequestToCollection } = useRequestStore()
+  const { addCollection, addRequestToCollection } = useRequestStore(
+    useShallow((s) => ({
+      addCollection: s.addCollection,
+      addRequestToCollection: s.addRequestToCollection,
+    })),
+  )
 
   const handleCreateCollection = useCallback(async () => {
     if (!project) return

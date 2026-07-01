@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { cn } from "@/lib/utils"
 import { AlertTriangle } from "lucide-react"
 
@@ -28,7 +29,7 @@ const LABELS = {
   transfer: "Transfer",
 }
 
-export function ResponseTimeline({ timings }: ResponseTimelineProps) {
+export const ResponseTimeline = memo(function ResponseTimeline({ timings }: ResponseTimelineProps) {
   const { dnsMs = 0, connectMs = 0, ttfbMs = 0, totalMs } = timings
 
   // Transfer is what remains after DNS, Connect, and TTFB
@@ -111,4 +112,4 @@ export function ResponseTimeline({ timings }: ResponseTimelineProps) {
       </div>
     </div>
   )
-}
+})

@@ -51,6 +51,12 @@ export interface RequestTab {
     operationName?: string
   }
   testResults?: TestResult[]
+  /**
+   * Key identifying the dataset row to use for data-driven execution.
+   * Loaded from RequestItem.datasetKey via buildTabFromRequest; persisted
+   * back via the save handlers. Optional and ignored by the live editor.
+   */
+  datasetKey?: string
 }
 
 export const formatSize = (size: number) => {

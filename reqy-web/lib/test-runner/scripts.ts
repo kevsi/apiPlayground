@@ -1,4 +1,3 @@
-import vm from "node:vm"
 import type { RunnerContext, RequestResponse } from "./types"
 
 export interface ScriptOptions {
@@ -65,11 +64,29 @@ function stringify(v: unknown): string {
   try { return JSON.stringify(v) } catch { return String(v) }
 }
 
-export function runScript(
+/**
+ * Lazily load the Node.js `vm` module.
+ * During browser bundling, Function() prevents webpack from bundling this.
+ * We return `null` if the module is unavailable.
+ */
+let _vm: typeof import("node:vm") | null
+async function getVm(): Promise<typeof import("node:vm") | null> {
+  if (_vm !== null) return _vm
+  try {
+    // Use Function() to prevent webpack from bundling this import
+    const importer = new Function('return import("node:vm")')
+    _vm = await importer()
+  } catch {
+    _vm = null
+  }
+  return _vm
+}
+
+export async function runScript(
   code: string,
   ctx: RunnerContext,
   options: ScriptOptions
-): ScriptOutput {
+): Promise<ScriptOutput> {
   const consoleLines: string[] = []
   const log = (msg: string) => { consoleLines.push(msg); ctx.log(msg) }
   const consoleShim = {
@@ -85,6 +102,14 @@ export function runScript(
     URL, parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
   }
   for (const key of FORBIDDEN_GLOBALS) sandbox[key] = undefined
+
+  const vm = await getVm()
+  if (!vm) {
+    return {
+      error: "Script execution requires Node.js `vm` module — not available in this environment.",
+      consoleLines,
+    }
+  }
 
   try {
     const wrapped = `(function() { return (${code}); })()`

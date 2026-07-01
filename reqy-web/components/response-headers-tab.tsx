@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { memo, useState } from "react"
 import { Check, Copy, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ interface ResponseHeadersTabProps {
   responseHeaders?: Record<string, string>
 }
 
-export function ResponseHeadersTab({ responseHeaders }: ResponseHeadersTabProps) {
+export const ResponseHeadersTab = memo(function ResponseHeadersTab({ responseHeaders }: ResponseHeadersTabProps) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -64,4 +64,4 @@ export function ResponseHeadersTab({ responseHeaders }: ResponseHeadersTabProps)
       </div>
     </div>
   )
-}
+})

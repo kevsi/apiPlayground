@@ -1,11 +1,9 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   ChevronDown,
   ChevronRight,
-  FolderPlus,
   MoreHorizontal,
   Plus,
   Lock,
@@ -15,8 +13,6 @@ import {
   Edit2,
   Search,
   Download,
-  LayoutGrid,
-  List,
   CheckSquare,
   Square,
   X,
@@ -24,7 +20,6 @@ import {
   Import,
   Play,
   Copy,
-  GripVertical,
   Loader2,
 } from "lucide-react"
 import { cn, downloadJson } from "@/lib/utils"
@@ -48,17 +43,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
 import type { Collection, CollectionFolder, RequestItem, HttpMethod } from "@/hooks/use-request-store"
 import { requestItemSchema } from "@/lib/import-schemas"
-import { CollectionsFolderTree } from "@/components/collections-folder-tree"
 
 export type NewCollectionInput = {
   name?: string
@@ -105,15 +91,6 @@ const collectionColors: Record<string, string> = {
   pink: "bg-pink-500",
 }
 
-const collectionBorderColors: Record<string, string> = {
-  emerald: "border-emerald-500/40",
-  blue: "border-blue-500/40",
-  amber: "border-amber-500/40",
-  purple: "border-purple-500/40",
-  red: "border-red-500/40",
-  pink: "border-pink-500/40",
-}
-
 const collectionIcons: Record<string, React.ReactNode> = {
   lock: <Lock className="size-3 text-white" />,
   users: <Users className="size-3 text-white" />,
@@ -121,13 +98,13 @@ const collectionIcons: Record<string, React.ReactNode> = {
 }
 
 
-type ViewMode = "list" | "card"
+
+
 
 interface CollectionsPanelProps {
   collections: Collection[]
   onSelectRequest: (request: RequestItem) => void
   onSelectAndSendRequest?: (request: RequestItem) => void
-  onRunCollection?: (collection: Collection) => void
 
   onAddCollection: (data?: NewCollectionInput) => string
   onDeleteCollection: (id: string) => void
@@ -145,13 +122,13 @@ interface CollectionsPanelProps {
   // Reorder operations
   onReorderRequestsInCollection?: (collectionId: string, folderId: string | null, orderedRequestIds: string[]) => void
   onReorderFolders?: (collectionId: string, parentFolderId: string | null, orderedFolderIds: string[]) => void
+  onRunCollection?: (collection: Collection) => void
 }
 
 export function CollectionsPanel({
   collections,
   onSelectRequest,
   onSelectAndSendRequest,
-  onRunCollection,
   onAddCollection,
   onDeleteCollection,
   onDuplicateCollection,
@@ -166,23 +143,21 @@ export function CollectionsPanel({
   onMoveFolder,
   onReorderRequestsInCollection,
   onReorderFolders,
+  onRunCollection,
 }: CollectionsPanelProps) {
 
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
-    new Set(collections.map((c) => c.id))
+    new Set()
   )
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<ViewMode>("list")
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
-  const [collectionDetail, setCollectionDetail] = useState<Collection | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const listContainerRef = useRef<HTMLDivElement>(null)
-  const [dragId, setDragId] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const dragOverIdRef = useRef<string | null>(null)
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<Set<string>>(new Set())
+  const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set())
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -244,12 +219,6 @@ export function CollectionsPanel({
     setPendingDelete({ label, onConfirm })
   }
 
-  // Selection state
-  const [selectedCollectionIds, setSelectedCollectionIds] = useState<Set<string>>(new Set())
-  const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set()) // "colId::reqId"
-
-  const isSelecting = selectedCollectionIds.size > 0 || selectedRequestIds.size > 0
-
   const toggleCollection = (id: string) => {
     setExpandedCollections((prev) => {
       const next = new Set(prev)
@@ -282,10 +251,6 @@ export function CollectionsPanel({
   const clearSelection = () => {
     setSelectedCollectionIds(new Set())
     setSelectedRequestIds(new Set())
-  }
-
-  const selectAllCollections = () => {
-    setSelectedCollectionIds(new Set(filteredCollections.map((c) => c.id)))
   }
 
   // --- Bulk actions ---
@@ -438,16 +403,6 @@ export function CollectionsPanel({
       }
     )
 
-  // Virtualizer for the list view — fixed row height ~88px
-  const rowVirtualizer = useVirtualizer({
-    count: filteredCollections.length,
-    getScrollElement: () => listContainerRef.current,
-    estimateSize: () => 88,
-    overscan: 5,
-  })
-
-  const totalSelected = selectedCollectionIds.size + selectedRequestIds.size
-
   return (
     <div className="flex h-full flex-col">
       {/* Ambient top highlight */}
@@ -464,27 +419,7 @@ export function CollectionsPanel({
           </div>
         </div>
         <div className="flex items-center gap-0.5">
-          {/* View toggle — pill style */}
-          <div className="flex items-center rounded-lg border border-border/40 bg-muted/30 p-0.5 mr-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className={cn("h-6 w-6 p-0 rounded-md transition-all", viewMode === "list" && "bg-background shadow-xs")}
-              title="Vue liste"
-            >
-              <List className="size-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className={cn("h-6 w-6 p-0 rounded-md transition-all", viewMode === "card" && "bg-background shadow-xs")}
-              title="Vue carte"
-            >
-              <LayoutGrid className="size-3" />
-            </Button>
-          </div>
+
           <input 
             type="file" 
             accept=".json" 
@@ -537,432 +472,141 @@ export function CollectionsPanel({
         </div>
       </div>
 
-      {/* Selection toolbar */}
-      {isSelecting && (
-        <div className="flex items-center gap-1.5 border-b border-border/60 bg-primary/[0.03] px-4 py-2 shrink-0 animate-in slide-in-from-top-2 duration-150">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="flex size-5 items-center justify-center rounded bg-primary/10">
-              <CheckSquare className="size-3 text-primary" />
-            </span>
-            <span className="text-xs font-semibold text-foreground/80">
-              {totalSelected} selected
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs font-medium"
-              onClick={selectAllCollections}
-            >
-              <Layers className="size-3" />
-              All
-            </Button>
-            <div className="mx-0.5 h-4 w-px bg-border/50" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs font-medium text-primary hover:text-primary"
-              onClick={bulkExport}
-              disabled={exporting}
-            >
-              {exporting ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
-              {exporting ? "Export..." : "Export"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs font-medium text-destructive hover:text-destructive"
-              onClick={bulkDelete}
-            >
-              <Trash2 className="size-3" />
-              Delete
-            </Button>
-            <div className="mx-0.5 h-4 w-px bg-border/50" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-              onClick={clearSelection}
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Collections content */}
-      <div ref={listContainerRef} data-testid="collection-list" className="flex-1 overflow-y-auto hide-scrollbar p-2" style={{ maxHeight: "60vh" }}>
-        {viewMode === "list" ? (
-          // ── LIST VIEW ──────────────────────────────────────────────────
-          <div
-            className="space-y-1 relative"
-            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-              const collection = filteredCollections[virtualItem.index]
-              const isExpanded = expandedCollections.has(collection.id)
-              const isSelected = selectedCollectionIds.has(collection.id)
-              const accentColor = collectionBorderColors[collection.color]?.replace("border-", "bg-").replace("/40", "") || "bg-muted-foreground/20"
-
-              return (
-                <div
-                  key={collection.id}
-                  data-index={virtualItem.index}
-                  data-testid={`collection-item-${collection.id}`}
-                  ref={rowVirtualizer.measureElement}
-                  className={cn(
-                    "rounded-xl transition-all duration-200 absolute top-0 left-0 w-full",
-                    isSelected && "bg-primary/[0.04] ring-1 ring-primary/20",
-                    dragId === collection.id && "opacity-40 scale-[0.98]"
-                  )}
-                  style={{
-                    transform: `translateY(${virtualItem.start}px)`,
-                  }}
-                  draggable={!!onReorderCollections}
-                  onDragStart={(e) => {
-                    setDragId(collection.id)
-                    e.dataTransfer.effectAllowed = "move"
-                    e.dataTransfer.setData("text/plain", collection.id)
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = "move"
-                    dragOverIdRef.current = collection.id
-                  }}
-                  onDragEnd={() => {
-                    const targetId = dragOverIdRef.current
-                    const draggedId = collection.id
-                    if (draggedId && targetId && onReorderCollections && draggedId !== targetId) {
-                      const ids = collections.map((c) => c.id)
-                      const fromIdx = ids.indexOf(draggedId)
-                      const toIdx = ids.indexOf(targetId)
-                      if (fromIdx !== -1 && toIdx !== -1) {
-                        ids.splice(fromIdx, 1)
-                        ids.splice(toIdx, 0, draggedId)
-                        onReorderCollections(ids)
-                      }
-                    }
-                    setDragId(null)
-                    dragOverIdRef.current = null
-                  }}
-                >
-                  {/* Collection row — premium card header */}
-                  <div className={cn(
-                    "group relative flex items-center gap-1.5 rounded-xl px-2.5 py-2.5 transition-all duration-200",
-                    "bg-card border shadow-xs",
-                    isExpanded && "rounded-b-none border-b-0 shadow-none",
-                    isSelected && "border-primary/35 shadow-primary/5",
-                    !isExpanded && "hover:shadow-sm hover:border-border/80",
-                    isExpanded && "bg-muted/20"
-                  )}>
-                    {/* Left accent bar — thicker, rounded */}
-                    <span className={cn(
-                      "absolute left-0 top-1 bottom-1 w-[4px] rounded-r-full transition-all duration-200",
-                      accentColor,
-                      isSelected && "opacity-100",
-                      !isSelected && "opacity-60 group-hover:opacity-100"
-                    )} />
-
-                    {/* Drag handle — always visible but subtle */}
-                    {onReorderCollections && (
-                      <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground/50 transition-colors duration-200">
-                        <GripVertical className="size-4" />
-                      </div>
-                    )}
-
-                    {/* Checkbox */}
-                    <button
-                      onClick={() => toggleSelectCollection(collection.id)}
-                      className={cn(
-                        "shrink-0 flex items-center justify-center transition-all duration-150",
-                        isSelected
-                        ? "text-primary"
-                        : "text-muted-foreground/40 hover:text-muted-foreground/60"
-                      )}
-                    >
-                      {isSelected ? (
-                        <span className="flex size-5 items-center justify-center rounded bg-primary/10">
-                          <CheckSquare className="size-3.5 text-primary" />
-                        </span>
-                      ) : (
-                        <Square className="size-3.5" />
-                      )}
-                    </button>
-
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleCollection(collection.id)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCollection(collection.id) } }}
-                      className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
-                    >
-                      {/* Chevron — subtle animation */}
-                      <div className="shrink-0 transition-transform duration-200 text-muted-foreground/50 group-hover:text-muted-foreground/70">
-                        {isExpanded ? (
-                          <ChevronDown className="size-3.5" />
-                        ) : (
-                          <ChevronRight className="size-3.5" />
-                        )}
-                      </div>
-
-                      {/* Collection icon */}
-                      <span
-                        className={cn(
-                          "flex size-6 shrink-0 items-center justify-center rounded-lg shadow-xs ring-1 ring-black/5",
-                          collectionColors[collection.color]
-                        )}
-                      >
-                        {collectionIcons[collection.icon] || <Package className="size-3 text-white" />}
-                      </span>
-
-                      {editingCollectionId === collection.id ? (
-                        <div className="flex w-full items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          <Input
-                            data-testid="collection-name-input"
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                onRenameCollection(collection.id, renameValue.trim() || collection.name)
-                                setEditingCollectionId(null)
-                              }
-                              if (event.key === "Escape") setEditingCollectionId(null)
-                            }}
-                            autoFocus
-                            className="h-7 text-sm"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onRenameCollection(collection.id, renameValue.trim() || collection.name)
-                              setEditingCollectionId(null)
-                            }}
-                            className="h-7 px-2 text-xs font-semibold text-primary"
-                          >
-                            OK
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="truncate text-sm font-semibold text-foreground/90 group-hover:text-foreground transition-colors">
-                            {collection.name}
-                          </span>
-                          <span className="shrink-0 text-[10px] font-semibold text-muted-foreground/60 bg-muted/30 px-1.5 py-0.5 rounded-full leading-none">
-                            {collection.requests.length}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Quick actions bar */}
-                    <div className="flex items-center gap-0.5">
-                      {onSelectAndSendRequest && collection.requests.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); onRunCollection?.(collection) }}
-                          className="size-7 p-0 text-muted-foreground/30 hover:text-emerald-500 hover:bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-all duration-200"
-                          title="Run all"
-                        >
-                          <Play className="size-3.5" />
-                        </Button>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-7 p-0 text-muted-foreground/30 hover:text-foreground hover:bg-accent opacity-0 group-hover:opacity-100 transition-all duration-200"
-                          >
-                            <MoreHorizontal className="size-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem data-testid="add-request-button" onClick={() => onAddRequestToCollection(collection.id)}>
-                            <Plus className="mr-2 size-3.5" /> Add Request
-                          </DropdownMenuItem>
-                          {onRunCollection && (
-                            <DropdownMenuItem onClick={() => onRunCollection(collection)}>
-                              <Play className="mr-2 size-3.5" /> Run collection
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditingCollectionId(collection.id)
-                              setRenameValue(collection.name)
-                            }}
-                          >
-                            <Edit2 className="mr-2 size-3.5" /> Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => exportCollection(collection)}>
-                            <Download className="mr-2 size-3.5" /> Export JSON
-                          </DropdownMenuItem>
-                          {onDuplicateCollection && (
-                            <DropdownMenuItem onClick={() => onDuplicateCollection(collection.id)}>
-                              <Copy className="mr-2 size-3.5" /> Duplicate
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => onDeleteCollection(collection.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="mr-2 size-3.5" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-
-                  {/* Expanded content — nested container with inset feel */}
-                  {isExpanded && (
-                    <div className={cn(
-                      "rounded-b-xl border border-t-0 shadow-xs bg-muted/[0.03] pb-2 overflow-hidden transition-all duration-200",
-                      isSelected
-                        ? "border-primary/20"
-                        : "border-border/40"
-                    )}>
-                      <div className="pt-0.5">
-                        <CollectionsFolderTree
-                          collection={collection}
-                          folders={collection.folders ?? []}
-                          requests={collection.requests}
-                          selectedRequestIds={selectedRequestIds}
-                          onToggleSelectRequest={toggleSelectRequest}
-                          onSelectRequest={onSelectRequest}
-                          onSelectAndSendRequest={onSelectAndSendRequest}
-                          onRemoveRequestFromCollection={onRemoveRequestFromCollection}
-                          onAddFolder={onAddFolder ?? (() => "")}
-                          onRenameFolder={onRenameFolder ?? (() => {})}
-                          onDeleteFolder={onDeleteFolder ?? (() => {})}
-                          onMoveRequestToFolder={onMoveRequestToFolder ?? (() => {})}
-                          onMoveFolder={onMoveFolder}
-                          onReorderRequests={onReorderRequestsInCollection}
-                          onReorderFolders={onReorderFolders}
-                          confirmDelete={confirmDelete}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          // ── CARD VIEW ──────────────────────────────────────────────────
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 p-1">
-            {filteredCollections.map((collection) => {
-              const isSelected = selectedCollectionIds.has(collection.id)
-              const accentColor = collectionBorderColors[collection.color]?.replace("/40", "/30") || ""
-              return (
-                <div
-                  key={collection.id}
-                  className={cn(
-                    "group relative flex flex-col items-center rounded-xl border p-3 transition-all duration-200 cursor-default gap-2.5 bg-card",
-                    isSelected
-                      ? "border-primary/40 bg-primary/[0.04] shadow-sm shadow-primary/15 ring-1 ring-primary/20"
-                      : cn(
-                          "hover:shadow-md hover:border-border/80",
-                          accentColor && `border-l-[3px] ${accentColor}`
-                        )
-                  )}
-                >
-                  {/* Top accent strip for selected state */}
-                  {isSelected && (
-                    <span className="absolute top-0 left-0 right-0 h-[3px] rounded-t-xl bg-primary/60" />
-                  )}
-
-                  {/* Checkbox */}
+      <div data-testid="collection-list" className="flex-1 overflow-y-auto">
+        <div className="divide-y divide-border/40">
+          {filteredCollections.map((collection) => {
+            const isExpanded = expandedCollections.has(collection.id)
+            const isSelected = selectedCollectionIds.has(collection.id)
+            return (
+              <div key={collection.id}>
+                <div className={cn(
+                  "flex items-center gap-3 px-3 py-2.5",
+                  isSelected && "bg-primary/[0.03]"
+                )}>
                   <button
                     onClick={() => toggleSelectCollection(collection.id)}
-                    className={cn(
-                      "absolute top-2.5 left-2.5 z-10 transition-all duration-150",
-                      isSelected
-                        ? "text-primary"
-                        : "text-muted-foreground/30 hover:text-muted-foreground/60"
-                    )}
+                    className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground/60"
                   >
                     {isSelected ? (
-                      <span className="flex size-4 items-center justify-center rounded bg-primary/10">
-                        <CheckSquare className="size-3 text-primary" />
-                      </span>
+                      <CheckSquare className="size-3.5 text-primary" />
                     ) : (
-                      <Square className="size-3 opacity-30 group-hover:opacity-100 transition-opacity" />
+                      <Square className="size-3.5" />
                     )}
                   </button>
-
-                  {/* Menu */}
-                  <div className="absolute top-2 right-2 z-10">
+                  <button
+                    onClick={() => toggleCollection(collection.id)}
+                    className="shrink-0 text-muted-foreground/50"
+                  >
+                    {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                  </button>
+                  <span className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded",
+                    collectionColors[collection.color]
+                  )}>
+                    {collectionIcons[collection.icon] || <Package className="size-2.5 text-white" />}
+                  </span>
+                  {editingCollectionId === collection.id ? (
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { onRenameCollection(collection.id, renameValue.trim() || collection.name); setEditingCollectionId(null) }
+                          if (e.key === "Escape") setEditingCollectionId(null)
+                        }}
+                        autoFocus
+                        className="h-7 text-sm w-48"
+                      />
+                      <Button variant="ghost" size="sm" onClick={() => { onRenameCollection(collection.id, renameValue.trim() || collection.name); setEditingCollectionId(null) }} className="h-7 px-2 text-xs font-medium text-primary">OK</Button>
+                    </div>
+                  ) : (
+                    <span
+                      className="flex-1 min-w-0 truncate text-sm font-medium text-foreground/90 cursor-pointer"
+                      onClick={() => toggleCollection(collection.id)}
+                    >
+                      {collection.name}
+                    </span>
+                  )}
+                  <span className="shrink-0 text-xs text-muted-foreground/50 font-mono">{collection.requests.length} req</span>
+                  <div className="flex items-center gap-0.5">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="size-6 p-0 text-muted-foreground/30 hover:text-foreground hover:bg-accent opacity-0 group-hover:opacity-100 transition-all duration-200">
-                          <MoreHorizontal className="size-3" />
-                        </Button>
+                        <button className="size-6 flex items-center justify-center rounded text-muted-foreground/30 hover:text-foreground hover:bg-accent">
+                          <MoreHorizontal className="size-3.5" />
+                        </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onClick={() => onAddRequestToCollection(collection.id)}>
-                          <Plus className="mr-2 size-3.5" /> Add Request
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setEditingCollectionId(collection.id); setRenameValue(collection.name) }}>
-                          <Edit2 className="mr-2 size-3.5" /> Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => exportCollection(collection)}>
-                          <Download className="mr-2 size-3.5" /> Export JSON
-                        </DropdownMenuItem>
-                        {onDuplicateCollection && (
-                          <DropdownMenuItem onClick={() => onDuplicateCollection(collection.id)}>
-                            <Copy className="mr-2 size-3.5" /> Duplicate
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => confirmDelete(`Supprimer "${collection.name}" ?`, () => onDeleteCollection(collection.id))} className="text-destructive">
-                          <Trash2 className="mr-2 size-3.5" /> Delete
-                        </DropdownMenuItem>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem onClick={() => onAddRequestToCollection(collection.id)}><Plus className="mr-2 size-3.5" /> Add request</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setEditingCollectionId(collection.id); setRenameValue(collection.name) }}><Edit2 className="mr-2 size-3.5" /> Rename</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportCollection(collection)}><Download className="mr-2 size-3.5" /> Export</DropdownMenuItem>
+                        {onDuplicateCollection && <DropdownMenuItem onClick={() => onDuplicateCollection(collection.id)}><Copy className="mr-2 size-3.5" /> Duplicate</DropdownMenuItem>}
+                        {onRunCollection && <DropdownMenuItem onClick={() => onRunCollection(collection)}><Play className="mr-2 size-3.5" /> Run all</DropdownMenuItem>}
+                        <DropdownMenuItem onClick={() => confirmDelete(`Delete "${collection.name}"?`, () => onDeleteCollection(collection.id))} className="text-destructive"><Trash2 className="mr-2 size-3.5" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-
-                  {/* Clickable card body → opens detail modal */}
-                  <button
-                    className="flex flex-col items-center gap-2 w-full pt-1.5"
-                    onClick={() => setCollectionDetail(collection)}
-                  >
-                    <span className={cn(
-                      "flex size-9 items-center justify-center rounded-xl shadow-xs ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105",
-                      collectionColors[collection.color]
-                    )}>
-                      {collectionIcons[collection.icon] || <Package className="size-4 text-white" />}
-                    </span>
-                    {editingCollectionId === collection.id ? (
-                      <div onClick={(e) => e.stopPropagation()} className="w-full px-1">
-                        <Input
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(ev) => {
-                            if (ev.key === "Enter") { onRenameCollection(collection.id, renameValue.trim() || collection.name); setEditingCollectionId(null) }
-                            if (ev.key === "Escape") setEditingCollectionId(null)
-                          }}
-                          autoFocus
-                          className="h-6 text-center text-xs"
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-center text-xs font-semibold text-foreground/90 leading-tight line-clamp-2 px-1">
-                        {collection.name}
-                      </span>
-                    )}
-                    <span className={cn(
-                      "text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground/70 border border-border/30"
-                    )}>
-                      {collection.requests.length} {collection.requests.length === 1 ? "request" : "requests"}
-                    </span>
-                  </button>
                 </div>
-              )
-            })}
-          </div>
-        )}
+                {isExpanded && collection.requests.length > 0 && (
+                  <div className="border-t border-border/20">
+                    {collection.requests.map((req) => {
+                      const reqKey = `${collection.id}::${req.id}`
+                      const isReqSelected = selectedRequestIds.has(reqKey)
+                      return (
+                        <div
+                          key={req.id}
+                          className={cn(
+                            "flex items-center gap-3 py-1.5 px-3 pl-14 text-sm",
+                            isReqSelected && "bg-primary/[0.03]",
+                            "hover:bg-muted/20"
+                          )}
+                        >
+                          <button
+                            onClick={() => toggleSelectRequest(collection.id, req.id)}
+                            className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground/60"
+                          >
+                            {isReqSelected ? (
+                              <CheckSquare className="size-3 text-primary" />
+                            ) : (
+                              <Square className="size-3" />
+                            )}
+                          </button>
+                          <span className={cn("shrink-0 rounded px-1 py-0.5 text-[10px] font-bold text-white", methodBadgeColors[req.method])}>
+                            {req.method}
+                          </span>
+                          <button
+                            className="flex-1 min-w-0 text-left truncate text-foreground/80 hover:text-foreground"
+                            onClick={() => onSelectRequest(req)}
+                          >
+                            {req.name}
+                          </button>
+                          {req.endpoint && (
+                            <span className="shrink-0 text-xs text-muted-foreground/40 font-mono truncate max-w-[200px]">{req.endpoint}</span>
+                          )}
+                          {onSelectAndSendRequest && (
+                            <button
+                              className="shrink-0 size-5 flex items-center justify-center rounded text-emerald-500/50 hover:text-emerald-500 hover:bg-emerald-500/10"
+                              onClick={() => onSelectAndSendRequest(req)}
+                              title="Load & send"
+                            >
+                              <Play className="size-3" />
+                            </button>
+                          )}
+                          <button
+                            className="shrink-0 size-5 flex items-center justify-center rounded text-muted-foreground/30 hover:text-destructive"
+                            onClick={() => confirmDelete(`Remove "${req.name}"?`, () => onRemoveRequestFromCollection(collection.id, req.id))}
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
 
         {filteredCollections.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center px-6 animate-fade-in">
@@ -993,107 +637,6 @@ export function CollectionsPanel({
           </div>
         )}
       </div>
-
-      {/* ── Collection detail modal (card click) ── */}
-      {collectionDetail && (
-        <Dialog open onOpenChange={(open) => !open && setCollectionDetail(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
-                <span className={cn("flex size-7 items-center justify-center rounded-lg shadow-xs", collectionColors[collectionDetail.color])}>
-                  {collectionIcons[collectionDetail.icon] || <Package className="size-3.5 text-white" />}
-                </span>
-                <span className="truncate text-base">{collectionDetail.name}</span>
-                <span className="ml-auto shrink-0 text-xs font-medium text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-full">
-                  {collectionDetail.requests.length} request{collectionDetail.requests.length !== 1 ? "s" : ""}
-                </span>
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="max-h-72 overflow-y-auto space-y-0.5 py-1 px-px">
-              {collectionDetail.requests.length === 0 && (
-                <div className="flex flex-col items-center py-8 text-center">
-                  <div className="rounded-full bg-muted/20 p-3 mb-2">
-                    <Package className="size-6 text-muted-foreground/20" />
-                  </div>
-                  <p className="text-sm text-muted-foreground/60">No requests in this collection</p>
-                </div>
-              )}
-              {collectionDetail.requests.map((req) => {
-                const reqKey = `${collectionDetail.id}::${req.id}`
-                const isReqSelected = selectedRequestIds.has(reqKey)
-                return (
-                  <div
-                    key={req.id}
-                    className={cn(
-                      "group flex items-center gap-2 rounded-lg px-3 py-2 transition-all duration-150",
-                      "hover:bg-accent/60 hover:shadow-xs",
-                      isReqSelected && "bg-primary/[0.04] ring-1 ring-primary/20"
-                    )}
-                  >
-                    <button onClick={() => toggleSelectRequest(collectionDetail.id, req.id)} className="shrink-0 flex items-center justify-center">
-                      {isReqSelected
-                        ? <span className="flex size-4 items-center justify-center rounded bg-primary/10"><CheckSquare className="size-3 text-primary" /></span>
-                        : <Square className="size-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />}
-                    </button>
-                    <button
-                      className="flex flex-1 items-center gap-2.5 min-w-0 text-left"
-                      onClick={() => { onSelectRequest(req); setCollectionDetail(null) }}
-                    >
-                      <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-white shadow-xs", methodBadgeColors[req.method])}>
-                        {req.method}
-                      </span>
-                      <span className="truncate text-sm font-medium text-foreground/90 group-hover:text-foreground transition-colors">{req.name}</span>
-                      <span className="ml-auto shrink-0 truncate text-xs text-muted-foreground/50 max-w-[140px] font-mono">{req.endpoint}</span>
-                    </button>
-                    {onSelectAndSendRequest && (
-                      <Button
-                        variant="ghost" size="sm"
-                        className="size-6 p-0 text-emerald-500 opacity-0 group-hover:opacity-100 hover:text-emerald-500 hover:bg-emerald-500/10 transition-all duration-150"
-                        title="Load & Send"
-                        onClick={() => { onSelectAndSendRequest(req); setCollectionDetail(null) }}
-                      >
-                        <Play className="size-3" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost" size="sm"
-                      className="size-6 p-0 text-muted-foreground/30 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all duration-150"
-                      onClick={() => confirmDelete(
-                        `Remove "${req.name}" from "${collectionDetail.name}"?`,
-                        () => { onRemoveRequestFromCollection(collectionDetail.id, req.id); setCollectionDetail(null) }
-                      )}
-                    >
-                      <Trash2 className="size-3" />
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-
-            {onRunCollection && (
-              <div className="flex items-center justify-between border-t border-border/60 px-4 py-3 bg-muted/10">
-                <span className="text-xs text-muted-foreground/60">Run all requests sequentially</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 text-xs font-medium gap-1.5"
-                  onClick={() => {
-                    onRunCollection(collectionDetail)
-                    setCollectionDetail(null)
-                  }}
-                >
-                  <Play className="size-3" />
-                  Run collection
-                </Button>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" size="sm" onClick={() => setCollectionDetail(null)} className="text-xs">Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* ── Delete confirmation modal ── */}
       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>

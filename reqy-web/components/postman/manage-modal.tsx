@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import type { AuthUser } from "@/hooks/use-auth"
 
 interface Collection {
   id: string
@@ -24,7 +23,7 @@ interface Collection {
 interface PostmanManageModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  user?: AuthUser | null
+  userEmail?: string
   isConnected: boolean
   onSelectCollection: (collection: Collection) => void
   onGoToSettings?: () => void
@@ -33,7 +32,7 @@ interface PostmanManageModalProps {
 export function PostmanManageModal({
   open,
   onOpenChange,
-  user,
+  userEmail,
   isConnected,
   onSelectCollection,
   onGoToSettings,
@@ -93,8 +92,8 @@ export function PostmanManageModal({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-3">
             <span>Importer depuis Postman</span>
-            {user?.email && (
-              <span className="truncate text-xs font-normal text-muted-foreground">{user.email}</span>
+            {userEmail && (
+              <span className="truncate text-xs font-normal text-muted-foreground">{userEmail}</span>
             )}
           </DialogTitle>
           <DialogDescription>
@@ -138,14 +137,24 @@ export function PostmanManageModal({
           ) : (
             <div className="max-h-[400px] space-y-2 overflow-y-auto pr-1">
               {collections.map((col) => (
-                <Card key={col.id} className="flex items-center justify-between gap-3 p-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{col.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {col.requests} requête{col.requests > 1 ? "s" : ""}
-                    </p>
+                <Card
+                  key={col.id}
+                  className="flex-row items-center justify-between gap-3 p-3"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="truncate text-sm font-medium">
+                      {col.name}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      · {col.requests} requête{col.requests > 1 ? "s" : ""}
+                    </span>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => onSelectCollection(col)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => onSelectCollection(col)}
+                  >
                     Importer
                   </Button>
                 </Card>

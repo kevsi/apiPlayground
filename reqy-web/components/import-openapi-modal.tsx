@@ -246,8 +246,8 @@ export function ImportOpenApiModal({
                 <p className="text-2xl font-bold">{tagGroups.length}</p>
                 <p className="text-xs text-muted-foreground">Collections</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center">
-                <p className="text-2xl font-bold">{spec.baseUrl || "—"}</p>
+              <div className="rounded-lg border bg-card p-3 text-center min-w-0">
+                <p className="text-xs font-mono font-semibold text-foreground truncate" title={spec.baseUrl}>{spec.baseUrl || "—"}</p>
                 <p className="text-xs text-muted-foreground">Base URL</p>
               </div>
             </div>

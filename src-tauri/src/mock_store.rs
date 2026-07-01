@@ -96,6 +96,7 @@ impl MockStore {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn delete_route(&self, id: &str) {
         let mut inner = self.inner.lock().unwrap();
         inner.routes.retain(|r| r.id != id);

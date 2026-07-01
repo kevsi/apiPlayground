@@ -1,14 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, Bell, FileJson, Clock, Command, GitBranch } from "lucide-react"
+import { Search, Bell, Clock, Command, GitBranch, X } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Input } from "@/components/ui/input"
 import { EnvironmentSelector } from "@/components/environment-selector"
 import { VariablesPanel } from "@/components/variables-panel"
 import { WorkspaceSelector } from "@/components/workspace-selector"
 import { ThemeSwitcher } from "@/components/theme-switcher"
-import { SyncStatus } from "@/components/sync-status"
 
 import {
   DropdownMenu,
@@ -19,10 +17,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog"
-import {
   Command as CommandPalette,
   CommandDialog,
   CommandEmpty,
@@ -32,23 +26,41 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Wifi, Radio, Network, Braces } from "lucide-react"
-import { WebSocketPanel } from "@/components/websocket-panel"
-import { SSEPanel } from "@/components/sse-panel"
-import { CaptureProxyPanel } from "@/components/capture-proxy-panel"
-import { GraphQLPanel } from "@/components/graphql-panel"
-import { GitPanel } from "@/components/git-panel"
 import { useRequestStore } from "@/hooks/use-request-store"
+import { useShallow } from "zustand/react/shallow"
 import { useRouter } from "next/navigation"
 
 export function ApiHeader() {
-  const { notifications, markNotificationRead, clearNotifications, requestSystemNotificationPermission, systemNotificationPermission, history, collections } = useRequestStore()
+  // Data slices: subscribe only to what we render. Each atomic selector returns
+  // the same reference unless that slice actually changes, so the header does
+  // NOT re-render on unrelated mutations (e.g. editing a request body).
+  const notifications = useRequestStore((s) => s.notifications)
+  const storeNotifPermission = useRequestStore(
+    (s) => s.systemNotificationPermission,
+  )
+  // Derive a reliable permission check: trust the store but fall back to the
+  // live browser permission (handles hydration mismatches / stale store values).
+  const systemNotificationPermission = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+    ? 'granted'
+    : storeNotifPermission
+  const history = useRequestStore((s) => s.history)
+  // Actions: stable refs, grouped under useShallow for a single subscription.
+  const {
+    markNotificationRead,
+    removeNotification,
+    clearNotifications,
+    requestSystemNotificationPermission,
+  } = useRequestStore(
+    useShallow((s) => ({
+      markNotificationRead: s.markNotificationRead,
+      removeNotification: s.removeNotification,
+      clearNotifications: s.clearNotifications,
+      requestSystemNotificationPermission:
+        s.requestSystemNotificationPermission,
+    })),
+  )
   const router = useRouter()
   const [searchOpen, setSearchOpen] = useState(false)
-  const [wsOpen, setWsOpen] = useState(false)
-  const [sseOpen, setSseOpen] = useState(false)
-  const [proxyOpen, setProxyOpen] = useState(false)
-  const [graphqlOpen, setGraphqlOpen] = useState(false)
-  const [gitOpen, setGitOpen] = useState(false)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -94,23 +106,20 @@ export function ApiHeader() {
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup heading="Tools">
-              <CommandItem onSelect={() => { setWsOpen(true); setSearchOpen(false) }}>
+              <CommandItem onSelect={() => { setSearchOpen(false); router.push("/websocket") }}>
                 <Wifi className="mr-2 size-4" />
                 <span>Open WebSocket Panel</span>
               </CommandItem>
-              <CommandItem onSelect={() => { setSseOpen(true); setSearchOpen(false) }}>
+              <CommandItem onSelect={() => { setSearchOpen(false); router.push("/sse") }}>
                 <Radio className="mr-2 size-4" />
                 <span>Open SSE Panel</span>
               </CommandItem>
-              <CommandItem onSelect={() => { setProxyOpen(true); setSearchOpen(false) }}>
-                <Network className="mr-2 size-4" />
-                <span>Open Capture Proxy</span>
-              </CommandItem>
-              <CommandItem onSelect={() => { setGraphqlOpen(true); setSearchOpen(false) }}>
+
+              <CommandItem onSelect={() => { setSearchOpen(false); router.push("/graphql") }}>
                 <Braces className="mr-2 size-4" />
                 <span>Open GraphQL Playground</span>
               </CommandItem>
-              <CommandItem onSelect={() => { setGitOpen(true); setSearchOpen(false) }}>
+              <CommandItem onSelect={() => { setSearchOpen(false); router.push("/git") }}>
                 <GitBranch className="mr-2 size-4" />
                 <span>Open Git Panel</span>
               </CommandItem>
@@ -125,35 +134,9 @@ export function ApiHeader() {
             </CommandGroup>
           </CommandList>
         </CommandDialog>
-        <Dialog open={wsOpen} onOpenChange={setWsOpen}>
-          <DialogContent className="max-w-3xl h-[80vh]">
-            <WebSocketPanel />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={sseOpen} onOpenChange={setSseOpen}>
-          <DialogContent className="max-w-3xl h-[80vh]">
-            <SSEPanel />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={proxyOpen} onOpenChange={setProxyOpen}>
-          <DialogContent className="max-w-4xl h-[85vh]">
-            <CaptureProxyPanel />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={graphqlOpen} onOpenChange={setGraphqlOpen}>
-          <DialogContent className="max-w-4xl h-[85vh]">
-            <GraphQLPanel />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={gitOpen} onOpenChange={setGitOpen}>
-          <DialogContent className="max-w-3xl h-[75vh]">
-            <GitPanel collections={collections} />
-          </DialogContent>
-        </Dialog>
         <EnvironmentSelector />
         <VariablesPanel />
         <ThemeSwitcher />
-        <SyncStatus />
 
         <div className="flex items-center gap-1.5">
           <DropdownMenu>
@@ -182,7 +165,7 @@ export function ApiHeader() {
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {(systemNotificationPermission !== "granted" && systemNotificationPermission !== "unsupported") && (
+              {systemNotificationPermission === "default" && (
                 <div className="border-b border-border p-3">
                   <button
                     className="w-full rounded-md bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-all duration-200 hover:bg-primary/10"
@@ -198,6 +181,13 @@ export function ApiHeader() {
                   </button>
                 </div>
               )}
+              {systemNotificationPermission === "denied" && (
+                <div className="border-b border-border p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Notifications are blocked in your browser. Re-enable them via the lock icon next to the URL (Notifications → Allow).
+                  </p>
+                </div>
+              )}
               {(!notifications || notifications.length === 0) ? (
                 <div className="flex flex-col items-center gap-2 p-6 text-sm text-muted-foreground">
                   <Bell className="size-8 text-muted-foreground/30" />
@@ -206,12 +196,25 @@ export function ApiHeader() {
               ) : (
                 <div className="max-h-[280px] overflow-y-auto">
                   {notifications.map((n) => (
-                    <DropdownMenuItem key={n.id} onClick={() => markNotificationRead(n.id)} className="flex flex-col items-start gap-1.5 px-4 py-3 border-b border-border last:border-b-0">
+                    <DropdownMenuItem
+                      key={n.id}
+                      onClick={() => markNotificationRead(n.id)}
+                      className="group flex flex-col items-start gap-1.5 px-4 py-3 border-b border-border last:border-b-0 relative"
+                    >
                       <div className="flex items-center justify-between w-full">
                         <span className={cn("text-sm", !n.read ? "font-semibold text-foreground" : "font-medium text-muted-foreground")}>
                           {n.title}
                         </span>
-                        <span className="text-[11px] text-muted-foreground/60">{new Date(n.createdAt).toLocaleTimeString()}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-muted-foreground/60">{new Date(n.createdAt).toLocaleTimeString()}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeNotification(n.id) }}
+                            className="shrink-0 rounded-md p-0.5 text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-foreground transition-all duration-200"
+                            title="Supprimer"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                       {n.body && <div className="text-xs text-muted-foreground/80 leading-relaxed">{n.body}</div>}
                       {!n.read && <span className="mt-1 size-1.5 rounded-full bg-primary" />}

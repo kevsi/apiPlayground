@@ -46,6 +46,7 @@ import { streamLLM, type StreamLLMOptions } from "@/src/ai/cloud-engine/llm";
 import { extractCitations } from "@/src/ai/cloud-engine/citations";
 import { detectLanguage } from "@/src/ai/cloud-engine/language";
 import { cn } from "@/lib/utils";
+import { loadAIProvider, loadApiKey, loadAiModel, loadAiBaseUrl, loadOllamaConfig } from "@/lib/projects-store";
 
 type AiTab = "analyse" | "debug" | "tests" | "explain" | "generate" | "optimize";
 
@@ -168,9 +169,13 @@ export function AIModal(props: AIModalProps) {
     setLlmError(null);
     setLlmOutput("");
     try {
-      // Provider config from localStorage (mirror use-ai-engine pattern)
-      const provider = (typeof window !== "undefined" && (localStorage.getItem("ai-provider") as any)) || "openai";
-      const apiKey = (typeof window !== "undefined" && localStorage.getItem(`ai-key-${provider}`)) || "";
+      // Provider config from persistence store
+      const provider = loadAIProvider();
+      const apiKey = loadApiKey(provider);
+      const model = loadAiModel(provider);
+      const openaiUrl = loadAiBaseUrl(provider);
+      const ollamaConfig = loadOllamaConfig();
+
       if (provider !== "ollama" && !apiKey) {
         setLlmError("Aucune clé API configurée. Va dans Settings → AI pour ajouter ta clé.");
         setLlmLoading(false);
@@ -180,6 +185,10 @@ export function AIModal(props: AIModalProps) {
       const streamOpts: StreamLLMOptions = {
         provider: provider as any,
         apiKey: apiKey || "",
+        model: model,
+        openaiUrl: openaiUrl,
+        host: ollamaConfig?.host,
+        port: ollamaConfig?.port,
         question: userPrompt || prompt,
         ctx,
         diagnostics,

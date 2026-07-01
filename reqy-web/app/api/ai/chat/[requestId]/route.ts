@@ -1,3 +1,7 @@
+export const dynamic = 'force-dynamic';
+export async function generateStaticParams() {
+  return [{ requestId: 'placeholder' }];
+}
 /**
  * Phase 5.3 — Chat history API routes
  *

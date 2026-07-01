@@ -4,6 +4,7 @@ import { useCallback, useState } from "react"
 import { useGraphqlTabsState } from "@/hooks/use-graphql-tabs-state"
 import { useGraphqlAI } from "@/hooks/use-graphql-ai"
 import { useRequestStore } from "@/hooks/use-request-store"
+import { useShallow } from "zustand/react/shallow"
 import { GraphqlTabBar } from "./graphql-tab-bar"
 import { GraphqlActiveToolbar } from "./graphql-active-toolbar"
 import { GraphqlRequestPanel } from "./graphql-request-panel"
@@ -42,9 +43,15 @@ export function GraphqlTabsManager() {
   const [saveCollectionId, setSaveCollectionId] = useState<string>("none")
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
 
-  const collections = useRequestStore().collections
-  const addCollection = useRequestStore().addCollection
-  const addRequestToCollection = useRequestStore().addRequestToCollection
+  // Was: 3× `useRequestStore().x` — each call re-subscribed to the whole
+  // store. Atomic selector for data + grouped actions via useShallow.
+  const collections = useRequestStore((s) => s.collections)
+  const { addCollection, addRequestToCollection } = useRequestStore(
+    useShallow((s) => ({
+      addCollection: s.addCollection,
+      addRequestToCollection: s.addRequestToCollection,
+    })),
+  )
 
   const { assistGraphql, fixGraphqlError, isLoading: aiLoading, error: aiError } = useGraphqlAI()
 

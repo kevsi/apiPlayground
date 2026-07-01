@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Check, ChevronsUpDown, Plus, Settings2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRequestStore, type EnvironmentVariable } from "@/hooks/use-request-store"
+import { useShallow } from "zustand/react/shallow"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -42,7 +43,20 @@ const envColors: Record<string, string> = {
 }
 
 export function EnvironmentSelector() {
-  const { environments, activeEnvironmentId, setActiveEnvironment, addEnvironment, updateEnvironment, deleteEnvironment } = useRequestStore()
+  // Data slices (atomic selectors) — the dropdown re-renders only when the
+  // environment list or the active id actually changes, not on every
+  // unrelated store mutation.
+  const environments = useRequestStore((s) => s.environments)
+  const activeEnvironmentId = useRequestStore((s) => s.activeEnvironmentId)
+  // Action refs are stable; group under useShallow.
+  const { setActiveEnvironment, addEnvironment, updateEnvironment, deleteEnvironment } = useRequestStore(
+    useShallow((s) => ({
+      setActiveEnvironment: s.setActiveEnvironment,
+      addEnvironment: s.addEnvironment,
+      updateEnvironment: s.updateEnvironment,
+      deleteEnvironment: s.deleteEnvironment,
+    })),
+  )
   
   const [isManageOpen, setIsManageOpen] = useState(false)
   const [editingEnvId, setEditingEnvId] = useState<string | null>(null)
@@ -106,7 +120,14 @@ export function EnvironmentSelector() {
 }
 
 function ManageEnvironmentsDialog({ open, onOpenChange, initialEditingId }: { open: boolean, onOpenChange: (open: boolean) => void, initialEditingId: string | null }) {
-  const { environments, addEnvironment, updateEnvironment, deleteEnvironment } = useRequestStore()
+  const environments = useRequestStore((s) => s.environments)
+  const { addEnvironment, updateEnvironment, deleteEnvironment } = useRequestStore(
+    useShallow((s) => ({
+      addEnvironment: s.addEnvironment,
+      updateEnvironment: s.updateEnvironment,
+      deleteEnvironment: s.deleteEnvironment,
+    })),
+  )
   const [selectedId, setSelectedId] = useState<string | null>(initialEditingId || (environments.length > 0 ? environments[0].id : null))
   const [envToDelete, setEnvToDelete] = useState<string | null>(null)
 

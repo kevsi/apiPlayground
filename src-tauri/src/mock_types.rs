@@ -60,6 +60,7 @@ pub struct MockRoute {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct TauriMockResponse {
     pub status: u16,
     pub body: String,

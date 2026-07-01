@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { memo, useState, useEffect } from "react"
 import { CheckCircle, Clock, FileText, Download, Play, Loader2, Sparkles, XCircle, AlertTriangle, ChevronDown, FlaskConical, Plus, GitCompare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,7 @@ interface ResponseStatusBarProps {
   onDiff?: () => void
 }
 
-export function ResponseStatusBar({
+export const ResponseStatusBar = memo(function ResponseStatusBar({
   responseStatus,
   responseTime,
   responseSize,
@@ -203,38 +203,6 @@ export function ResponseStatusBar({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {onAnalyze && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onAnalyze}
-            disabled={aiIsLoading || !hasResponse}
-            className="h-8 gap-1.5 text-xs font-medium transition-all duration-200"
-          >
-            {aiIsLoading ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="size-3.5" />
-            )}
-            AI Analyze
-          </Button>
-        )}
-        {onGenerateTests && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onGenerateTests}
-            disabled={aiIsLoading || !hasResponse}
-            className="h-8 gap-1.5 text-xs font-medium transition-all duration-200"
-          >
-            {aiIsLoading ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="size-3.5" />
-            )}
-            AI Tests
-          </Button>
-        )}
         {onCreateMock && (
           <Button
             variant="outline"
@@ -272,4 +240,4 @@ export function ResponseStatusBar({
       </div>
     </div>
   )
-}
+})

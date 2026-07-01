@@ -120,6 +120,7 @@ export function RequestTabBar({
                 type="button"
                 onClick={(e) => onCloseTab(tab.id, e)}
                 className="ml-0.5 rounded p-0.5 opacity-0 transition-all duration-150 hover:bg-muted-foreground/10 group-hover:opacity-100 hover:scale-110"
+                data-testid="tabbar-close-tab"
               >
                 <X className="size-3 text-muted-foreground/50 hover:text-foreground" />
               </button>
@@ -215,6 +216,7 @@ export function RequestTabBar({
             onClick={onAddTab}
             className="size-7 text-muted-foreground/50 hover:text-foreground transition-all duration-200"
             title="New tab"
+            data-testid="tabbar-add-tab"
           >
             <Plus className="size-4" />
           </Button>

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
 
 const GITHUB_USER_URL = "https://api.github.com/user"

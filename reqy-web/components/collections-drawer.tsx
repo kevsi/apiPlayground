@@ -9,6 +9,7 @@ interface CollectionsModalProps {
   onOpenChange: (open: boolean) => void
   collections: Collection[]
   onSelectRequest: (request: RequestItem) => void
+  onRunCollection?: (collection: Collection) => void
   onAddCollection: (data?: NewCollectionInput) => string
   onDeleteCollection: (id: string) => void
   onDuplicateCollection?: (id: string) => void
@@ -28,6 +29,7 @@ export function CollectionsModal({
   onOpenChange,
   collections,
   onSelectRequest,
+  onRunCollection,
   onAddCollection,
   onDeleteCollection,
   onDuplicateCollection,
@@ -66,6 +68,10 @@ export function CollectionsModal({
             onDeleteFolder={onDeleteFolder}
             onMoveRequestToFolder={onMoveRequestToFolder}
             onMoveFolder={onMoveFolder}
+            onRunCollection={onRunCollection ? ((collection) => {
+              onRunCollection(collection)
+              onOpenChange(false)
+            }) : undefined}
           />
         </div>
       </DialogContent>
