@@ -9,6 +9,8 @@ on:
 env:
   NODE_VERSION: "22"
   PNPM_VERSION: "9"
+  # Test-only secret — production secrets must come from GitHub Actions secrets.
+  AUTH_SIGNING_SECRET: "ci-test-secret-must-be-at-least-32-characters-long"
 
 jobs:
   lint:
@@ -34,7 +36,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Type check
+      - name: Type check (reqy-web)
+        run: npx tsc --noEmit
+
+      - name: Type check (sync-server)
+        working-directory: sync-server
+        run: npx tsc --noEmit
+
+      - name: Type check (reqy-cli)
+        working-directory: reqy-cli
+        run: npx tsc --noEmit
+
+      - name: Type check (reqy-mcp)
+        working-directory: reqy-mcp
         run: npx tsc --noEmit
 
       - name: Lint
@@ -63,7 +77,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
+      - name: Build reqy-web
+        run: pnpm build
+
+      - name: Build sync-server
+        working-directory: sync-server
         run: pnpm build
 
   test:

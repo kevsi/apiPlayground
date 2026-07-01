@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { extractPostmanCollection } from "@/lib/postman-collection"
+import { extractPostmanCollection } from "@/lib/postman"
 
 describe("extractPostmanCollection — main bug", () => {
   it("returns ALL requests, not just the first 3", () => {

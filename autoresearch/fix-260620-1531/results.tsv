@@ -1,7 +1,0 @@
-# metric_direction: lower_is_better
-iteration	timestamp	error_type	error_fixed	commit	metric	delta	guard	status	description
-0	2026-06-20T15:31:00Z	baseline	-	-	4	0	-	baseline	4 findings from predict: OAuth secrets, saveToStorageAsync, BroadcastChannel, MockHeaderChip
-1	2026-06-20T15:32:00Z	security-secrets	GitHub OAuth secrets	experiment: fix — replace real GitHub OAuth secrets in .env.example with placeholders	3	-1	-	keep	Replaced real GitHub OAuth client ID and secret with placeholder values in .env.example
-2	2026-06-20T15:32:15Z	persistence-data-loss	saveToStorageAsync fire-and-forget	experiment: fix — debounced save queue with retry for persistence reliability	2	-1	pass	keep	Added debounced save queue (300ms) with exponential backoff retry (3 attempts). Replaces fire-and-forget pattern.
-3	2026-06-20T15:33:15Z	cross-tab-sync	BroadcastChannel crash in incognito	experiment: fix — BroadcastChannel crash in incognito + storage event fallback + gen counter	1	-1	pass	keep	Wrapped BroadcastChannel in try/catch, added localStorage storage event fallback, added generation counter to avoid stale reloads
-4	2026-06-20T15:36:30Z	dead-component	MockHeaderChip returns null with side effects	experiment: fix — remove dead MockHeaderChip component	1	-1	pass	keep	Removed MockHeaderChip.tsx (returned null unconditionally). Side effects not ported — component was dead code (never rendered UI, only fetched config on mount).

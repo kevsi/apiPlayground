@@ -1,20 +1,107 @@
 /**
- * Pure extraction logic for Postman v2.1 collections → Reqly shape.
+ * Postman integration — single barrel entry point.
  *
- * Lives outside the Next.js route so it can be unit-tested in isolation and
- * reused by other importers (CLI, MCP, sync server, etc.).
+ * Replaces the historical split across `lib/postman.ts`, `lib/postman-api.ts`,
+ * and `lib/postman-collection.ts`. Import everything from `@/lib/postman`.
  *
- * What this handles (deliberately exhaustive — the old per-route helper missed
- * most of these):
- *   • Recursive folder traversal with **consistent** folder IDs shared between
- *     the folder tree and the request folderId references.
- *   • Body modes: raw (json|text), urlencoded, formdata (text fields),
- *     graphql, file (binary placeholder).
- *   • Auth: bearer, basic (base64 user:pass), apikey, oauth2 access token,
- *     noauth.
- *   • Disabled query params and formdata fields are filtered out.
- *   • URL is preserved verbatim (Postman may already contain variables).
+ * Sections in this file:
+ *   1. API client (low-level HTTP, auth header, timeout, error class)
+ *   2. High-level helpers (validate API key)
+ *   3. v2.1 collection extractor (folders, requests, body modes, auth)
  */
+
+// ─────────────────────────────────────────────────────────────────────────
+// 1. API client
+// ─────────────────────────────────────────────────────────────────────────
+
+const POSTMAN_API_BASE = "https://api.postman.com"
+const TIMEOUT_MS = 10000
+
+export class PostmanApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message)
+    this.name = "PostmanApiError"
+  }
+}
+
+export async function postmanFetch(
+  apiKey: string,
+  path: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  try {
+    return await fetch(`${POSTMAN_API_BASE}${path}`, {
+      ...options,
+      headers: {
+        "X-API-Key": apiKey,
+        Accept: "application/vnd.api.v10+json",
+        "User-Agent": "Reqly/1.0",
+        ...(options.headers ?? {}),
+      },
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+export async function postmanFetchJson<T = unknown>(
+  apiKey: string,
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const res = await postmanFetch(apiKey, path, options)
+  if (!res.ok) {
+    let msg = ""
+    try {
+      const body = await res.json()
+      msg = body?.error?.message ?? body?.message ?? ""
+    } catch {
+      /* body not JSON */
+    }
+    throw new PostmanApiError(res.status, msg || `Erreur Postman (HTTP ${res.status})`)
+  }
+  return res.json()
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 2. High-level helpers
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface PostmanUser {
+  username: string
+  email?: string
+}
+
+export async function validatePostmanApiKey(apiKey: string): Promise<PostmanUser> {
+  try {
+    const data = await postmanFetchJson<any>(apiKey, "/me")
+    return {
+      username: data.user?.username ?? data.username ?? "unknown",
+      email: data.user?.email ?? data.email,
+    }
+  } catch (err) {
+    if (err instanceof PostmanApiError) {
+      if (err.status === 429) {
+        throw new PostmanApiError(
+          429,
+          "Limite de requêtes Postman atteinte, réessayez plus tard"
+        )
+      }
+      throw err
+    }
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new PostmanApiError(0, "Timeout : Postman n'a pas répondu en 10s")
+    }
+    throw new PostmanApiError(0, "Erreur réseau, réessayez")
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 3. v2.1 collection extractor
+// ─────────────────────────────────────────────────────────────────────────
 
 /**
  * The Reqly store schema (lib/types.ts) defines `bodyType` as one of:
@@ -153,7 +240,6 @@ function extractBody(
   const body = (req as { body?: unknown }).body
   if (!body) return { body: "" }
 
-  // Legacy Postman format: body is a plain string.
   if (typeof body === "string") return { body, bodyType: "raw" }
 
   if (!isPlainObject(body)) return { body: "" }
@@ -264,7 +350,7 @@ function extractAuth(req: unknown): {
         findAuthValue(a.oauth2, "token")
       return {
         authType: "oauth2",
-        ...(accessToken ? { authToken: accessToken } : {}),
+        ...(accessToken ? { authToken: accessToken } : {}) ,
       }
     }
     case "noauth":
@@ -276,12 +362,6 @@ function extractAuth(req: unknown): {
 
 /**
  * Walk a Postman collection item tree and extract folders + requests.
- *
- * The two output arrays are guaranteed to be coherent: every request.folderId
- * (when non-null) points to an entry in the returned folders array, and every
- * folder.parentId points either to null (root) or another folder in the same
- * array. Folders are emitted in DFS pre-order so a client that creates them
- * sequentially (parent → child) sees no dangling parentIds.
  */
 export function extractPostmanCollection(items: unknown): ExtractedCollection {
   const folders: ExtractedFolder[] = []
@@ -293,8 +373,6 @@ export function extractPostmanCollection(items: unknown): ExtractedCollection {
       if (!isPlainObject(raw)) continue
       const item = raw as { name?: unknown; item?: unknown[]; request?: unknown }
 
-      // Folder: has a sub-item array AND no inline request.
-      // (Postman stores either-or; we trust that invariant.)
       if (Array.isArray(item.item) && !item.request) {
         const folderId = randomId("folder")
         const name = typeof item.name === "string" && item.name.trim()
@@ -305,8 +383,6 @@ export function extractPostmanCollection(items: unknown): ExtractedCollection {
         continue
       }
 
-      // Some Postman exports put the request on the same object as `item` —
-      // in that case we treat it as a request regardless of `item` presence.
       if (!item.request) continue
 
       const req = item.request as {

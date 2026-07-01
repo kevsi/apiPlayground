@@ -5,8 +5,7 @@ import {
   postmanImportBodySchema,
   postmanImportResponseSchema,
 } from "@/lib/import-schemas"
-import { postmanFetchJson, PostmanApiError } from "@/lib/postman-api"
-import { extractPostmanCollection } from "@/lib/postman-collection"
+import { postmanFetchJson, PostmanApiError, extractPostmanCollection } from "@/lib/postman"
 
 /**
  * Legacy Postman import endpoint.

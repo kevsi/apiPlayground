@@ -1,8 +1,8 @@
 /**
  * Python route detector smoke tests.
- * Run: npx tsx lib/project-analyzer.python.test.ts
+ * Run: npx tsx scripts/run-project-analyzer.ts
  */
-import { detectDjango, detectFastAPI, detectFlask } from "./detect-shared"
+import { detectDjango, detectFastAPI, detectFlask } from "../lib/detect-shared"
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -80,7 +80,7 @@ assert(
   "DRF router.register users",
 )
 
-console.log("project-analyzer.python.test.ts: all assertions passed")
+console.log("scripts/run-project-analyzer.ts: all assertions passed")
 console.log(`  FastAPI: ${fastApiRoutes.length} routes`)
 console.log(`  Flask: ${flaskRoutes.length} routes`)
 console.log(`  Django: ${djangoRoutes.length} routes`)

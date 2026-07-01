@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
-import { postmanFetchJson, PostmanApiError } from "@/lib/postman-api"
+import { postmanFetchJson, PostmanApiError } from "@/lib/postman"
 
 async function fetchCollectionDetails(apiKey: string, collectionId: string) {
   try {

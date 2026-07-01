@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
-import { postmanFetchJson, PostmanApiError } from "@/lib/postman-api"
-import { extractPostmanCollection } from "@/lib/postman-collection"
+import { postmanFetchJson, PostmanApiError, extractPostmanCollection } from "@/lib/postman"
 
 const bodySchema = {
   parse(input: unknown): { collectionId: string } {

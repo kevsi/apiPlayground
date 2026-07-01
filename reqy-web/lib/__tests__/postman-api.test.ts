@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { postmanFetch, postmanFetchJson, PostmanApiError } from "@/lib/postman-api"
+import { postmanFetch, postmanFetchJson, PostmanApiError } from "@/lib/postman"
 
 describe("postmanFetch", () => {
   beforeEach(() => {

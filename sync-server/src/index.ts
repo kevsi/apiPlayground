@@ -1,4 +1,5 @@
-import http from "node:http"
+import { serve } from "@hono/node-server"
+import { serveStatic } from "@hono/node-server/serve-static"
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { WebSocketServer } from "ws"
@@ -35,44 +36,22 @@ app.route("/api/sync", sync)
 
 const port = Number(process.env.PORT ?? 4000)
 
-const server = http.createServer(async (req, res) => {
-  try {
-    const protocol = (req.headers["x-forwarded-proto"] as string) ?? "http"
-    const host = req.headers.host ?? `localhost:${port}`
-    const url = `${protocol}://${host}${req.url ?? "/"}`
-    const headers = new Headers()
-    for (const [k, v] of Object.entries(req.headers)) {
-      if (v == null) continue
-      if (Array.isArray(v)) headers.set(k, v.join(", "))
-      else headers.set(k, v)
-    }
-
-    const method = req.method ?? "GET"
-    const init: RequestInit = { method, headers }
-
-    if (method !== "GET" && method !== "HEAD") {
-      const chunks: Buffer[] = []
-      for await (const chunk of req) chunks.push(chunk as Buffer)
-      init.body = Buffer.concat(chunks)
-      // `duplex` is a Node fetch extension not in lib.dom's RequestInit
-      ;(init as RequestInit & { duplex?: "half" | "full" }).duplex = "half"
-    }
-
-    const honoRes = await app.fetch(new Request(url, init))
-    res.statusCode = honoRes.status
-    honoRes.headers.forEach((v, k) => res.setHeader(k, v))
-    const body = await honoRes.arrayBuffer()
-    res.end(Buffer.from(body))
-  } catch (err) {
-    res.statusCode = 500
-    res.setHeader("Content-Type", "application/json")
-    res.end(JSON.stringify({ error: err instanceof Error ? err.message : "Internal error" }))
-  }
-})
+// @hono/node-server streams request bodies natively (no Buffer.concat),
+// handles chunked transfer, and integrates with Node's HTTP server lifecycle.
+const node = serve(
+  {
+    fetch: app.fetch,
+    port,
+    hostname: process.env.HOST ?? "0.0.0.0",
+  },
+  (info) => {
+    console.log(`[reqly-sync] listening on http://${info.address}:${info.port}`)
+  },
+)
 
 const wss = new WebSocketServer({ noServer: true })
 
-server.on("upgrade", (req, socket, head) => {
+node.on("upgrade", (req, socket, head) => {
   if (req.url?.startsWith("/api/sync/ws")) {
     handleWsUpgrade(req, socket, head, wss)
     return
@@ -80,14 +59,10 @@ server.on("upgrade", (req, socket, head) => {
   socket.destroy()
 })
 
-server.listen(port, () => {
-  console.log(`[reqly-sync] listening on http://localhost:${port}`)
-})
-
 function shutdown() {
   console.log("[reqly-sync] shutting down")
   closeAll()
-  server.close(() => process.exit(0))
+  node.close(() => process.exit(0))
   // Force exit after 5s if close hangs
   setTimeout(() => process.exit(0), 5000).unref()
 }

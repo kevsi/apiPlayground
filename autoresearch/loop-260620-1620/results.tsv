@@ -1,9 +1,0 @@
-﻿# metric_direction: lower_is_better
-0	2026-06-20T16:21:04Z	1aaefe7	0	0.0	-	-	baseline	initial state
-1	2026-06-20T16:22:14Z	4ec102c	0	0.0	-	-	keep	extract TauriFsAdapter into dedicated file
-2	2026-06-20T16:23:26Z	e5dd9c6	0	0.0	-	-	keep	create withCrossTabSync middleware
-3	2026-06-20T16:23:26Z	e5dd9c6	0	0.0	-	-	keep	add onMessage registration to middleware
-4	2026-06-20T16:23:00Z	4414c1d	0	0.0	-	-	keep	wire withCrossTabSync into use-request-store
-5	2026-06-20T16:23:30Z	bc26c7c	0	0.0	-	-	keep	create use-sync-state hook
-6	2026-06-20T16:23:45Z	bc26c7c	0	0.0	-	-	keep	create SyncStatusBanner component
-7	2026-06-20T16:24:30Z	0a0bf70	0	0.0	-	-	keep	wire SyncState into use-request-store save
