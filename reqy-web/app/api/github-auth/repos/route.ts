@@ -1,15 +1,8 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
+import { buildGithubHeaders } from "@/lib/github-auth/headers"
 
 const GITHUB_REPOS_URL = "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,organization_member"
-
-function buildGithubHeaders(token: string): Record<string, string> {
-  return {
-    Accept: "application/vnd.github.v3+json",
-    "User-Agent": "api-playground",
-    Authorization: `Bearer ${token}`,
-  }
-}
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get("github_token")?.value

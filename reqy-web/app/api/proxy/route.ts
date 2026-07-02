@@ -7,93 +7,12 @@ import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils"
 import { isBoolean, isHttpMethod } from "@/lib/type-guards"
 import { InMemoryRateLimiter, UpstashRateLimiter, type DistributedRateLimiter, type RateLimitResult } from "@/lib/rate-limiter"
 import { getServerEnv } from "@/lib/env"
-import dns from "node:dns/promises"
+import { isPrivateHost, isBlockedIp } from "@/lib/security/ssrf"
+import { readWithCap } from "@/lib/security/streaming"
+import { resolveCached } from "@/lib/security/dns-cache"
 import { isIP } from "node:net"
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
-
-const PRIVATE_CIDRS_V4: Array<[string, number]> = [
-  ["0.0.0.0", 8],
-  ["10.0.0.0", 8],
-  ["100.64.0.0", 10],   // CGNAT (RFC 6598)
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],  // link-local
-  ["172.16.0.0", 12],
-  ["192.0.0.0", 24],
-  ["192.0.2.0", 24],    // TEST-NET-1
-  ["192.88.99.0", 24],
-  ["192.168.0.0", 16],
-  ["198.18.0.0", 15],   // benchmarking
-  ["198.51.100.0", 24], // TEST-NET-2
-  ["203.0.113.0", 24],  // TEST-NET-3
-  ["224.0.0.0", 4],     // multicast
-  ["240.0.0.0", 4],     // reserved / broadcast
-]
-
-const PRIVATE_CIDRS_V6: Array<[string, number]> = [
-  ["::", 128],
-  ["::1", 128],
-  ["::ffff:0:0", 96],   // IPv4-mapped
-  ["64:ff9b::", 96],    // NAT64
-  ["100::", 64],
-  ["2001::", 32],
-  ["2001:db8::", 32],
-  ["fc00::", 7],        // ULA
-  ["fe80::", 10],       // link-local
-]
-
-function ipToBigInt(ip: string): bigint {
-  const v = isIP(ip)
-  if (v === 4) {
-    const parts = ip.split(".").map(Number)
-    const n =
-      ((parts[0] << 24) >>> 0) +
-      ((parts[1] << 16) >>> 0) +
-      ((parts[2] << 8) >>> 0) +
-      parts[3]
-    return BigInt(n >>> 0)
-  }
-  const groups = ip.split(":")
-  let head: number[] = []
-  let tail: number[] = []
-  let hasEmpty = false
-  for (const g of groups) {
-    if (g === "") {
-      hasEmpty = true
-    } else {
-      (hasEmpty ? tail : head).push(parseInt(g, 16))
-    }
-  }
-  const fill = 8 - head.length - tail.length
-  const full = hasEmpty ? [...head, ...new Array(fill).fill(0), ...tail] : [...head, ...tail]
-  let acc = BigInt(0)
-  for (const g of full) acc = (acc << BigInt(16)) + BigInt(g)
-  return acc
-}
-
-function ipInCidr(ip: string, cidr: [string, number]): boolean {
-  const v = isIP(ip)
-  const v6 = isIP(cidr[0])
-  if (v !== v6) return false
-  const ipN = ipToBigInt(ip)
-  const netN = ipToBigInt(cidr[0])
-  const bits = BigInt(v === 4 ? 32 - cidr[1] : 128 - cidr[1])
-  if (bits === BigInt(0)) return ipN === netN
-  return (ipN >> bits) === (netN >> bits)
-}
-
-function isBlockedIp(ip: string): boolean {
-  const v = isIP(ip)
-  if (v === 4) return PRIVATE_CIDRS_V4.some((c) => ipInCidr(ip, c))
-  if (v === 6) {
-    if (ip.toLowerCase().startsWith("::ffff:")) {
-      const v4 = ip.substring(7)
-      if (isIP(v4) === 4 && isBlockedIp(v4)) return true
-    }
-    return PRIVATE_CIDRS_V6.some((c) => ipInCidr(ip, c))
-  }
-  return true // unknown literal — fail-closed
-}
 
 const rateLimiter: DistributedRateLimiter = (() => {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -312,18 +231,19 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // 2) Resolve DNS once, check the resolved address, and PIN it in the
+      // 2) Resolve DNS once (cached), check the resolved address, and PIN it in the
       //    outbound URL so DNS rebinding between check and fetch cannot
-      //    redirect to a private IP.
+      //    redirect to a private IP. The cache is per-instance — on serverless
+      //    each cold start pays the lookup cost; on self-hosted Node the cache
+      //    absorbs bursts to the same host.
       let resolvedIp: string
-      try {
-        const dnsStart = Date.now()
-        const { address } = await dns.lookup(parsedUrl.hostname, { all: false })
-        timings.dnsMs = Date.now() - dnsStart
-        resolvedIp = address
-      } catch {
+      const dnsStart = Date.now()
+      const address = await resolveCached(parsedUrl.hostname)
+      timings.dnsMs = Date.now() - dnsStart
+      if (!address) {
         return structuredError("DNS resolution failed", "DNS_ERROR", 400)
       }
+      resolvedIp = address
 
       if (isBlockedIp(resolvedIp)) {
         return structuredError(
@@ -391,6 +311,12 @@ export async function POST(request: NextRequest) {
       headers: finalHeaders,
       body: bodyToSend,
       signal: controller.signal,
+      // SSRF hardening: do NOT follow redirects automatically. An attacker
+      // could host a public URL that responds 302 → http://10.0.0.1/, which
+      // fetch would silently follow past our SSRF guard. With redirect:
+      // 'manual' we surface the 3xx to the caller, who can decide to
+      // re-validate the Location against the SSRF guard before following.
+      redirect: "manual",
     }).finally(() => clearTimeout(timeout))
 
     // TTFB approximation: time from request start until response headers
@@ -418,37 +344,14 @@ export async function POST(request: NextRequest) {
 
     // Stream the response body and cancel as soon as the cap is reached,
     // so we don't waste memory buffering a multi-GB payload just to throw
-    // 99% of it away.
+    // 99% of it away. See `lib/security/streaming.ts` for the unit tests.
     const reader = response.body?.getReader()
     if (!reader) {
       body = ""
       size = 0
     } else {
-      const chunks: Uint8Array[] = []
-      let received = 0
-      let truncated = false
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          if (!value) continue
-          const remaining = MAX_RESPONSE_BODY_SIZE - received
-          if (value.byteLength > remaining) {
-            chunks.push(value.subarray(0, Math.max(0, remaining)))
-            received += remaining
-            truncated = true
-            try { await reader.cancel() } catch { /* ignore */ }
-            break
-          }
-          chunks.push(value)
-          received += value.byteLength
-        }
-      } finally {
-        // Ensure the reader lock is released even on error paths
-        try { reader.releaseLock() } catch { /* ignore */ }
-      }
-      const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)))
-      size = buf.byteLength
+      const { body: buf, size: bytesRead, truncated } = await readWithCap(reader, MAX_RESPONSE_BODY_SIZE)
+      size = bytesRead
       if (isBinary) {
         body = buf.toString("base64")
         encoding = "base64"

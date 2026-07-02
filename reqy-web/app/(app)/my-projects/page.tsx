@@ -8,7 +8,7 @@ import { RouteModal } from '@/components/route-modal';
 import { ImportGithubModal } from '@/components/import-github-modal';
 import { AlertDialog, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useRequestStore } from '@/hooks/use-request-store';
-import type { SavedProject } from '@/types';
+import type { SavedProject } from '@/lib/types';
 import { analyzeProject } from '@/lib/project-analyzer';
 import { toast } from '@/hooks/use-toast';
 

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/hooks/use-toast"
-import type { SavedProject, AnalysisMode } from "@/types"
+import type { SavedProject, AnalysisMode } from "@/lib/types"
 
 interface ImportGithubModalProps {
   open: boolean

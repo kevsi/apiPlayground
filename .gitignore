@@ -31,6 +31,7 @@ secrets.txt
 **/lint-output.txt
 **/package-lock.json
 reqy-web/out/
+sync-server/dist/
 **/test-results/
 *.tsbuildinfo
 

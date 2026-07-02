@@ -15,7 +15,7 @@
 import { get, set } from "idb-keyval"
 import { isTauriAvailable } from "@/lib/tauri"
 import { StorageError, IndexedDbError } from "@/lib/storage-error"
-import { TauriFsAdapter } from "@/lib/store/adapters/tauri-fs-adapter"
+import { TauriFsAdapter } from "@/hooks/store/adapters/tauri-fs-adapter"
 
 export interface StorageAdapter {
   load(key: string): Promise<string | null>

@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from "next/server"
  * To re-enable auth in the future:
  *   1. Build the `/login` and `/signup` pages (or whatever UI is chosen).
  *   2. Implement `app/api/auth/{signin,signup,callback,session}` routes
- *      (HMAC cookie mint/verify lives in `lib/session.ts`).
+ *      with HMAC cookie mint/verify (helper to write: create lib/session.ts).
  *   3. Replace this function's body with the gate logic — the previous
  *      implementation is recoverable from git history at tag
  *      `v0.2.0-security-hardening` (commit `6fc5301` introduced it).

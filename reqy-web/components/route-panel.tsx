@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import type { SavedProject } from '../types'
+import type { SavedProject } from '../lib/types'
 
 interface RoutePanelProps {
   project: SavedProject

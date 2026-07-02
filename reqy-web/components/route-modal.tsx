@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import type { SavedProject } from '../types'
+import type { SavedProject } from '../lib/types'
 import { useRequestStore } from "@/hooks/use-request-store"
 import { useShallow } from "zustand/react/shallow"
 import { Layers, CheckCircle, Copy, Shield, ShieldOff, ChevronDown, ChevronRight, FileText, Search, X, Package, Server, Route, Lock, Unlock, List, Code2, Info } from "lucide-react"

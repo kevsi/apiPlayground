@@ -30,9 +30,9 @@ import type {
 } from "./request-types"
 
 import type { CurrentRequest, LastResponse } from "@/lib/ai-engine"
-import type { SavedProject } from "@/types"
+import type { SavedProject } from "@/lib/types"
 import { runProactiveAnalysis } from "./store-analysis"
-import { withCrossTabSync } from "@/lib/store/middleware/with-cross-tab-sync"
+import { withCrossTabSync } from "@/hooks/store/middleware/with-cross-tab-sync"
 import { storageAdapter } from "@/lib/storage-adapter"
 import { WORKSPACE_PERSONAL_ID } from "./store/types"
 import { createNotificationsMutations } from "./store/notifications"

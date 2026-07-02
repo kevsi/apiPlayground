@@ -1,6 +1,6 @@
 "use client"
 
-import type { SavedProject } from "@/types"
+import type { SavedProject } from "@/lib/types"
 import type { CommitFn } from "./types"
 import { WORKSPACE_PERSONAL_ID } from "./types"
 

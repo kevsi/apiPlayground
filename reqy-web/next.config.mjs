@@ -42,7 +42,7 @@ const securityHeaders = [
   },
   // HSTS only in production — breaks dev over plain HTTP otherwise.
   ...(process.env.NODE_ENV === "production"
-    ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
+    ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" }]
     : []),
 ]
 

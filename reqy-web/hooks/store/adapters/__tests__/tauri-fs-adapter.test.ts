@@ -18,7 +18,7 @@ vi.mock('@tauri-apps/api/path', () => ({
   appDataDir: (...args: unknown[]) => mockAppDataDir(...args),
 }))
 
-import { TauriFsAdapter } from '@/lib/store/adapters/tauri-fs-adapter'
+import { TauriFsAdapter } from '@/hooks/store/adapters/tauri-fs-adapter'
 import { TauriError } from '@/lib/storage-error'
 
 describe('TauriFsAdapter.load', () => {
