@@ -39,6 +39,9 @@ const mockBaseUrl = ""
 // Allow per-workspace override (keyed by workspace id)
 const mockEnabledByWorkspace: Record<string, boolean> = {}
 
+const MAX_LOGS = 200
+const mockLogs: MockLogEntry[] = []
+
 // Use centralized workspace normalizer
 const normalizeWorkspaceId = (workspaceId?: string | null): string => WORKSPACE_NORMALIZER.normalize(workspaceId)
 
@@ -90,17 +93,13 @@ export function getActiveMockRoutesForServer(serverPrefix: string, workspaceId?:
 }
 
 export function addMockLog(entry: MockLogEntry): void {
-  const MAX_LOGS = 200
-  let mockLogs: MockLogEntry[] = []
   mockLogs.push(entry)
   if (mockLogs.length > MAX_LOGS) {
-    mockLogs = mockLogs.slice(-MAX_LOGS)
+    mockLogs.splice(0, mockLogs.length - MAX_LOGS)
   }
 }
 
 export function getMockLogs(): MockLogEntry[] {
-  const MAX_LOGS = 200
-  let mockLogs: MockLogEntry[] = []
   return mockLogs
 }
 

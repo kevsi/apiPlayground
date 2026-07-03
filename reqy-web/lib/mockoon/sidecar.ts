@@ -46,7 +46,7 @@ export async function startMockoonSidecar(
 
     const timeout = setTimeout(() => {
       proc.kill()
-      reject(new Error("Mockoon CLI failed to start within 5s"))
+      reject(new Error(`Mockoon CLI failed to start within 5s. stderr: ${stderrBuffer.trim() || "(none)"}`))
     }, 5000)
 
     proc.on("error", (err) => {

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import type { RequestItem, Collection, HistoryItem } from "@/hooks/use-request-store"
 import { isTauriAvailable } from "@/lib/tauri"
 import { getMockRoutes, setMockRoutes, isMockEnabledGlobally, setMockEnabledGlobally, reloadMockoonServer } from "@/lib/tauri-mock"
-import type { MockRoute, MockRouteRateLimit, MockRouteVariant, MockServerConfig, MockServer } from "@/lib/mock-types"
+import type { MockRoute, MockServerConfig, MockServer } from "@/lib/mock-types"
 import { MOCK_CONFIG_UPDATED_EVENT } from "@/lib/mock-events"
 import { persistence } from "@/lib/persistence"
 
@@ -16,10 +16,6 @@ export interface MockLogEntry {
   matchedRouteName: string
   responseStatus: number
   delay: number
-}
-
-interface MockStore {
-  routes: MockRoute[]
 }
 
 const STORAGE_KEY = "reqly-mock-routes"
@@ -82,7 +78,7 @@ function loadFromStorage(): MockRoute[] {
     const routes: MockRoute[] = persistence.getItem<MockRoute[]>(STORAGE_KEY) || []
     return routes.map((r) => ({
       ...r,
-      workspaceId: (r as any).workspaceId || "ws-personal",
+      workspaceId: (r as MockRoute & { workspaceId?: string }).workspaceId || "ws-personal",
     }))
   } catch {
     return []
@@ -99,29 +95,6 @@ async function saveToStorage(routes: MockRoute[]) {
 let _id = 0
 function generateId(): string {
   return `mock_${Date.now()}_${++_id}_${Math.random().toString(36).substring(2, 7)}`
-}
-
-function generateLocalPrefix(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 32) || "server"
-}
-
-function generatePrefixFromUrl(baseUrl: string): string {
-  if (!baseUrl.trim()) return "local"
-  try {
-    const url = new URL(baseUrl)
-    const host = url.hostname
-    // Extract domain name without TLD (e.g., 'jsonplaceholder' from 'jsonplaceholder.typicode.com')
-    const parts = host.split(".")
-    const domain = parts.length > 1 ? parts[0] : host
-    return generateLocalPrefix(domain)
-  } catch {
-    return generateLocalPrefix(baseUrl.split("/").filter(Boolean)[0] || "api")
-  }
 }
 
 function createDefaultServer(): MockServer {

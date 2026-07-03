@@ -44,7 +44,7 @@ describe("POST /api/mockoon/reload", () => {
       },
     ]
 
-    const response = await POST(makeRequest(routes) as any)
+    const response = await POST(makeRequest(routes) as unknown as Request)
     const json = await response.json()
 
     expect(response.status).toBe(200)
