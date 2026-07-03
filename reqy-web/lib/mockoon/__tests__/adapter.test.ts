@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import type { MockRoute } from "@/lib/mock-types"
+import type { MockRoute, MockServer } from "@/lib/mock-types"
 import {
   convertMockRoutesToEnvironment,
   environmentToJson,
@@ -29,7 +29,7 @@ describe("convertMockRoutesToEnvironment", () => {
       },
     ]
 
-    const env = convertMockRoutesToEnvironment(routes, { name: "test", port: 9001 })
+    const env = convertMockRoutesToEnvironment(routes, [], { name: "test", port: 9001 })
 
     expect(env.name).toBe("test")
     expect(env.port).toBe(9001)
@@ -57,7 +57,7 @@ describe("convertMockRoutesToEnvironment", () => {
       },
     ]
 
-    const env = convertMockRoutesToEnvironment(routes, { name: "test", port: 9001 })
+    const env = convertMockRoutesToEnvironment(routes, [], { name: "test", port: 9001 })
     expect(env.routes).toHaveLength(0)
   })
 
@@ -91,14 +91,48 @@ describe("convertMockRoutesToEnvironment", () => {
       },
     ]
 
-    const env = convertMockRoutesToEnvironment(routes, { name: "test", port: 9001 })
+    const env = convertMockRoutesToEnvironment(routes, [], { name: "test", port: 9001 })
     expect(env.routes[0].responses).toHaveLength(2)
+  })
+
+  it("prefixes endpoints with the route's server localPrefix", () => {
+    const servers: MockServer[] = [
+      {
+        id: "s1",
+        name: "Payments",
+        baseUrl: "http://localhost:3001",
+        localPrefix: "/payments",
+        enabled: true,
+        createdAt: 0,
+      },
+    ]
+
+    const routes: MockRoute[] = [
+      {
+        id: "r1",
+        name: "Charge",
+        method: "POST",
+        pathPattern: "/charge",
+        responseStatus: 200,
+        responseHeaders: {},
+        responseBody: "{}",
+        contentType: "application/json",
+        delay: 0,
+        enabled: true,
+        serverId: "s1",
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ]
+
+    const env = convertMockRoutesToEnvironment(routes, servers, { name: "test", port: 9001 })
+    expect(env.routes[0].endpoint).toBe("/payments/charge")
   })
 })
 
 describe("environmentToJson", () => {
   it("serializes environment to JSON", () => {
-    const env = convertMockRoutesToEnvironment([], { name: "empty", port: 9001 })
+    const env = convertMockRoutesToEnvironment([], [], { name: "empty", port: 9001 })
     const json = environmentToJson(env)
     expect(json).toContain('"name": "empty"')
     expect(JSON.parse(json).port).toBe(9001)
