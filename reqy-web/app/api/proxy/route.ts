@@ -1,7 +1,5 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
-import { getActiveMockRoutesForWorkspace, getMockServers, isMockEnabledForWorkspace } from "@/lib/mock-store"
-import { resolveMockMatch, applyMockDelay, buildMockHeaders } from "@/lib/mock-resolver"
 import { validateProxyPayload } from "@/lib/schemas/proxy"
 import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils"
 import { isBoolean, isHttpMethod } from "@/lib/type-guards"
@@ -50,11 +48,6 @@ function isPrivateHost(hostname: string): boolean {
   if (isIP(lower)) return isBlockedIp(lower)
   // Otherwise: rely on DNS pre-resolution in the caller. Fail-closed here too.
   return true
-}
-
-function isRouteServerEnabled(route: { serverId?: string }): boolean {
-  if (!route.serverId) return true
-  return getMockServers().some((server) => server.id === route.serverId && server.enabled)
 }
 
 function validateUrl(rawUrl: string): { valid: boolean; parsed?: URL; error?: string } {
@@ -167,54 +160,7 @@ export async function POST(request: NextRequest) {
     parsedUrl = urlValidation.parsed!
     targetUrl = parsedUrl.href
 
-    // ── Mock check — intercept BEFORE SSRF guard ─────────────────────────
-    const pathname = parsedUrl.pathname
-
-    // Determine workspace context (payload overrides header) using centralized normalizer
-    const workspaceIdFromPayload = validPayload.workspaceId
-    const workspaceIdFromHeader = request.headers.get("x-workspace-id")
-    workspaceId = WORKSPACE_NORMALIZER.normalize(workspaceIdFromPayload ?? workspaceIdFromHeader ?? undefined)
-
-    if (isMockEnabledForWorkspace(workspaceId)) {
-      const activeRoutes = getActiveMockRoutesForWorkspace(workspaceId).filter(isRouteServerEnabled)
-      const requestQuery = Object.fromEntries(parsedUrl.searchParams.entries())
-      const resolved = resolveMockMatch(activeRoutes, {
-        method,
-        pathname,
-        query: requestQuery,
-        headers,
-      })
-
-      if (resolved) {
-        if (resolved.rateLimited) {
-          return NextResponse.json(JSON.parse(resolved.body), {
-            status: 429,
-            headers: buildMockHeaders(resolved.route, resolved.headers, 0, {
-              rateLimited: true,
-              retryAfterSeconds: resolved.route.rateLimit?.windowSeconds,
-              debug: `proxy|rate-limited|workspace:${resolved.route.workspaceId || "ws-personal"}|pathname:${pathname}`,
-            }),
-          })
-        }
-
-        await applyMockDelay(resolved.delay)
-
-        const responseHeaders = buildMockHeaders(resolved.route, resolved.headers, resolved.delay, {
-          debug: `proxy|matched|workspace:${resolved.route.workspaceId || "ws-personal"}|pathname:${pathname}|pattern:${resolved.route.pathPattern}`,
-          variantId: resolved.variantId,
-          variantName: resolved.variantName,
-        })
-
-        return NextResponse.json({
-          status: resolved.status,
-          body: resolved.body,
-          headers: responseHeaders,
-          encoding: "utf8",
-          mocked: true,
-        })
-      }
-    }
-
+    // ── SSRF protection ──────────────────────────────────────────────────
     // ── SSRF protection ──────────────────────────────────────────────────
     // Allow local testing in development mode or if explicitly enabled
     const env = getServerEnv()
@@ -266,11 +212,6 @@ export async function POST(request: NextRequest) {
     const finalHeaders: Record<string, string> = Object.fromEntries(
       Object.entries(headers).map(([key, value]) => [key, String(value)]),
     )
-
-    const targetIsLocalMock = parsedUrl.origin === request.nextUrl.origin && parsedUrl.pathname.startsWith("/mock/")
-    if (targetIsLocalMock && workspaceId) {
-      finalHeaders["x-workspace-id"] = workspaceId
-    }
 
     // SSRF protection: pin Host header to original hostname when IP was rewritten.
     if (hostOverride) {
