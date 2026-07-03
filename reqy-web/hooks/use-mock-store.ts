@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import type { RequestItem, Collection, HistoryItem } from "@/hooks/use-request-store"
 import { isTauriAvailable } from "@/lib/tauri"
-import { getMockRoutes, setMockRoutes, isMockEnabledGlobally, setMockEnabledGlobally } from "@/lib/tauri-mock"
+import { getMockRoutes, setMockRoutes, isMockEnabledGlobally, setMockEnabledGlobally, reloadMockoonServer } from "@/lib/tauri-mock"
 import type { MockRoute, MockRouteRateLimit, MockRouteVariant, MockServerConfig, MockServer } from "@/lib/mock-types"
 import { MOCK_CONFIG_UPDATED_EVENT } from "@/lib/mock-events"
 import { persistence } from "@/lib/persistence"
@@ -504,6 +504,13 @@ async function syncToBackend(routes: MockRoute[], config?: MockServerConfig, ser
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ routes, baseUrl: config?.baseUrl, servers }),
     })
+
+    // Reload Mockoon CLI sidecar with current active routes.
+    const activeRoutes = routes.filter((r) => r.enabled)
+    const result = await reloadMockoonServer(activeRoutes)
+    if (!result.ok) {
+      console.error("Mockoon sidecar reload failed:", result.error)
+    }
   } catch {
     // Backend might not be available
   }

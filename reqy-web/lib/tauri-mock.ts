@@ -1,6 +1,23 @@
 import { isTauriAvailable } from "./tauri"
 import type { MockRoute } from "./mock-types"
 
+export async function reloadMockoonServer(
+  routes: MockRoute[],
+  port?: number,
+): Promise<{ ok: true; baseUrl: string; pid: number } | { ok: false; error: string }> {
+  const response = await fetch("/api/mockoon/reload", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ routes, port }),
+  })
+
+  const data = (await response.json()) as { ok: boolean; baseUrl?: string; pid?: number; error?: string }
+  if (response.ok && data.ok) {
+    return { ok: true, baseUrl: data.baseUrl!, pid: data.pid! }
+  }
+  return { ok: false, error: data.error ?? "Unknown error" }
+}
+
 export async function getMockRoutes(): Promise<MockRoute[]> {
   if (!isTauriAvailable()) return []
   const { invoke } = await import("@tauri-apps/api/core")
