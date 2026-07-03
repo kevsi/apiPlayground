@@ -182,7 +182,9 @@ function resolveActiveResponse(route: ResolveMockRoute): {
   }
 }
 
-/** Find the first matching route and resolve its response (no delay applied). */
+/**
+ * @deprecated Mockoon CLI now handles request matching. Kept for rollback only.
+ */
 export function resolveMockMatch(
   routes: ResolveMockRoute[],
   request: MockResolveRequest,

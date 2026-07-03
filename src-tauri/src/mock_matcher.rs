@@ -1,3 +1,5 @@
+//! Legacy mock route matcher. Deprecated in favor of Mockoon CLI sidecar.
+
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
