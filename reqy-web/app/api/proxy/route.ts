@@ -41,15 +41,6 @@ function getRateLimitKey(request: NextRequest): string {
   return ip
 }
 
-function isPrivateHost(hostname: string): boolean {
-  const lower = hostname.toLowerCase()
-  if (lower === "localhost") return true
-  // If hostname is itself an IP literal, test directly.
-  if (isIP(lower)) return isBlockedIp(lower)
-  // Otherwise: rely on DNS pre-resolution in the caller. Fail-closed here too.
-  return true
-}
-
 function validateUrl(rawUrl: string): { valid: boolean; parsed?: URL; error?: string } {
   if (!rawUrl || typeof rawUrl !== "string") {
     return { valid: false, error: "Missing or invalid URL" }
@@ -180,7 +171,7 @@ export async function POST(request: NextRequest) {
       //    redirect to a private IP. The cache is per-instance — on serverless
       //    each cold start pays the lookup cost; on self-hosted Node the cache
       //    absorbs bursts to the same host.
-      const resolvedIp: string
+      let resolvedIp: string
       const dnsStart = Date.now()
       const address = await resolveCached(parsedUrl.hostname)
       timings.dnsMs = Date.now() - dnsStart
@@ -320,7 +311,6 @@ export async function POST(request: NextRequest) {
         requestedUrl: targetUrl,
         hostname: parsedUrl.hostname,
         isPrivateHost: isPrivateHost(parsedUrl.hostname),
-        workspaceId,
       }
     }
 
@@ -335,14 +325,14 @@ export async function POST(request: NextRequest) {
       const resp = structuredError(message, "BAD_GATEWAY", 502)
       if (debugMode) {
         // attach debug info when requested
-        return NextResponse.json({ ...(await resp.json()), _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null, workspaceId } }, { status: 502 })
+        return NextResponse.json({ ...(await resp.json()), _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null } }, { status: 502 })
       }
       return resp
     }
 
     const resp = structuredError(message, "INTERNAL_ERROR", 500)
     if (debugMode) {
-      return NextResponse.json({ ...(await resp.json()), _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null, workspaceId } }, { status: 500 })
+      return NextResponse.json({ ...(await resp.json()), _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null } }, { status: 500 })
     }
     return resp
   }
