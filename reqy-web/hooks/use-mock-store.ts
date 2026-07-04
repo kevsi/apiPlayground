@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import type { RequestItem, Collection, HistoryItem } from "@/hooks/use-request-store"
-import { isTauriAvailable } from "@/lib/tauri"
-import { getMockRoutes, setMockRoutes, isMockEnabledGlobally, setMockEnabledGlobally, reloadMockoonServer } from "@/lib/tauri-mock"
+import { reloadMockoonServer } from "@/lib/tauri-mock"
 import type { MockRoute, MockServerConfig, MockServer } from "@/lib/mock-types"
-import { MOCK_CONFIG_UPDATED_EVENT } from "@/lib/mock-events"
 import { persistence } from "@/lib/persistence"
 
 export interface MockLogEntry {
@@ -22,6 +20,7 @@ const STORAGE_KEY = "reqly-mock-routes"
 const CONFIG_KEY = "reqly-mock-config"
 const LOGS_KEY = "reqly-mock-logs"
 const SERVERS_KEY = "reqly-mock-servers"
+const SIDECAR_BASE_URL_KEY = "reqly-mock-sidecar-base-url"
 const DEFAULT_SERVER_ID = "mock_server_default"
 
 function loadConfig(): MockServerConfig {
@@ -72,6 +71,22 @@ async function saveServers(servers: MockServer[]) {
   } catch { /* quota */ }
 }
 
+function loadSidecarBaseUrl(): string {
+  if (typeof window === "undefined") return ""
+  try {
+    return persistence.getItem<string>(SIDECAR_BASE_URL_KEY) || ""
+  } catch {
+    return ""
+  }
+}
+
+async function saveSidecarBaseUrl(baseUrl: string) {
+  if (typeof window === "undefined") return
+  try {
+    await persistence.setItem(SIDECAR_BASE_URL_KEY, baseUrl)
+  } catch { /* quota */ }
+}
+
 function loadFromStorage(): MockRoute[] {
   if (typeof window === "undefined") return []
   try {
@@ -113,9 +128,9 @@ export function useMockStore() {
   const [servers, setServers] = useState<MockServer[]>([])
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [enabledGlobally, setEnabledGlobally] = useState(true)
   const [mockLogs, setMockLogs] = useState<MockLogEntry[]>([])
   const [config, setConfig] = useState<MockServerConfig>({ baseUrl: "" })
+  const [sidecarBaseUrl, setSidecarBaseUrl] = useState<string>("")
 
   useEffect(() => {
     async function load() {
@@ -131,69 +146,34 @@ export function useMockStore() {
       setServers(loadedServers)
       setSelectedServerId(loadedServers[0]?.id || DEFAULT_SERVER_ID)
 
-      if (isTauriAvailable()) {
-        // Load global toggle state
-        try {
-          const globalEnabled = await isMockEnabledGlobally()
-          setEnabledGlobally(globalEnabled)
-        } catch { /* use default */ }
+      // Load routes from localStorage only (no legacy /api/mock/config or Tauri Rust sync)
+      const local = loadFromStorage()
+      let migratedRoutes: MockRoute[] = []
+      if (local.length > 0) {
+        migratedRoutes = local.map(r => ({
+          ...r,
+          serverId: r.serverId || DEFAULT_SERVER_ID,
+          workspaceId: r.workspaceId || "ws-personal",
+        }))
+        setRoutes(migratedRoutes)
+      }
 
-        const local = loadFromStorage()
-        if (local.length > 0) {
-          // Ensure routes without serverId are assigned to default
-          const migratedRoutes = local.map(r => ({
-            ...r,
-            serverId: r.serverId || DEFAULT_SERVER_ID,
-            workspaceId: r.workspaceId || "ws-personal"
-          }))
-          setRoutes(migratedRoutes)
-        } else {
-          const tauriRoutes = await getMockRoutes()
-          if (tauriRoutes.length > 0) {
-            const migratedRoutes = tauriRoutes.map(r => ({
-              ...r,
-              serverId: r.serverId || DEFAULT_SERVER_ID,
-              workspaceId: r.workspaceId || "ws-personal"
-            }))
-            setRoutes(migratedRoutes)
-            saveToStorage(migratedRoutes)
-          }
-        }
-      } else {
-        try {
-          const res = await fetch("/api/mock/config")
-          const data = await res.json()
-          if (data.globalEnabled !== undefined) {
-            setEnabledGlobally(Boolean(data.globalEnabled))
-          }
-          if (data.baseUrl !== undefined) {
-            setConfig((prev) => ({ ...prev, baseUrl: data.baseUrl || prev.baseUrl }))
-          }
-        } catch { /* server not available */ }
+      // Restore sidecar base URL and start the sidecar if we have any routes
+      const storedBaseUrl = loadSidecarBaseUrl()
+      setSidecarBaseUrl(storedBaseUrl)
 
-        const local = loadFromStorage()
-        if (local.length > 0) {
-          const migratedRoutes = local.map(r => ({
-            ...r,
-            serverId: r.serverId || DEFAULT_SERVER_ID,
-            workspaceId: r.workspaceId || "ws-personal"
-          }))
-          setRoutes(migratedRoutes)
-        } else {
-          try {
-            const res = await fetch("/api/mock/config")
-            const data = await res.json()
-            const serverRoutes: MockRoute[] = (data.routes || []).map((r: MockRoute) => ({
-              ...r,
-              serverId: r.serverId || DEFAULT_SERVER_ID,
-              workspaceId: r.workspaceId || "ws-personal",
-              responseHeaders: r.responseHeaders ?? { "content-type": "application/json" },
-            }))
-            if (serverRoutes.length > 0) {
-              setRoutes(serverRoutes)
-              saveToStorage(serverRoutes)
-            }
-          } catch { /* server not available */ }
+      if (migratedRoutes.length > 0) {
+        try {
+          const activeRoutes = migratedRoutes.filter((r) => r.enabled)
+          const result = await reloadMockoonServer(activeRoutes, loadedServers)
+          if (result.ok) {
+            setSidecarBaseUrl(result.baseUrl)
+            await saveSidecarBaseUrl(result.baseUrl)
+          } else {
+            console.error("Mockoon sidecar reload failed:", result.error)
+          }
+        } catch {
+          // Backend might not be available
         }
       }
 
@@ -210,7 +190,7 @@ export function useMockStore() {
         saveConfig(config),
         saveServers(servers),
       ])
-      syncToBackend(routes, config, servers)
+      await syncToBackend(routes, servers)
     })()
   }, [routes, config, servers, isLoaded])
 
@@ -242,26 +222,6 @@ export function useMockStore() {
 
   const deleteRoute = useCallback((id: string) => {
     setRoutes((prev) => prev.filter((r) => r.id !== id))
-  }, [])
-
-  const toggleGlobal = useCallback(() => {
-    setEnabledGlobally((prev) => {
-      const next = !prev
-      if (isTauriAvailable()) {
-        setMockEnabledGlobally(next).catch(() => {})
-      } else {
-        fetch("/api/mock/config", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ globalEnabled: next }),
-        }).then(() => {
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event(MOCK_CONFIG_UPDATED_EVENT))
-          }
-        }).catch(() => {})
-      }
-      return next
-    })
   }, [])
 
   const toggleRoute = useCallback((id: string) => {
@@ -384,16 +344,15 @@ export function useMockStore() {
     servers,
     selectedServerId,
     isLoaded,
-    enabledGlobally,
     mockLogs,
     baseUrl: config.baseUrl,
+    sidecarBaseUrl,
     setBaseUrl,
     addRoute,
     updateRoute,
     deleteRoute,
     toggleRoute,
     reorderRoutes,
-    toggleGlobal,
     generateFromCollection,
     getRoutesForWorkspace,
     addMockLog,
@@ -460,27 +419,13 @@ function extractPathPattern(url: string): string {
 }
 
 /**
- * Sync routes to backend (Tauri Rust store or Next.js API).
+ * Reload the Mockoon CLI sidecar with the current active routes and servers.
  * Fire-and-forget — no error if backend is down.
  */
-async function syncToBackend(routes: MockRoute[], config?: MockServerConfig, servers?: MockServer[]) {
+async function syncToBackend(routes: MockRoute[], servers: MockServer[]) {
   try {
-    if (isTauriAvailable()) {
-      await setMockRoutes(routes)
-    }
-    // Toujours syncer vers le handler Next.js /api/mock/[...path] qui lit
-    // l'état en mémoire côté serveur (getMockRoutes / getMockServers).
-    // En mode Tauri, le sync Rust seul ne suffit pas car la requête finale
-    // transite par le serveur Next.js qui a sa propre copie en mémoire.
-    await fetch("/api/mock/config", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ routes, baseUrl: config?.baseUrl, servers }),
-    })
-
-    // Reload Mockoon CLI sidecar with current active routes.
     const activeRoutes = routes.filter((r) => r.enabled)
-    const result = await reloadMockoonServer(activeRoutes)
+    const result = await reloadMockoonServer(activeRoutes, servers)
     if (!result.ok) {
       console.error("Mockoon sidecar reload failed:", result.error)
     }
