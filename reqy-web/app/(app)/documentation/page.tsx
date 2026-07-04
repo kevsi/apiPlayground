@@ -400,8 +400,9 @@ export default function DocumentationPage() {
                 <SectionCard icon={<FlaskConical className="size-4" />} title="Mock Server">
                   <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
                     <p>
-                      The <strong>Mock Server</strong> lets you simulate API endpoints without a real backend.
-                      It intercepts requests to <Code>/mock/&lt;path&gt;</Code> and returns configurable responses.
+                      The <strong>Mock Server</strong> is powered by a Mockoon sidecar running on <Code>http://127.0.0.1:3001</Code>.
+                      It lets you simulate API endpoints without a real backend by sending requests to{" "}
+                      <Code>http://127.0.0.1:3001/&lt;prefix&gt;/&lt;path&gt;</Code>.
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -435,7 +436,8 @@ export default function DocumentationPage() {
                     </div>
 
                     <p>
-                      The mock server runs entirely in-browser via a Next.js catch-all API route. No external process needed.
+                      The mock server runs as an external Mockoon sidecar process. Make sure the sidecar is
+                      started on <Code>http://127.0.0.1:3001</Code> before sending mock requests.
                     </p>
                   </div>
                 </SectionCard>
