@@ -1,14 +1,15 @@
 import { isTauriAvailable } from "./tauri"
-import type { MockRoute } from "./mock-types"
+import type { MockRoute, MockServer } from "./mock-types"
 
 export async function reloadMockoonServer(
   routes: MockRoute[],
+  servers?: MockServer[],
   port?: number,
 ): Promise<{ ok: true; baseUrl: string; pid: number } | { ok: false; error: string }> {
   const response = await fetch("/api/mockoon/reload", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ routes, port }),
+    body: JSON.stringify({ routes, servers, port }),
   })
 
   const data = (await response.json()) as { ok: boolean; baseUrl?: string; pid?: number; error?: string }

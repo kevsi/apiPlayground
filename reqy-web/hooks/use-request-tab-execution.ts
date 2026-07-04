@@ -186,43 +186,6 @@ export function useRequestTabExecution(state: RequestTabsState) {
     [envVars, variableMappings, history],
   )
 
-  const mockSyncedRef = useRef(false)
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (mockSyncedRef.current) return
-    mockSyncedRef.current = true
-
-    const routesData = persistence.getItem<MockRoute[]>("reqly-mock-routes")
-    const serversData = persistence.getItem<MockServer[]>("reqly-mock-servers")
-    const configData = persistence.getItem<{ baseUrl?: string }>("reqly-mock-config")
-    if (!routesData && !serversData) return
-
-    const body: Record<string, unknown> = {}
-    if (routesData) {
-      body.routes = routesData.map((route) => ({
-        ...route,
-        workspaceId: route.workspaceId || "ws-personal",
-      }))
-    }
-    if (serversData) body.servers = serversData
-    if (configData?.baseUrl) body.baseUrl = configData.baseUrl
-
-    fetch("/api/mock/config")
-      .then((r) => r.json())
-      .then((serverState) => {
-        const serverRoutes = Array.isArray(serverState.routes) ? serverState.routes : []
-        if (serverRoutes.length === 0) {
-          return fetch("/api/mock/config", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-          })
-        }
-      })
-      .catch(() => {})
-  }, [])
-
   const notifyUnresolvedVariables = useCallback(() => {
     const warnings = getUnresolvedWarnings(variableMappings, history)
     if (warnings.length === 0) return

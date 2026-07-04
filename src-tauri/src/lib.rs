@@ -7,7 +7,6 @@ use serde::Deserialize;
 use std::fs;
 
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, Mutex};
 use std::time::Instant;
@@ -34,13 +33,7 @@ fn decode_html_entities(text: &str) -> String {
     .replace("&amp;", "&")
 }
 
-mod mock_matcher;
-mod mock_store;
-mod mock_types;
 mod websocket;
-
-use mock_store::MockStore;
-use mock_types::MockRoute;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,29 +44,6 @@ struct TauriFetchResponse {
   duration_ms: u128,
   encoding: String,
   mocked: bool,
-}
-
-static MOCK_STORE: OnceLock<MockStore> = OnceLock::new();
-
-fn get_mock_store() -> &'static MockStore {
-  MOCK_STORE.get().expect("MockStore not initialized")
-}
-
-fn parse_mock_store_path(app: &AppHandle) -> PathBuf {
-  // Use Tauri's app_data_dir (resolves to the per-app isolated directory:
-  // ~/.local/share/reqly on Linux, ~/Library/Application Support/reqly on macOS,
-  // %APPDATA%/reqly on Windows). The previous dirs::data_dir() call returned
-  // the *parent* of the app directory, which forced "forbidden path" errors
-  // and a silent IDB fallback whenever the frontend wrote to $APPDATA/reqly
-  // while the backend wrote to $APPDATA/mock-routes.json (mismatch).
-  let base = app
-    .path()
-    .app_data_dir()
-    .unwrap_or_else(|_| PathBuf::from("."));
-  let dir = base.join("reqly");
-  let path = dir.join("mock-routes.json");
-  let _ = fs::create_dir_all(&dir);
-  path
 }
 
 #[tauri::command]
@@ -110,49 +80,6 @@ fn open_external(url: String) -> Result<(), String> {
   open::that(&url).map_err(|e| e.to_string())
 }
 
-// ── Mock Tauri commands ──
-
-#[tauri::command]
-fn get_mock_routes() -> Vec<MockRoute> {
-  get_mock_store().get_routes()
-}
-
-#[tauri::command]
-fn set_mock_routes(routes: Vec<MockRoute>) {
-  get_mock_store().set_routes(routes);
-}
-
-#[tauri::command]
-fn add_mock_route(route: MockRoute) {
-  get_mock_store().add_route(route);
-}
-
-#[tauri::command]
-fn update_mock_route(id: String, route: MockRoute) -> Result<(), String> {
-  get_mock_store().update_route(&id, route)
-}
-
-#[tauri::command]
-#[allow(dead_code)]
-fn delete_mock_route(id: String) {
-  get_mock_store().delete_route(&id);
-}
-
-#[tauri::command]
-fn toggle_mock_enabled(id: String) -> Result<(), String> {
-  get_mock_store().toggle_enabled(&id)
-}
-
-#[tauri::command]
-fn is_mock_enabled_globally() -> bool {
-  get_mock_store().is_mock_enabled_globally()
-}
-
-#[tauri::command]
-fn set_mock_enabled_globally(enabled: bool) {
-  get_mock_store().set_mock_enabled_globally(enabled);
-}
-
 // Note: SSRF protection is intentionally absent from the desktop Tauri binary.
 // Reqly is an API client (like Postman/Insomnia) that runs entirely on the
 // user's own machine. Blocking localhost or LAN addresses would prevent the
@@ -167,21 +94,6 @@ async fn fetch_proxy(
   headers: Vec<(String, String)>,
   body: Option<String>,
 ) -> Result<TauriFetchResponse, String> {
-  // Check mock store first — intercept before SSRF checks or network calls
-  if let Some(mock) = get_mock_store().find_mock_match(&method, &url, &headers) {
-    if mock.delay > 0 {
-      tokio::time::sleep(std::time::Duration::from_millis(mock.delay)).await;
-    }
-    return Ok(TauriFetchResponse {
-      status: mock.status,
-      body: mock.body,
-      headers: mock.headers,
-      duration_ms: mock.duration_ms + mock.delay as u128,
-      encoding: mock.encoding,
-      mocked: true,
-    });
-  }
-
   // Parse and validate URL
   let parsed_url = reqwest::Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
 
@@ -553,13 +465,6 @@ pub fn run() {
       fetch_proxy,
       export_json,
       open_external,
-      get_mock_routes,
-      set_mock_routes,
-      add_mock_route,
-      update_mock_route,
-      toggle_mock_enabled,
-      is_mock_enabled_globally,
-      set_mock_enabled_globally,
       start_capture_proxy,
       stop_capture_proxy,
       websocket::commands::ws_connect,
@@ -568,11 +473,6 @@ pub fn run() {
       websocket::commands::ws_get_status,
     ])
     .setup(|app| {
-      // Initialize mock store (file-persisted, survives restarts)
-      let store_path = parse_mock_store_path(app.handle());
-      let store = MockStore::new(store_path);
-      let _ = MOCK_STORE.set(store);
-
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()

@@ -1,4 +1,4 @@
-import type { MockRoute, MockRouteVariant } from "@/lib/mock-types"
+import type { MockRoute, MockRouteVariant, MockServer } from "@/lib/mock-types"
 import type {
   MockoonEnvironment,
   MockoonRoute,
@@ -34,6 +34,13 @@ function convertVariantToResponse(
   }
 }
 
+function buildEndpoint(pathPattern: string, prefix?: string): string {
+  const normalizedPrefix = prefix?.replace(/^\/+|\/$/g, "") || ""
+  const normalizedPath = pathPattern.replace(/^\/?/, "/")
+  if (!normalizedPrefix) return normalizedPath
+  return `/${normalizedPrefix}${normalizedPath}`
+}
+
 function convertRouteToMockoonRoute(route: MockRoute): MockoonRoute {
   const baseResponse: MockoonResponse = {
     uuid: generateUuid(),
@@ -57,24 +64,34 @@ function convertRouteToMockoonRoute(route: MockRoute): MockoonRoute {
     type: "http",
     documentation: route.name,
     method: route.method.toUpperCase(),
-    endpoint: route.pathPattern,
+    endpoint: buildEndpoint(route.pathPattern),
     responses: [baseResponse, ...variantResponses],
   }
 }
 
 export function convertMockRoutesToEnvironment(
   routes: MockRoute[],
+  servers: MockServer[] = [],
   options: { name: string; port: number; hostname?: string } = {
     name: "reqy-mock-environment",
     port: 3001,
   },
 ): MockoonEnvironment {
+  const prefixByServerId = new Map(servers.map((s) => [s.id, s.localPrefix]))
+
   return {
     uuid: generateUuid(),
     name: options.name,
     port: options.port,
     hostname: options.hostname ?? "127.0.0.1",
-    routes: routes.filter((route) => route.enabled).map(convertRouteToMockoonRoute),
+    routes: routes
+      .filter((route) => route.enabled)
+      .map((route) => {
+        const mockoonRoute = convertRouteToMockoonRoute(route)
+        const prefix = route.serverId ? prefixByServerId.get(route.serverId) : undefined
+        mockoonRoute.endpoint = buildEndpoint(route.pathPattern, prefix)
+        return mockoonRoute
+      }),
   }
 }
 

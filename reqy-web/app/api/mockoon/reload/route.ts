@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
-import type { MockRoute } from "@/lib/mock-types"
+import type { MockRoute, MockServer } from "@/lib/mock-types"
 import { convertMockRoutesToEnvironment } from "@/lib/mockoon/adapter"
 import { startMockoonSidecar, stopMockoonSidecar } from "@/lib/mockoon/sidecar"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { routes: MockRoute[]; port?: number }
+    const body = (await request.json()) as {
+      routes: MockRoute[]
+      servers?: MockServer[]
+      port?: number
+    }
     const routes = body.routes ?? []
+    const servers = body.servers ?? []
     const port = body.port ?? 3001
 
     await stopMockoonSidecar()
 
-    const environment = convertMockRoutesToEnvironment(routes, {
-      name: "reqy-mock-environment",
-      port,
-    })
+    const environment = convertMockRoutesToEnvironment(
+      routes,
+      servers,
+      {
+        name: "reqy-mock-environment",
+        port,
+      },
+    )
 
     const state = await startMockoonSidecar(environment)
 

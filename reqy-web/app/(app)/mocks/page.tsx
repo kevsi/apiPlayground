@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -132,49 +132,39 @@ export default function MocksPage() {
     if (!selectedServer) return
     setIsTesting(true)
 
-    // Build display URL
-    const prefix = selectedServer.localPrefix || "default"
+    const sidecarBaseUrl = mockStore.sidecarBaseUrl || "http://127.0.0.1:3001"
+    const prefix = selectedServer.localPrefix || ""
     const cleanPath = route.pathPattern.replace(/^\/?/, "/")
-    const displayUrl = `/mock/${prefix}${cleanPath}`
+    const displayUrl = `${sidecarBaseUrl.replace(/\/$/, "")}${prefix ? `/${prefix}` : ""}${cleanPath}`
     setTestUrl(displayUrl)
 
     try {
-      // Simulate delay
-      if (route.delay > 0) {
-        await new Promise((r) => setTimeout(r, route.delay))
+      let testPath = cleanPath
+      const paramMatches = cleanPath.match(/:\w+/g)
+      if (paramMatches) {
+        paramMatches.forEach((param) => {
+          testPath = testPath.replace(param, "1")
+        })
       }
+      const testUrl = `${sidecarBaseUrl.replace(/\/$/, "")}${prefix ? `/${prefix}` : ""}${testPath}`
 
-      // Pick variant if configured
-      let activeStatus = route.responseStatus
-      let activeBody = route.responseBody
-      let activeHeaders: Record<string, string> = route.responseHeaders ?? {}
+      const response = await fetch(testUrl, {
+        method: route.method,
+        headers: route.responseHeaders,
+      })
 
-      if (route.variants && route.variants.length > 0) {
-        const totalWeight = route.variants.reduce((s, v) => s + v.weight, 0)
-        if (totalWeight > 0) {
-          let roll = Math.random() * totalWeight
-          for (const v of route.variants) {
-            roll -= v.weight
-            if (roll <= 0) {
-              activeStatus = v.responseStatus
-              activeBody = v.responseBody
-              activeHeaders = v.responseHeaders ?? {}
-              break
-            }
-          }
-        }
-      }
+      const body = await response.text()
 
       const headers: { key: string; value: string }[] = [
         { key: "x-mock-route", value: route.id },
         { key: "x-mock-name", value: route.name },
         { key: "x-mock-delay", value: String(route.delay) },
-        ...Object.entries(activeHeaders).map(([key, value]) => ({ key, value })),
+        ...Array.from(response.headers.entries()).map(([key, value]) => ({ key, value })),
       ]
 
       setTestResult({
-        status: activeStatus,
-        body: activeBody,
+        status: response.status,
+        body,
         headers,
         url: displayUrl,
         method: route.method,
@@ -221,27 +211,11 @@ export default function MocksPage() {
     toast({ title: `Serveur "${server.name}" supprimé.` })
   }
 
-  const handleToggleServer = async (serverId: string) => {
-    const server = mockStore.servers.find((s) => s.id === serverId)
+  const handleToggleServer = useCallback((id: string) => {
+    const server = mockStore.servers.find((s) => s.id === id)
     if (!server) return
-    const newEnabled = !server.enabled
-    mockStore.updateServer(serverId, { enabled: newEnabled })
-    // Sync immédiat — on construit l'état à jour manuellement car le useEffect
-    // de sync n'a pas encore écrit dans localStorage (stale read).
-    try {
-      const updatedServers = mockStore.servers.map((s) =>
-        s.id === serverId ? { ...s, enabled: newEnabled } : s
-      )
-      await fetch("/api/mock/config", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          routes: mockStore.routes,
-          servers: updatedServers,
-        }),
-      })
-    } catch { /* serveur indisponible */ }
-  }
+    mockStore.updateServer(id, { enabled: !server.enabled })
+  }, [mockStore])
 
   const handleGenerateFromCollection = async () => {
     if (!selectedCollectionId || !mockStore.selectedServerId) return
@@ -263,7 +237,12 @@ export default function MocksPage() {
     mockStore.reorderRoutes(ids)
   }
 
-  const serverBaseUrl = typeof window !== "undefined" ? window.location.origin : ""
+  const serverBaseUrl = (() => {
+    const base = mockStore.sidecarBaseUrl || "http://127.0.0.1:3001"
+    return selectedServer
+      ? `${base.replace(/\/$/, "")}/${selectedServer.localPrefix ? `${selectedServer.localPrefix}/` : ""}`
+      : base
+  })()
 
   const EndpointRow = ({ route, onTest, onEdit, onDuplicate, index, onMove }: {
     route: MockRoute
@@ -461,14 +440,14 @@ export default function MocksPage() {
                       <label className="text-xs font-medium text-muted-foreground">URL de base</label>
                       <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs">
                         <code className="flex-1 truncate">
-                          {`${serverBaseUrl.replace(/\/$/, "")}/mock/${selectedServer.localPrefix ? `${selectedServer.localPrefix}/` : ""}`}
+                          {serverBaseUrl}
                         </code>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="size-6 shrink-0"
                           onClick={() => {
-                            const url = `${serverBaseUrl.replace(/\/$/, "")}/mock/${selectedServer.localPrefix ? `${selectedServer.localPrefix}/` : ""}`
+                            const url = serverBaseUrl
                             navigator.clipboard.writeText(url).then(() => {
                               toast({ title: "URL copiée dans le presse-papiers." })
                             })
@@ -615,8 +594,8 @@ export default function MocksPage() {
                 className="mt-1.5 h-8 text-xs font-mono"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Les requêtes seront interceptées sur <code className="bg-muted px-1 rounded">
-                  /mock/{serverFormData.localPrefix || "prefix"}/
+                Les requêtes seront servies par le sidecar Mockoon sur <code className="bg-muted px-1 rounded">
+                  {`http://127.0.0.1:3001/${serverFormData.localPrefix || "prefix"}/`}
                 </code>
               </p>
             </div>
