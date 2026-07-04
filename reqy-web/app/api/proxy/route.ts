@@ -93,7 +93,6 @@ export async function POST(request: NextRequest) {
   let parsedUrl: URL | undefined = undefined
   let targetUrl = ""
   let debugMode = false
-  let workspaceId: string | undefined
   let hostOverride: string | undefined
 
   // ── Timing metrics ────────────────────────────────────────────────────
@@ -161,7 +160,6 @@ export async function POST(request: NextRequest) {
     targetUrl = parsedUrl.href
 
     // ── SSRF protection ──────────────────────────────────────────────────
-    // ── SSRF protection ──────────────────────────────────────────────────
     // Allow local testing in development mode or if explicitly enabled
     const env = getServerEnv()
     const allowLocal =
@@ -182,7 +180,7 @@ export async function POST(request: NextRequest) {
       //    redirect to a private IP. The cache is per-instance — on serverless
       //    each cold start pays the lookup cost; on self-hosted Node the cache
       //    absorbs bursts to the same host.
-      let resolvedIp: string
+      const resolvedIp: string
       const dnsStart = Date.now()
       const address = await resolveCached(parsedUrl.hostname)
       timings.dnsMs = Date.now() - dnsStart
