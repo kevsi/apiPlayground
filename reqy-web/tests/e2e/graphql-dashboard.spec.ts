@@ -45,7 +45,7 @@ test.describe("GraphQL dashboard redesign", () => {
 
   test("prettify reformats the query", async ({ page }) => {
     await page.goto("/graphql")
-    const editor = page.locator('[data-testid="graphql-query-editor"] .cm-content")
+    const editor = page.locator('[data-testid="graphql-query-editor"] .cm-content')
     await editor.fill("{a,b,c,d}")
     // Prettify button is inside graphql-toolbar
     await page.locator('[data-testid="graphql-prettify-button"]').click()
@@ -63,7 +63,7 @@ test.describe("GraphQL dashboard redesign", () => {
 
   test("code generator formats the active query as fetch", async ({ page }) => {
     await page.goto("/graphql")
-    const editor = page.locator('[data-testid="graphql-query-editor"] .cm-content")
+    const editor = page.locator('[data-testid="graphql-query-editor"] .cm-content')
     await editor.fill("{ hello }")
     await page.getByTestId("graphql-response-tab-code").click()
     await expect(page.getByTestId("graphql-code-generator")).toBeVisible()
