@@ -43,7 +43,6 @@ struct TauriFetchResponse {
   headers: Vec<(String, String)>,
   duration_ms: u128,
   encoding: String,
-  mocked: bool,
 }
 
 #[tauri::command]
@@ -172,7 +171,6 @@ async fn fetch_proxy(
     headers: header_pairs,
     duration_ms,
     encoding,
-    mocked: false,
   })
 }
 

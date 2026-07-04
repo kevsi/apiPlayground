@@ -9,7 +9,6 @@ import {
   History,
   FolderKanban,
   Variable,
-  FlaskConical,
   Sparkles,
   BarChart3,
   Settings,
@@ -18,15 +17,11 @@ import {
   Terminal,
   Link2,
   Shuffle,
-  Gauge,
   Copy,
   Search,
   Filter,
   Braces,
-  Router,
   CheckCircle2,
-  XCircle,
-  AlertCircle,
 } from "lucide-react"
 
 const sections = [
@@ -35,7 +30,6 @@ const sections = [
   { id: "history", label: "Request History" },
   { id: "collections", label: "Collections" },
   { id: "environments", label: "Environment Variables" },
-  { id: "mock-server", label: "Mock Server" },
   { id: "ai", label: "AI Integration" },
   { id: "dashboard", label: "Dashboard" },
   { id: "settings", label: "Settings" },
@@ -150,7 +144,7 @@ export default function DocumentationPage() {
                 <SectionCard icon={<Globe className="size-4" />} title="Overview">
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     ReQLy is a full-featured API client built with Next.js. It lets you send HTTP requests,
-                    inspect responses, organize your work into collections, simulate APIs with a built-in mock server,
+                    inspect responses, organize your work into collections,
                     manage environment variables, and much more — all from your browser.
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
@@ -159,7 +153,6 @@ export default function DocumentationPage() {
                       { icon: <History className="size-4" />, label: "History", desc: "Search, filter, replay" },
                       { icon: <FolderKanban className="size-4" />, label: "Collections", desc: "Organize & batch run" },
                       { icon: <Variable className="size-4" />, label: "Environments", desc: "{{variables}} support" },
-                      { icon: <FlaskConical className="size-4" />, label: "Mock Server", desc: "Simulate APIs" },
                       { icon: <Sparkles className="size-4" />, label: "AI Assistant", desc: "Follow-up requests" },
                     ].map((f) => (
                       <div key={f.label} className="rounded-lg border border-border bg-muted/50 p-3 space-y-1">
@@ -391,54 +384,6 @@ export default function DocumentationPage() {
                         Variables are resolved at request time from the currently active environment.
                       </p>
                     </div>
-                  </div>
-                </SectionCard>
-              </section>
-
-              {/* ============ MOCK SERVER ============ */}
-              <section id="mock-server" className="scroll-mt-20">
-                <SectionCard icon={<FlaskConical className="size-4" />} title="Mock Server">
-                  <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
-                    <p>
-                      The <strong>Mock Server</strong> is powered by a Mockoon sidecar running on <Code>http://127.0.0.1:3001</Code>.
-                      It lets you simulate API endpoints without a real backend by sending requests to{" "}
-                      <Code>http://127.0.0.1:3001/&lt;prefix&gt;/&lt;path&gt;</Code>.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1">
-                        <h4 className="text-xs font-semibold text-foreground flex items-center gap-1"><Router className="size-3" /> Creating Routes</h4>
-                        <p className="text-xs text-muted-foreground">Create routes manually with method, path pattern, response status, body, content-type, and delay. Or generate from an existing collection — each request becomes a mock route.</p>
-                      </div>
-                      <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1">
-                        <h4 className="text-xs font-semibold text-foreground flex items-center gap-1"><Shuffle className="size-3" /> Path Patterns</h4>
-                        <p className="text-xs text-muted-foreground">Use <Code>:param</Code> for dynamic segments (<Code>/api/users/:id</Code>) and <Code>*</Code> for wildcard matching (<Code>/api/*</Code>).</p>
-                      </div>
-                      <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1">
-                        <h4 className="text-xs font-semibold text-foreground flex items-center gap-1"><Gauge className="size-3" /> Rate Limiting</h4>
-                        <p className="text-xs text-muted-foreground">Configure max requests per time window per route. When exceeded, the server returns <Badge color="red">429 Too Many Requests</Badge> with a <Code>Retry-After</Code> header.</p>
-                      </div>
-                      <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1">
-                        <h4 className="text-xs font-semibold text-foreground flex items-center gap-1"><Shuffle className="size-3" /> Scenarios / Variants</h4>
-                        <p className="text-xs text-muted-foreground">Add multiple response variants with probability weights. Each request randomly selects a variant — perfect for simulating success vs failure scenarios.</p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
-                      <p className="text-xs font-medium text-foreground">Mock response headers:</p>
-                      <div className="text-xs space-y-1 font-mono">
-                        <div><Code>x-mock-route</Code> — unique ID of the matched route</div>
-                        <div><Code>x-mock-name</Code> — human-readable route name</div>
-                        <div><Code>x-mock-delay</Code> — configured delay in milliseconds</div>
-                        <div><Code>x-mock-variant</Code> — selected variant ID (if multiple variants)</div>
-                        <div><Code>x-mock-rate-limited</Code> — <Code>true</Code> if rate limited</div>
-                      </div>
-                    </div>
-
-                    <p>
-                      The mock server runs as an external Mockoon sidecar process. Make sure the sidecar is
-                      started on <Code>http://127.0.0.1:3001</Code> before sending mock requests.
-                    </p>
                   </div>
                 </SectionCard>
               </section>

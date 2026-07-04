@@ -45,14 +45,12 @@ interface ResponsePanelProps {
   }
   responseSize?: string
   responseHeaders?: Record<string, string>
-  mocked?: boolean
   isLoading?: boolean
   onRun?: () => Promise<void>
   onRunAndSave?: () => Promise<void>
   onRunAndDownload?: () => Promise<void>
   onAnalyze?: () => Promise<void>
   onGenerateTests?: () => Promise<void>
-  onCreateMock?: () => void
   onPatchRequest?: (patch: Partial<RequestPayload>) => void
   aiSummary?: string
   aiError?: string
@@ -77,7 +75,6 @@ export function ResponsePanel({
   responseTimings,
   responseSize,
   responseHeaders,
-  mocked,
   testResults,
   isLoading = false,
   onRun,
@@ -85,7 +82,6 @@ export function ResponsePanel({
   onRunAndDownload,
   onAnalyze,
   onGenerateTests,
-  onCreateMock,
   onPatchRequest,
   aiSummary,
   aiError,
@@ -312,7 +308,6 @@ export function ResponsePanel({
         responseStatus={responseStatus}
         responseTime={responseTime}
         responseSize={responseSize}
-        mocked={mocked}
         isLoading={isLoading}
         hasResponse={hasResponse}
         aiIsLoading={aiIsLoading}
@@ -320,7 +315,6 @@ export function ResponsePanel({
         onRunAndSave={onRunAndSave}
         onRunAndDownload={onRunAndDownload}
         onExport={handleExport}
-        onCreateMock={onCreateMock}
         onDiff={handleOpenDiff}
       />
 

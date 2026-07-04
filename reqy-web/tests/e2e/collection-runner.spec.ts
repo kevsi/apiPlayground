@@ -1,9 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { startMockServer, stopMockServer, getMockBaseUrl } from "./fixtures/mock-server"
 import { runButton } from "./helpers/page-objects"
-
-test.beforeAll(async () => { await startMockServer() })
-test.afterAll(async () => { await stopMockServer() })
 
 test("run button visible on collections page", async ({ page }) => {
   await page.goto("/collections")

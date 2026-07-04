@@ -7,8 +7,6 @@ import {
   peekPendingCollectionRequest,
   clearPendingCollectionRequest,
 } from "@/lib/request-bridge"
-import { useMockStore } from "@/hooks/use-mock-store"
-import type { MockRoute, MockServer } from "@/lib/mock-types"
 import { resolveMappingValue, computeDynamicVars, getUnresolvedWarnings } from "@/lib/variable-mapping"
 import { toast } from "@/hooks/use-toast"
 import { fireSystemNotification, pushInAppNotification } from "@/lib/system-notifications"
@@ -72,7 +70,6 @@ export function useRequestTabExecution(state: RequestTabsState) {
     updateTab,
   } = state
 
-  const { addRoute } = useMockStore()
   const {
     collections,
     environments,
@@ -383,7 +380,6 @@ export function useRequestTabExecution(state: RequestTabsState) {
           responseBody: result.responseBody,
           responseData: result.responseData,
           responseHeaders: result.responseHeaders,
-          mocked: result.mocked,
         })
 
         setCurrentRequest({
@@ -769,44 +765,6 @@ export function useRequestTabExecution(state: RequestTabsState) {
     await aiEngine.generateTests(ctx)
   }, [aiEngine, syncActiveTabToAiStore])
 
-  const handleCreateMock = useCallback(() => {
-    try {
-      const tab = activeTab
-      if (!tab) return
-      if (!tab.responseBody && tab.responseStatus !== 204) return
-
-      const findHeader = (headers: Record<string, string> | undefined, name: string) => {
-        if (!headers) return undefined
-        const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase())
-        return key ? headers[key] : undefined
-      }
-
-      const mockData: Omit<MockRoute, "id" | "createdAt" | "updatedAt"> = {
-        name: tab.name
-          ? `${tab.name} (mock)`
-          : `${tab.method} ${tab.url || tab.endpoint || "/"} (mock)`,
-        method: tab.method as MockRoute["method"],
-        pathPattern: tab.endpoint || tab.url || "/",
-        responseStatus: tab.responseStatus || 200,
-        responseHeaders: tab.responseHeaders ? { ...tab.responseHeaders } : {},
-        responseBody: tab.responseBody || "",
-        contentType: findHeader(tab.responseHeaders, "content-type") || "application/json",
-        delay: 0,
-        enabled: true,
-        workspaceId: activeWorkspaceId ?? "ws-personal",
-      }
-
-      toast({
-        title: `✅ Mock créé : ${mockData.name}`,
-        description: `${mockData.method} ${mockData.pathPattern} → ${mockData.responseStatus}`,
-        duration: 5000,
-      })
-      addRoute(mockData)
-    } catch (e) {
-      console.error("[handleCreateMock]", e)
-    }
-  }, [activeTab, addRoute, activeWorkspaceId])
-
   const handleGenerateFollowUp = useCallback(
     async (item: HistoryItem) => {
       const payload = buildAiProxyPayload("", "")
@@ -1055,7 +1013,6 @@ export function useRequestTabExecution(state: RequestTabsState) {
     handleBatchRunRequest,
     handleAnalyzeRequest,
     handleGenerateTests,
-    handleCreateMock,
     handleGenerateFollowUp,
     exportActiveRequest,
     createNewRequestInCollection,

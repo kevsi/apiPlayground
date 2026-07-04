@@ -310,7 +310,6 @@ export async function POST(request: NextRequest) {
       body,
       headers: responseHeaders,
       encoding,
-      mocked: false,
       durationMs,
       size,
       timings,

@@ -79,7 +79,6 @@ export function RequestTabsManager() {
     handleBatchRunRequest,
     handleAnalyzeRequest,
     handleGenerateTests,
-    handleCreateMock,
     handleGenerateFollowUp,
     exportActiveRequest,
     createNewRequestInCollection,
@@ -253,7 +252,6 @@ export function RequestTabsManager() {
                 responseTime={activeTab.responseTime}
                 responseSize={activeTab.responseSize}
                 responseHeaders={activeTab.responseHeaders}
-                mocked={activeTab.mocked}
                 testResults={activeTab.testResults}
                 isLoading={isLoading || aiEngine.isLoading}
                 aiIsLoading={aiEngine.isLoading}
@@ -262,7 +260,6 @@ export function RequestTabsManager() {
                 onRunAndDownload={sendAndDownload}
                 onAnalyze={handleAnalyzeRequest}
                 onGenerateTests={handleGenerateTests}
-                onCreateMock={handleCreateMock}
                 onPatchRequest={(patch) => {
                   const tabPatch: Record<string, unknown> = {}
                   if (patch.method !== undefined) tabPatch.method = patch.method

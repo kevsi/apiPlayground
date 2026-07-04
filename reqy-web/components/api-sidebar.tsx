@@ -9,7 +9,6 @@ import {
   ChevronDown,
   Folder,
   FolderCode,
-  FlaskConical,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react"
@@ -26,7 +25,6 @@ const navItems = [
   { icon: Zap, label: "API Endpoints", href: "/", key: "api-endpoints" },
   { icon: Folder, label: "Collections", href: "/collections/", key: "collections" },
   { icon: FolderCode, label: "Projects", href: "/my-projects/", key: "projects" },
-  { icon: FlaskConical, label: "Mock Server", href: "/mocks/", key: "mocks" },
   { icon: Sparkles, label: "AI Assistant", href: "/ai-insights/", key: "ai-insights" },
   { icon: Settings, label: "Settings", href: "/settings/", key: "settings" },
 ]

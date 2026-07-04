@@ -4,7 +4,6 @@ export interface TauriFetchResponse {
   headers: Record<string, string>
   durationMs: number
   encoding: string
-  mocked?: boolean
 }
 
 declare global {
@@ -38,7 +37,6 @@ export async function invokeTauriFetch(
     headers: Array<[string, string]>
     durationMs: number
     encoding: string
-    mocked?: boolean
   }>("fetch_proxy", {
     method,
     url,
@@ -52,7 +50,6 @@ export async function invokeTauriFetch(
     headers: Object.fromEntries(result.headers ?? []),
     durationMs: result.durationMs,
     encoding: result.encoding ?? "utf8",
-    mocked: result.mocked ?? false,
   }
 }
 

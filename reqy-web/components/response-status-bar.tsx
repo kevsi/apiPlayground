@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, useState, useEffect } from "react"
-import { CheckCircle, Clock, FileText, Download, Play, Loader2, Sparkles, XCircle, AlertTriangle, ChevronDown, FlaskConical, Plus, GitCompare } from "lucide-react"
+import { CheckCircle, Clock, FileText, Download, Play, Loader2, Sparkles, XCircle, AlertTriangle, ChevronDown, GitCompare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,7 +16,6 @@ interface ResponseStatusBarProps {
   responseStatus?: number
   responseTime?: number
   responseSize?: string
-  mocked?: boolean
   isLoading?: boolean
   hasResponse: boolean
   aiIsLoading?: boolean
@@ -26,7 +25,6 @@ interface ResponseStatusBarProps {
   onAnalyze?: () => Promise<void>
   onGenerateTests?: () => Promise<void>
   onExport?: () => void
-  onCreateMock?: () => void
   onDiff?: () => void
 }
 
@@ -34,7 +32,6 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
   responseStatus,
   responseTime,
   responseSize,
-  mocked,
   isLoading = false,
   hasResponse,
   aiIsLoading = false,
@@ -44,7 +41,6 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
   onAnalyze,
   onGenerateTests,
   onExport,
-  onCreateMock,
   onDiff,
 }: ResponseStatusBarProps) {
   const getStatusColor = (status?: number) => {
@@ -151,14 +147,6 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
               <FileText className="size-3 text-muted-foreground/70" />
               <span className="text-[11px] font-mono font-medium text-muted-foreground">{responseSize ?? "0 B"}</span>
             </div>
-
-            {/* Mocked badge */}
-            {mocked && (
-              <div className="flex items-center gap-1 rounded-md border border-purple-500/20 bg-purple-500/10 px-2 py-1">
-                <FlaskConical className="size-3 text-purple-500" />
-                <span className="text-[10px] font-semibold font-mono text-purple-500">Mocked</span>
-              </div>
-            )}
           </div>
         ) : (
           <span className="text-xs text-muted-foreground/70 italic">Awaiting request...</span>
@@ -203,18 +191,6 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {onCreateMock && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onCreateMock}
-            disabled={!hasResponse}
-            className="h-8 gap-1.5 text-xs font-medium text-purple-500 border-purple-500/30 hover:bg-purple-500/10 transition-all duration-200"
-          >
-            <Plus className="size-3.5" />
-            Créer un mock
-          </Button>
-        )}
         <Button
           variant="outline"
           size="sm"

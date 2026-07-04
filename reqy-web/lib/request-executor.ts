@@ -39,7 +39,6 @@ export interface RequestTab {
   responseBody?: string
   responseData?: string | Blob
   responseHeaders?: Record<string, string>
-  mocked?: boolean
   assertions?: RequestTestAssertion[]
   runnerAssertions?: Assertion[]
   preRequestScript?: string
@@ -176,7 +175,6 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
   let responseStatus: number | undefined
   let responseSize = "0 B"
   let responseTime: number | undefined
-  let mocked = false
 
   try {
     if (nativeMode) {
@@ -189,7 +187,6 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
       responseStatus = result.status
       responseHeaders = result.headers
       responseTime = result.durationMs
-      mocked = result.mocked ?? false
 
       if (result.encoding === "base64") {
         const contentType = responseHeaders["content-type"] || responseHeaders["Content-Type"] || "application/octet-stream"
@@ -226,7 +223,6 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
       const proxyResult = await parseJsonSafe(proxyResponse)
       responseStatus = proxyResult.status ?? proxyResponse.status ?? 0
       responseHeaders = proxyResult.headers || {}
-      mocked = proxyResult.mocked ?? false
 
       const proxyError = proxyResult.error || (!proxyResponse.ok ? proxyResponse.statusText || "Proxy request failed" : undefined)
 
@@ -265,6 +261,5 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
     responseData,
     responseSize,
     responseTime,
-    mocked,
   }
 }
