@@ -131,6 +131,8 @@ export function useMockStore() {
   const [mockLogs, setMockLogs] = useState<MockLogEntry[]>([])
   const [config, setConfig] = useState<MockServerConfig>({ baseUrl: "" })
   const [sidecarBaseUrl, setSidecarBaseUrl] = useState<string>("")
+  const [sidecarStatus, setSidecarStatus] = useState<"idle" | "loading" | "running" | "error">("idle")
+  const [sidecarError, setSidecarError] = useState<string>("")
 
   useEffect(() => {
     async function load() {
@@ -163,16 +165,23 @@ export function useMockStore() {
       setSidecarBaseUrl(storedBaseUrl)
 
       if (migratedRoutes.length > 0) {
+        setSidecarStatus("loading")
         try {
           const activeRoutes = migratedRoutes.filter((r) => r.enabled)
           const result = await reloadMockoonServer(activeRoutes, loadedServers)
           if (result.ok) {
+            setSidecarStatus("running")
+            setSidecarError("")
             setSidecarBaseUrl(result.baseUrl)
             await saveSidecarBaseUrl(result.baseUrl)
           } else {
+            setSidecarStatus("error")
+            setSidecarError(result.error)
             console.error("Mockoon sidecar reload failed:", result.error)
           }
-        } catch {
+        } catch (err) {
+          setSidecarStatus("error")
+          setSidecarError(err instanceof Error ? err.message : String(err))
           // Backend might not be available
         }
       }
@@ -190,7 +199,7 @@ export function useMockStore() {
         saveConfig(config),
         saveServers(servers),
       ])
-      await syncToBackend(routes, servers)
+      await syncToBackend(routes, servers, setSidecarStatus, setSidecarError, setSidecarBaseUrl)
     })()
   }, [routes, config, servers, isLoaded])
 
@@ -347,6 +356,8 @@ export function useMockStore() {
     mockLogs,
     baseUrl: config.baseUrl,
     sidecarBaseUrl,
+    sidecarStatus,
+    sidecarError,
     setBaseUrl,
     addRoute,
     updateRoute,
@@ -422,14 +433,29 @@ function extractPathPattern(url: string): string {
  * Reload the Mockoon CLI sidecar with the current active routes and servers.
  * Fire-and-forget — no error if backend is down.
  */
-async function syncToBackend(routes: MockRoute[], servers: MockServer[]) {
+async function syncToBackend(
+  routes: MockRoute[],
+  servers: MockServer[],
+  setSidecarStatus: (s: "idle" | "loading" | "running" | "error") => void,
+  setSidecarError: (e: string) => void,
+  setSidecarBaseUrl: (u: string) => void,
+) {
+  setSidecarStatus("loading")
   try {
     const activeRoutes = routes.filter((r) => r.enabled)
     const result = await reloadMockoonServer(activeRoutes, servers)
-    if (!result.ok) {
+    if (result.ok) {
+      setSidecarStatus("running")
+      setSidecarError("")
+      setSidecarBaseUrl(result.baseUrl)
+    } else {
+      setSidecarStatus("error")
+      setSidecarError(result.error)
       console.error("Mockoon sidecar reload failed:", result.error)
     }
-  } catch {
+  } catch (err) {
+    setSidecarStatus("error")
+    setSidecarError(err instanceof Error ? err.message : String(err))
     // Backend might not be available
   }
 }

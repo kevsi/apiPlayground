@@ -18,13 +18,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { useMockStore } from "@/hooks/use-mock-store"
 import type { MockRoute, MockServer } from "@/lib/mock-types"
 import { useRequestStore, type Collection } from "@/hooks/use-request-store"
 import { MockRouteEditor, type MockRouteFormData } from "@/components/mock-route-editor"
-import { Play, Plus, MoreHorizontal, Edit2, Trash2, Copy, Power, PowerOff, FlaskConical, Search, Loader2, GripVertical, Server, Dot } from "lucide-react"
+import { Play, Plus, MoreHorizontal, Edit2, Trash2, Copy, Power, PowerOff, FlaskConical, Search, Loader2, GripVertical, Server, Dot, Link2, AlertTriangle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
 const methodBadge: Record<string, string> = {
@@ -55,7 +58,7 @@ export default function MocksPage() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("")
   const [testUrl, setTestUrl] = useState("")
   const [testResult, setTestResult] = useState<TestResultData | null>(null)
-  const [isTesting, setIsTesting] = useState(false)
+  const [testingRouteId, setTestingRouteId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const dragOverIndexRef = useRef<number | null>(null)
@@ -130,7 +133,7 @@ export default function MocksPage() {
 
   const handleTestMock = async (route: MockRoute) => {
     if (!selectedServer) return
-    setIsTesting(true)
+    setTestingRouteId(route.id)
 
     const sidecarBaseUrl = mockStore.sidecarBaseUrl || "http://127.0.0.1:3001"
     const prefix = selectedServer.localPrefix || ""
@@ -172,8 +175,19 @@ export default function MocksPage() {
     } catch (err) {
       setTestResult({ status: 0, body: String(err), headers: [], url: displayUrl, method: route.method })
     } finally {
-      setIsTesting(false)
+      setTestingRouteId(null)
     }
+  }
+
+  const handleCopyRouteUrl = (route: MockRoute) => {
+    if (!selectedServer) return
+    const sidecarBaseUrl = mockStore.sidecarBaseUrl || "http://127.0.0.1:3001"
+    const prefix = selectedServer.localPrefix || ""
+    const cleanPath = route.pathPattern.replace(/^\/?/, "/")
+    const routeUrl = `${sidecarBaseUrl.replace(/\/$/, "")}${prefix ? `/${prefix}` : ""}${cleanPath}`
+    navigator.clipboard.writeText(routeUrl).then(() => {
+      toast({ title: "URL copiée dans le presse-papiers." })
+    })
   }
 
   const handleAddServer = () => {
@@ -244,13 +258,15 @@ export default function MocksPage() {
       : base
   })()
 
-  const EndpointRow = ({ route, onTest, onEdit, onDuplicate, index, onMove }: {
+  const EndpointRow = ({ route, onTest, onEdit, onDuplicate, onCopyUrl, index, onMove, isTestingThisRoute }: {
     route: MockRoute
     onTest: (r: MockRoute) => void
     onEdit: (r: MockRoute) => void
     onDuplicate: (r: MockRoute) => void
+    onCopyUrl: (r: MockRoute) => void
     index: number
     onMove: (from: number, to: number) => void
+    isTestingThisRoute: boolean
   }) => {return (
     <div
       className={cn(
@@ -311,10 +327,14 @@ export default function MocksPage() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onTest(route)} disabled={isTesting}>
-            {isTesting ? <Loader2 className="size-3.5 mr-2 animate-spin" /> : <Play className="size-3.5 mr-2" />}
-            {isTesting ? "Test en cours..." : "Tester"}
+          <DropdownMenuItem onClick={() => onTest(route)} disabled={isTestingThisRoute}>
+            {isTestingThisRoute ? <Loader2 className="size-3.5 mr-2 animate-spin" /> : <Play className="size-3.5 mr-2" />}
+            {isTestingThisRoute ? "Test en cours..." : "Tester"}
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onCopyUrl(route)}>
+            <Link2 className="size-3.5 mr-2" /> Copier l'URL
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => onEdit(route)}>
             <Edit2 className="size-3.5 mr-2" /> Modifier
           </DropdownMenuItem>
@@ -357,9 +377,13 @@ export default function MocksPage() {
               <div className="flex-1 overflow-y-auto p-3">
                 {mockStore.servers.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-center py-8">
-                    <div>
-                      <Server className="mx-auto size-8 text-muted-foreground/40 mb-2" />
+                    <div className="flex flex-col items-center gap-3">
+                      <Server className="size-8 text-muted-foreground/40" />
                       <p className="text-xs text-muted-foreground">Aucun serveur</p>
+                      <Button size="sm" onClick={() => setAddServerOpen(true)}>
+                        <Plus className="size-3.5 mr-1.5" />
+                        Créer votre premier serveur mock
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -419,6 +443,75 @@ export default function MocksPage() {
 
             {/* Right panel — endpoints */}
             <div className="flex-1 overflow-auto flex flex-col">
+              {/* Sidecar status card */}
+              <div className="px-6 pt-4">
+                <Card>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      {mockStore.sidecarStatus === "running" && (
+                        <span className="inline-flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          <span className="relative flex size-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                            <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                          </span>
+                          Mockoon actif
+                        </span>
+                      )}
+                      {mockStore.sidecarStatus === "loading" && (
+                        <span className="inline-flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          <Loader2 className="size-3.5 animate-spin" />
+                          <span className="size-2 rounded-full bg-amber-500" />
+                          Démarrage du mock server…
+                        </span>
+                      )}
+                      {mockStore.sidecarStatus === "error" && (
+                        <span className="inline-flex items-center gap-2 text-xs font-medium text-red-600 dark:text-red-400">
+                          <AlertTriangle className="size-3.5" />
+                          <span className="size-2 rounded-full bg-red-500" />
+                          Erreur Mockoon
+                        </span>
+                      )}
+                      {mockStore.sidecarStatus === "idle" && (
+                        <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <span className="size-2 rounded-full bg-slate-400" />
+                          Mockoon inactif
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs">
+                      <code className="flex-1 truncate">
+                        {mockStore.sidecarBaseUrl || "http://127.0.0.1:3001"}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(mockStore.sidecarBaseUrl || "http://127.0.0.1:3001").then(() => {
+                            toast({ title: "URL copiée dans le presse-papiers." })
+                          })
+                        }}
+                      >
+                        <Copy className="size-3.5" />
+                      </Button>
+                    </div>
+
+                    <p className="text-[10px] text-muted-foreground">
+                      Vos endpoints sont servis localement par Mockoon CLI.
+                    </p>
+
+                    {mockStore.sidecarStatus === "error" && mockStore.sidecarError && (
+                      <Alert variant="destructive">
+                        <AlertTriangle />
+                        <AlertTitle>Erreur Mockoon</AlertTitle>
+                        <AlertDescription>{mockStore.sidecarError}</AlertDescription>
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
               {selectedServer ? (
                 <>
                   {/* Server info header */}
@@ -431,17 +524,29 @@ export default function MocksPage() {
                         </p>
                       </div>
                       <Badge variant={selectedServer.enabled ? "default" : "secondary"}>
-                        {selectedServer.enabled ? "Actif" : "Inactif"}
+                        {selectedServer.enabled ? "Activé" : "Désactivé"}
                       </Badge>
                     </div>
 
                     {/* URL bar */}
                     <div className="space-y-2 mb-4">
-                      <label className="text-xs font-medium text-muted-foreground">URL de base</label>
+                      <label className="text-xs font-medium text-muted-foreground">URL de base du mock server</label>
                       <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs">
-                        <code className="flex-1 truncate">
-                          {serverBaseUrl}
-                        </code>
+                        {mockStore.sidecarStatus === "running" ? (
+                          <a
+                            href={serverBaseUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 truncate text-primary hover:underline inline-flex items-center gap-1.5"
+                          >
+                            {serverBaseUrl}
+                            <Link2 className="size-3 shrink-0" />
+                          </a>
+                        ) : (
+                          <code className="flex-1 truncate">
+                            {serverBaseUrl}
+                          </code>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -456,6 +561,9 @@ export default function MocksPage() {
                           <Copy className="size-3.5" />
                         </Button>
                       </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Les routes sont accessibles sur <code className="bg-muted px-1 rounded">{`${serverBaseUrl}{path}`}</code>.
+                      </p>
                     </div>
 
                     {/* Actions and search */}
@@ -502,7 +610,7 @@ export default function MocksPage() {
                             {searchQuery ? "Aucun endpoint ne correspond." : "Aucun endpoint pour ce serveur."}
                           </p>
                           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                            Créez un endpoint manuellement ou importez-en un lot depuis une collection.
+                            Créez un endpoint manuellement ou importez-en un lot depuis une collection existante.
                           </p>
                         </div>
                       </div>
@@ -515,8 +623,10 @@ export default function MocksPage() {
                             onTest={handleTestMock}
                             onEdit={handleEditRoute}
                             onDuplicate={handleDuplicateRoute}
+                            onCopyUrl={handleCopyRouteUrl}
                             index={idx}
                             onMove={handleMoveRoute}
+                            isTestingThisRoute={testingRouteId === route.id}
                           />
                         ))}
                       </div>
@@ -594,9 +704,9 @@ export default function MocksPage() {
                 className="mt-1.5 h-8 text-xs font-mono"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Les requêtes seront servies par le sidecar Mockoon sur <code className="bg-muted px-1 rounded">
-                  {`http://127.0.0.1:3001/${serverFormData.localPrefix || "prefix"}/`}
-                </code>
+                Détermine le préfixe d'URL pour ce groupe d'endpoints (ex: api/v1). Les routes seront accessibles sur <code className="bg-muted px-1 rounded">
+                  {`http://127.0.0.1:3001/${serverFormData.localPrefix || "prefix"}/{path}`}
+                </code>.
               </p>
             </div>
           </div>
@@ -652,23 +762,23 @@ export default function MocksPage() {
       </Dialog>
 
       {/* Test result dialog */}
-      <Dialog open={!!testUrl} onOpenChange={(open) => { if (!open) { setTestUrl(""); setTestResult(null); setIsTesting(false) } }}>
+      <Dialog open={!!testUrl} onOpenChange={(open) => { if (!open) { setTestUrl(""); setTestResult(null); setTestingRouteId(null) } }}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Résultat du test</DialogTitle>
           </DialogHeader>
 
           {/* Loading state */}
-          {isTesting && (
+          {testingRouteId !== null && (
             <div className="flex flex-col items-center justify-center py-10 gap-3">
               <Loader2 className="size-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Simulation en cours…</p>
+              <p className="text-sm text-muted-foreground">Appel du mock server…</p>
               <code className="text-xs font-mono text-muted-foreground/70">{testUrl}</code>
             </div>
           )}
 
           {/* Result */}
-          {!isTesting && testResult !== null && (
+          {testingRouteId === null && testResult !== null && (
             <div className="space-y-4 overflow-y-auto pr-1">
               <div className="flex items-center gap-3">
                 <span className={cn(
