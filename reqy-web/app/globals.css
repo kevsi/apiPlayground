@@ -723,13 +723,10 @@ html {
 
 /* Prevent app from shrinking below minimum dimensions */
 html {
-  min-width: 820px;
-  min-height: 500px;
   overflow: auto;
 }
 
 body {
-  min-width: 820px;
   min-height: 500px;
 }
 
@@ -742,16 +739,6 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-}
-
-/* Respect user animation preference (accessibility) */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
   }
 }
 

@@ -82,13 +82,14 @@ export function WebSocketTab() {
             variant="ghost"
             size="sm"
             onClick={handleReconnect}
-            className="h-6 gap-1 px-2 text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10"
+            className="min-h-9 gap-1 px-2 text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10"
           >
             <RefreshCw className="size-3" />
             Reconnect
           </Button>
           <button
             onClick={() => setDismissedError(true)}
+            aria-label="Dismiss error"
             className="text-xs text-muted-foreground/40 hover:text-foreground ml-1"
           >
             ×

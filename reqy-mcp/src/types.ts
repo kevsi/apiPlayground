@@ -13,6 +13,21 @@ export interface QueryParam {
   value: string
 }
 
+export interface Assertion {
+  id?: string
+  type: "status-code" | "json-path" | "header" | "response-time" | "body-contains"
+  target: string
+  operator?: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "contains" | "regex" | "exists" | "notExists"
+  value?: string
+  enabled?: boolean
+}
+
+export interface GraphQLConfig {
+  query: string
+  variables?: Record<string, unknown>
+  operationName?: string
+}
+
 export interface RequestItem {
   id: string
   name: string
@@ -26,6 +41,11 @@ export interface RequestItem {
   authToken?: string
   queryParams?: QueryParam[]
   folderId?: string | null
+  preRequestScript?: string
+  postResponseScript?: string
+  runnerAssertions?: Assertion[]
+  protocol?: "rest" | "graphql"
+  graphql?: GraphQLConfig
   createdAt: number
   updatedAt: number
 }
@@ -88,7 +108,51 @@ export interface RunResult {
   body?: string
 }
 
+export interface AssertionResult {
+  assertion: Assertion
+  passed: boolean
+  actualValue: unknown
+  error?: string
+}
+
+export interface RequestRunRecord {
+  id: string
+  requestId: string
+  requestName: string
+  collectionId: string
+  collectionName: string
+  method: HttpMethod
+  url: string
+  status: number
+  statusText: string
+  durationMs: number
+  size: number
+  passed: boolean
+  assertionResults?: AssertionResult[]
+  error?: string
+  body?: string
+  executedAt: number
+}
+
+export interface CollectionRunRecord {
+  id: string
+  collectionId: string
+  collectionName: string
+  startedAt: number
+  completedAt: number
+  totalDurationMs: number
+  results: RequestRunRecord[]
+  summary: {
+    total: number
+    passed: number
+    failed: number
+    errored: number
+  }
+}
+
 export interface RunnerOptions {
   envName?: string
   timeoutMs: number
+  allowLocalHosts?: boolean
+  maxResponseSize?: number
 }

@@ -18,6 +18,7 @@ import type { SettingsSection } from "@/components/settings/settings-sidebar"
 import { ApparenceSection } from "@/components/settings/sections/apparence-section"
 import { ToolsSection } from "@/components/settings/sections/tools-section"
 import { KeyboardSection } from "@/components/settings/sections/keyboard-section"
+import McpSection from "@/components/settings/mcp-section"
 
 const AISection = dynamic(() => import("@/components/settings/ai-section"), { ssr: false })
 const NotificationsSection = dynamic(() => import("@/components/settings/notifications-section"), { ssr: false })
@@ -36,7 +37,7 @@ const AI_PROVIDERS: Array<{ value: AIProvider; label: string }> = [
 
 type SectionKey = SettingsSection
 
-const SECTION_KEYS: SectionKey[] = ["apparence", "ai", "notifications", "integrations", "keyboard"]
+const SECTION_KEYS: SectionKey[] = ["apparence", "ai", "notifications", "integrations", "keyboard", "mcp"]
 
 export default function SettingsPage() {
   const { systemNotificationPermission, requestSystemNotificationPermission, aiAutoApply, setAiAutoApply } =
@@ -60,7 +61,7 @@ export default function SettingsPage() {
   const [postmanConnecting, setPostmanConnecting] = useState(false)
 
   // Lire les erreurs d'auth GitHub OAuth depuis l'URL (après redirection callback)
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     const params = new URLSearchParams(window.location.search)
     const authError = params.get("github_auth_error")
     if (authError) {
@@ -318,6 +319,7 @@ export default function SettingsPage() {
               ) : null}
               {activeSection === "integrations" ? <ToolsSection /> : null}
               {activeSection === "keyboard" ? <KeyboardSection /> : null}
+              {activeSection === "mcp" ? <McpSection /> : null}
           </SettingsLayout>
         </div>
 

@@ -32,7 +32,7 @@ export function FloatingAiChat() {
   const [hidden, setHidden] = useState<boolean>(() => {
     if (typeof window === "undefined") return false
     try {
-      return localStorage.getItem("reqly-hide-ai-chat") === "true"
+      return persistence.getItem<string>("reqly-hide-ai-chat") === "true"
     } catch {
       return false
     }
@@ -316,22 +316,18 @@ export function FloatingAiChat() {
   const hasUnread = chatState !== "open" && messages.some((m) => m.role === "assistant")
   const activeSession = conversationHistory.find((session) => session.id === currentSessionId)
 
-  // React to same-tab localStorage changes (e.g. when the sidebar "Show AI chat" button is clicked)
+  // React to same-tab persistent changes (e.g. when the sidebar "Show AI chat" button is clicked)
   useEffect(() => {
-    const onStorage = () => {
+    const check = () => {
       try {
-        const next = localStorage.getItem("reqly-hide-ai-chat") === "true"
+        const next = persistence.getItem<string>("reqly-hide-ai-chat") === "true"
         setHidden((prev) => (prev === next ? prev : next))
       } catch {
         /* ignore */
       }
     }
-    window.addEventListener("storage", onStorage)
-    const interval = window.setInterval(onStorage, 1000)
-    return () => {
-      window.removeEventListener("storage", onStorage)
-      window.clearInterval(interval)
-    }
+    const interval = window.setInterval(check, 1000)
+    return () => window.clearInterval(interval)
   }, [])
 
   if (pathname === "/ai-insights") {
@@ -370,9 +366,9 @@ export function FloatingAiChat() {
         <button
           onClick={() => {
             try {
-              localStorage.setItem("reqly-hide-ai-chat", "true")
+              void persistence.setItem("reqly-hide-ai-chat", "true")
             } catch {
-              /* localStorage unavailable, ignore */
+              /* storage unavailable, ignore */
             }
             setHidden(true)
           }}

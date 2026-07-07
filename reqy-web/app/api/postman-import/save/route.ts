@@ -1,6 +1,16 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
+import { InMemoryRateLimiter } from "@/lib/rate-limiter"
 import { postmanFetchJson, PostmanApiError, extractPostmanCollection } from "@/lib/postman"
+
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 })
+
+function getRateLimitKey(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  return forwarded?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "127.0.0.1"
+}
 
 const bodySchema = {
   parse(input: unknown): { collectionId: string } {
@@ -16,6 +26,12 @@ const bodySchema = {
 }
 
 export async function POST(request: NextRequest) {
+  const rateKey = getRateLimitKey(request)
+  const rateResult = await rateLimiter.check(rateKey)
+  if (!rateResult.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
+  }
+
   let raw: unknown
   try {
     raw = await request.json()
@@ -39,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const data = await postmanFetchJson<any>(apiKey, `/collections/${parsed.collectionId}`)
+    const data = await postmanFetchJson<{ collection: { info?: { name?: string; description?: string }; item?: unknown[] } }>(apiKey, `/collections/${parsed.collectionId}`)
     const collection = data.collection
     const { folders, requests } = extractPostmanCollection(collection?.item ?? [])
     const name =

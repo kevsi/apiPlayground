@@ -72,9 +72,16 @@ export const postmanImportBodySchema = z.object({
 export const postmanRouteSchema = z.object({
   method: z.string(),
   path: z.string(),
+  url: z.string().optional(),
   name: z.string().optional(),
   description: z.union([z.string(), z.array(z.unknown())]).optional(),
   sourceFile: z.string().optional(),
+  headers: z.record(z.string()).optional(),
+  body: z.string().optional(),
+  bodyType: z.enum(["json", "form-data", "x-www-form", "raw", "binary"]).optional(),
+  authType: z.enum(["none", "bearer", "basic", "api-key", "oauth2"]).optional(),
+  authToken: z.string().optional(),
+  queryParams: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
 })
 
 export const postmanImportResponseSchema = z.object({

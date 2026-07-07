@@ -26,6 +26,10 @@ export interface OpenApiParseSuccess {
     version: string
     description?: string
     baseUrl?: string
+    /** Global security requirements (e.g. `[{ bearerAuth: [] }]`) */
+    rootSecurity?: Record<string, string[]>[]
+    /** Defined security schemes from `components.securitySchemes` / `securityDefinitions` */
+    securitySchemes?: Record<string, unknown>
   }
   endpoints: OpenApiEndpoint[]
   /** Suggested collections grouped by tag (one collection per tag) */
@@ -45,6 +49,8 @@ export interface OpenApiEndpoint {
   parameters: OpenApiParameter[]
   requestBody?: OpenApiRequestBody
   security: Record<string, string[]>[]
+  /** Global security requirements inherited from the spec root */
+  rootSecurity?: Record<string, string[]>[]
 }
 
 export interface OpenApiParameter {
@@ -90,8 +96,20 @@ export interface CollectionImportData {
     endpoint: string
     headers?: Record<string, string>
     body?: string
+    bodyType?: "json" | "form-data" | "x-www-form" | "raw" | "binary"
+    authType?: "none" | "bearer" | "basic" | "api-key" | "oauth2"
+    authToken?: string
     queryParams?: Array<{ key: string; value: string }>
+    assertions?: RequestItem["assertions"]
+    runnerAssertions?: RequestItem["runnerAssertions"]
+    preRequestScript?: string
+    postResponseScript?: string
   }>
+}
+
+interface EndpointConversionContext {
+  baseUrl?: string
+  securitySchemes?: Record<string, unknown>
 }
 
 const COLLECTION_COLORS = ["emerald", "blue", "amber", "purple", "red", "pink"] as const
@@ -133,6 +151,10 @@ export function convertToCollections(
   options: ImportOptions,
 ): CollectionImportData[] {
   const { groupByTag, baseUrlOverride } = options
+  const context: EndpointConversionContext = {
+    baseUrl: baseUrlOverride ?? result.spec.baseUrl,
+    securitySchemes: result.spec.securitySchemes,
+  }
 
   if (groupByTag) {
     return result.tagGroups.map((group, index) => ({
@@ -140,7 +162,7 @@ export function convertToCollections(
       description: group.description ?? result.spec.description,
       color: COLLECTION_COLORS[index % COLLECTION_COLORS.length],
       icon: COLLECTION_ICONS[index % COLLECTION_ICONS.length],
-      requests: group.endpoints.map((ep) => endpointToRequest(ep, baseUrlOverride ?? result.spec.baseUrl)),
+      requests: group.endpoints.map((ep) => endpointToRequest(ep, context)),
     }))
   }
 
@@ -152,7 +174,7 @@ export function convertToCollections(
       description: result.spec.description,
       color: "emerald",
       icon: "package",
-      requests: result.endpoints.map((ep) => endpointToRequest(ep, baseUrlOverride ?? result.spec.baseUrl)),
+      requests: result.endpoints.map((ep) => endpointToRequest(ep, context)),
     },
   ]
 }
@@ -180,6 +202,12 @@ function parseOpenApi3(doc: Record<string, unknown>): OpenApiParseSuccess {
     }
   }
 
+  // Build $ref resolution map from components/schemas
+  const components = doc.components as Record<string, unknown> | undefined
+  const schemas = (components?.schemas ?? {}) as Record<string, unknown>
+  const securitySchemes = (components?.securitySchemes ?? {}) as Record<string, unknown>
+  const rootSecurity = (doc.security as Array<Record<string, string[]>>) || []
+
   const endpoints: OpenApiEndpoint[] = []
 
   for (const [path, pathItem] of Object.entries(paths)) {
@@ -188,6 +216,7 @@ function parseOpenApi3(doc: Record<string, unknown>): OpenApiParseSuccess {
 
     // Shared path-level parameters
     const pathParams = extractPathLevelParams(pathObj.parameters)
+    const pathSecurity = pathObj.security as Array<Record<string, string[]>> | undefined
 
     for (const method of ["get", "post", "put", "patch", "delete", "options", "head"] as const) {
       const operation = pathObj[method] as Record<string, unknown> | undefined
@@ -198,13 +227,15 @@ function parseOpenApi3(doc: Record<string, unknown>): OpenApiParseSuccess {
         path,
         operation,
         pathParams,
+        schemas,
+        pathSecurity ?? rootSecurity,
       )
       endpoints.push(endpoint)
     }
   }
 
   // Group by tag
-  return buildResult(title, version, description, baseUrl, endpoints)
+  return buildResult(title, version, description, baseUrl, endpoints, rootSecurity, securitySchemes)
 }
 
 // ─── Internal: Swagger 2.0 parser ───────────────────────────────────────────
@@ -233,11 +264,17 @@ function parseSwagger2(doc: Record<string, unknown>): OpenApiParseSuccess {
     }
   }
 
+  // Build $ref resolution map from definitions (Swagger 2.0)
+  const definitions = (doc.definitions ?? {}) as Record<string, unknown>
+  const securityDefinitions = (doc.securityDefinitions ?? {}) as Record<string, unknown>
+  const rootSecurity = (doc.security as Array<Record<string, string[]>>) || []
+
   const endpoints: OpenApiEndpoint[] = []
 
   for (const [path, pathItem] of Object.entries(paths)) {
     if (!pathItem || typeof pathItem !== "object") continue
     const pathObj = pathItem as Record<string, unknown>
+    const pathSecurity = pathObj.security as Array<Record<string, string[]>> | undefined
 
     for (const method of ["get", "post", "put", "patch", "delete", "options", "head"] as const) {
       const operation = pathObj[method] as Record<string, unknown> | undefined
@@ -263,7 +300,7 @@ function parseSwagger2(doc: Record<string, unknown>): OpenApiParseSuccess {
           required: !!bodyParam.required,
           description: bodyParam.description as string | undefined,
           example: bodyParam.schema
-            ? extractExampleFromSchema(bodyParam.schema as Record<string, unknown>)
+            ? extractExampleFromSchema(bodyParam.schema as Record<string, unknown>, undefined, definitions)
             : undefined,
         }
       }
@@ -286,9 +323,8 @@ function parseSwagger2(doc: Record<string, unknown>): OpenApiParseSuccess {
       const summary = (operation.summary as string) || `${method.toUpperCase()} ${path}`
       const tags = (operation.tags as string[]) || []
 
-      // Security from swagger
-      const security = (doc.security as Array<Record<string, string[]>>) || []
-      const operationSecurity = (operation.security as Array<Record<string, string[]>>) || security
+      // Security from swagger: operation-level overrides root-level
+      const operationSecurity = (operation.security as Array<Record<string, string[]>>) || (pathSecurity ?? rootSecurity)
 
       endpoints.push({
         method: method.toUpperCase(),
@@ -299,11 +335,12 @@ function parseSwagger2(doc: Record<string, unknown>): OpenApiParseSuccess {
         parameters,
         requestBody,
         security: operationSecurity,
+        rootSecurity,
       })
     }
   }
 
-  return buildResult(title, version, description, baseUrl, endpoints)
+  return buildResult(title, version, description, baseUrl, endpoints, rootSecurity, securityDefinitions)
 }
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
@@ -354,6 +391,8 @@ function buildEndpointFromOperation(
   path: string,
   operation: Record<string, unknown>,
   pathParams: OpenApiParameter[],
+  rootSchemas: Record<string, unknown> = {},
+  pathSecurity: Array<Record<string, string[]>> = [],
 ): OpenApiEndpoint {
   const summary = (operation.summary as string) || `${method} ${path}`
   const operationParams = extractOperationParams(operation)
@@ -368,9 +407,9 @@ function buildEndpointFromOperation(
     return true
   })
 
-  const requestBody = extractRequestBody(operation)
+  const requestBody = extractRequestBody(operation, rootSchemas)
   const tags = (operation.tags as string[]) || []
-  const security = extractSecurity(operation)
+  const security = extractSecurity(operation, pathSecurity)
 
   return {
     method,
@@ -398,7 +437,10 @@ function extractOperationParams(operation: Record<string, unknown>): OpenApiPara
     }))
 }
 
-function extractRequestBody(operation: Record<string, unknown>): OpenApiRequestBody | undefined {
+function extractRequestBody(
+  operation: Record<string, unknown>,
+  rootSchemas: Record<string, unknown> = {},
+): OpenApiRequestBody | undefined {
   const rb = operation.requestBody as Record<string, unknown> | undefined
   if (!rb || typeof rb !== "object") return undefined
 
@@ -418,13 +460,36 @@ function extractRequestBody(operation: Record<string, unknown>): OpenApiRequestB
     contentType: preferredType,
     required: !!rb.required,
     description: rb.description as string | undefined,
-    example: extractExampleFromSchema(schema, mediaType),
+    example: extractExampleFromSchema(schema, mediaType, rootSchemas),
   }
+}
+
+/** Resolve $ref like "#/components/schemas/LoginDto" against rootSchemas. */
+function resolveRef(ref: string, rootSchemas: Record<string, unknown>): Record<string, unknown> | null {
+  const parts = ref.split("/")
+  if (parts[0] !== "#" || parts[1] !== "components" || parts[2] !== "schemas") return null
+  const name = parts.slice(3).join("/")
+  return (rootSchemas[name] as Record<string, unknown>) ?? null
+}
+
+/** Recursively resolve $ref until we get a concrete schema. */
+function derefSchema(
+  schema: Record<string, unknown>,
+  rootSchemas: Record<string, unknown>,
+  depth = 0,
+): Record<string, unknown> | null {
+  if (depth > 10) return schema
+  const ref = schema.$ref as string | undefined
+  if (!ref) return schema
+  const resolved = resolveRef(ref, rootSchemas)
+  if (!resolved) return null
+  return derefSchema(resolved, rootSchemas, depth + 1)
 }
 
 function extractExampleFromSchema(
   schema?: Record<string, unknown>,
   mediaType?: Record<string, unknown>,
+  rootSchemas: Record<string, unknown> = {},
 ): string | undefined {
   // Try direct example on media type
   if (mediaType?.example !== undefined) {
@@ -439,17 +504,117 @@ function extractExampleFromSchema(
     }
   }
 
-  // Try schema-level example
   if (!schema) return undefined
+
+  // Try schema-level example
   if (schema.example !== undefined) return tryStringify(schema.example)
   if (schema.default !== undefined) return tryStringify(schema.default)
 
-  // Generate example from schema type
-  return generateExampleFromSchema(schema)
+  // Generate example from schema type (with $ref resolution)
+  return generateExampleFromSchema(schema, rootSchemas)
 }
 
-function generateExampleFromSchema(schema: Record<string, unknown>): string | undefined {
+function uuidV4(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0"))
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`
+}
+
+function defaultValueForFormat(format: string | undefined, type: string): unknown {
+  if (!format) {
+    switch (type) {
+      case "string": return "string"
+      case "integer": return 0
+      case "number": return 0.0
+      case "boolean": return false
+      default: return null
+    }
+  }
+  switch (format) {
+    case "email": return "user@example.com"
+    case "uuid": return uuidV4()
+    case "uri":
+    case "url": return "https://example.com"
+    case "date": return "2025-01-01"
+    case "date-time": return "2025-01-01T00:00:00Z"
+    case "time": return "12:00:00"
+    case "ipv4": return "127.0.0.1"
+    case "ipv6": return "::1"
+    case "hostname": return "example.com"
+    case "byte": return "aGVsbG8="
+    case "binary": return ""
+    default:
+      switch (type) {
+        case "integer": return 0
+        case "number": return 0.0
+        case "boolean": return false
+        default: return "string"
+      }
+  }
+}
+
+/** Generate a sample JSON value from an OpenAPI schema, resolving $refs. */
+function generateExampleFromSchema(
+  rawSchema: Record<string, unknown>,
+  rootSchemas: Record<string, unknown> = {},
+  depth = 0,
+): string | undefined {
+  if (depth > 10) return undefined
+
+  // Resolve $ref before processing
+  const schema = derefSchema(rawSchema, rootSchemas)
+  if (!schema) return undefined
+
+  // Check example/default directly
+  if (schema.example !== undefined) return tryStringify(schema.example)
+  if (schema.default !== undefined) return tryStringify(schema.default)
+
+  // Handle enum
+  const enumVals = schema.enum as unknown[] | undefined
+  if (Array.isArray(enumVals) && enumVals.length > 0) return tryStringify(enumVals[0])
+
+  // Handle composition (allOf)
+  const allOf = schema.allOf as Record<string, unknown>[] | undefined
+  if (Array.isArray(allOf) && allOf.length > 0) {
+    const merged: Record<string, unknown> = {}
+    for (const sub of allOf) {
+      const subResult = generateExampleFromSchema(sub, rootSchemas, depth + 1)
+      if (subResult) {
+        try {
+          const parsed = JSON.parse(subResult)
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            Object.assign(merged, parsed)
+          }
+        } catch {
+          // skip string results
+        }
+      }
+    }
+    if (Object.keys(merged).length > 0) return JSON.stringify(merged, null, 2)
+  }
+
+  // Handle anyOf/oneOf — pick first branch that yields a result
+  const anyOf = schema.anyOf as Record<string, unknown>[] | undefined
+  if (Array.isArray(anyOf) && anyOf.length > 0) {
+    for (const branch of anyOf) {
+      const result = generateExampleFromSchema(branch, rootSchemas, depth + 1)
+      if (result) return result
+    }
+  }
+  const oneOf = schema.oneOf as Record<string, unknown>[] | undefined
+  if (Array.isArray(oneOf) && oneOf.length > 0) {
+    for (const branch of oneOf) {
+      const result = generateExampleFromSchema(branch, rootSchemas, depth + 1)
+      if (result) return result
+    }
+  }
+
+  // Generate by type
   const type = schema.type as string | undefined
+  const format = schema.format as string | undefined
 
   if (type === "object" || schema.properties) {
     const props = schema.properties as Record<string, unknown> | undefined
@@ -457,21 +622,69 @@ function generateExampleFromSchema(schema: Record<string, unknown>): string | un
     const example: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(props)) {
       const propSchema = val as Record<string, unknown>
-      const propType = propSchema.type as string | undefined
-      const propExample = propSchema.example ?? propSchema.default
+      // Resolve $ref for the property
+      const resolvedProp = derefSchema(propSchema, rootSchemas)
+      if (!resolvedProp) {
+        example[key] = null
+        continue
+      }
+
+      const propExample = resolvedProp.example ?? resolvedProp.default
       if (propExample !== undefined) {
         example[key] = propExample
-      } else if (propType === "string") {
-        example[key] = "string"
-      } else if (propType === "integer" || propType === "number") {
-        example[key] = 0
-      } else if (propType === "boolean") {
-        example[key] = false
-      } else if (propType === "array") {
-        example[key] = []
-      } else {
-        example[key] = null
+        continue
       }
+
+      // Handle enum in property
+      const propEnum = resolvedProp.enum as unknown[] | undefined
+      if (Array.isArray(propEnum) && propEnum.length > 0) {
+        example[key] = propEnum[0]
+        continue
+      }
+
+      const propType = resolvedProp.type as string | undefined
+      const propFormat = resolvedProp.format as string | undefined
+
+      // Handle nested object via recursion
+      if (propType === "object" || resolvedProp.properties) {
+        const nested = generateExampleFromSchema(resolvedProp, rootSchemas, depth + 1)
+        try {
+          example[key] = nested ? JSON.parse(nested) : null
+        } catch {
+          example[key] = null
+        }
+        continue
+      }
+
+      // Handle array items
+      if (propType === "array") {
+        const items = resolvedProp.items as Record<string, unknown> | undefined
+        if (items) {
+          const resolvedItems = derefSchema(items, rootSchemas)
+          if (resolvedItems) {
+            const itemExample = generateExampleFromSchema(resolvedItems, rootSchemas, depth + 1)
+            try {
+              example[key] = itemExample ? [JSON.parse(itemExample)] : []
+            } catch {
+              example[key] = []
+            }
+          } else {
+            example[key] = []
+          }
+        } else {
+          example[key] = []
+        }
+        continue
+      }
+
+      // Primitive with format
+      if (propFormat && propType === "string") {
+        example[key] = defaultValueForFormat(propFormat, "string")
+        continue
+      }
+
+      // Simple type-based default
+      example[key] = defaultValueForFormat(undefined, propType ?? "string")
     }
     return JSON.stringify(example, null, 2)
   }
@@ -479,16 +692,24 @@ function generateExampleFromSchema(schema: Record<string, unknown>): string | un
   if (type === "array") {
     const items = schema.items as Record<string, unknown> | undefined
     if (items) {
-      const itemExample = generateExampleFromSchema(items)
-      if (itemExample) {
-        try {
-          return JSON.stringify([JSON.parse(itemExample)], null, 2)
-        } catch {
-          return "[]"
+      const resolvedItems = derefSchema(items, rootSchemas)
+      if (resolvedItems) {
+        const itemExample = generateExampleFromSchema(resolvedItems, rootSchemas, depth + 1)
+        if (itemExample) {
+          try {
+            return JSON.stringify([JSON.parse(itemExample)], null, 2)
+          } catch {
+            return "[]"
+          }
         }
       }
     }
     return "[]"
+  }
+
+  // Primitive type
+  if (type === "string" && format) {
+    return tryStringify(defaultValueForFormat(format, "string"))
   }
 
   return undefined
@@ -503,8 +724,11 @@ function tryStringify(value: unknown): string | undefined {
   }
 }
 
-function extractSecurity(operation: Record<string, unknown>): Record<string, string[]>[] {
-  return (operation.security as Record<string, string[]>[]) || []
+function extractSecurity(
+  operation: Record<string, unknown>,
+  fallback: Array<Record<string, string[]>> = [],
+): Record<string, string[]>[] {
+  return (operation.security as Array<Record<string, string[]>>) ?? fallback
 }
 
 function buildResult(
@@ -513,6 +737,8 @@ function buildResult(
   description: string | undefined,
   baseUrl: string | undefined,
   endpoints: OpenApiEndpoint[],
+  rootSecurity?: Array<Record<string, string[]>>,
+  securitySchemes?: Record<string, unknown>,
 ): OpenApiParseSuccess {
   // Group by tag
   const tagMap = new Map<string, OpenApiEndpoint[]>()
@@ -545,7 +771,14 @@ function buildResult(
 
   return {
     success: true,
-    spec: { title, version, description, baseUrl },
+    spec: {
+      title,
+      version,
+      description,
+      baseUrl,
+      ...(rootSecurity && rootSecurity.length > 0 ? { rootSecurity } : {}),
+      ...(securitySchemes && Object.keys(securitySchemes).length > 0 ? { securitySchemes } : {}),
+    },
     endpoints,
     tagGroups,
     totalEndpoints: endpoints.length,
@@ -554,9 +787,48 @@ function buildResult(
 
 // ─── Endpoint → RequestItem converter ───────────────────────────────────────
 
+function mapContentTypeToBodyType(contentType?: string): CollectionImportData["requests"][number]["bodyType"] {
+  if (!contentType) return "raw"
+  const ct = contentType.toLowerCase()
+  if (ct.includes("application/json") || ct.includes("+json")) return "json"
+  if (ct.includes("multipart/form-data")) return "form-data"
+  if (ct.includes("application/x-www-form-urlencoded")) return "x-www-form"
+  if (ct.includes("application/octet-stream") || ct.startsWith("image/") || ct.startsWith("audio/") || ct.startsWith("video/")) return "binary"
+  return "raw"
+}
+
+function mapSecurityToAuth(
+  security: Array<Record<string, string[]>>,
+  securitySchemes?: Record<string, unknown>,
+): Pick<CollectionImportData["requests"][number], "authType" | "authToken"> {
+  if (security.length === 0 || !securitySchemes) return { authType: "none" }
+
+  // Pick the first alternative from the OR-list of security requirements.
+  const firstRequirement = security[0]
+  const schemeName = Object.keys(firstRequirement)[0]
+  if (!schemeName) return { authType: "none" }
+
+  const scheme = securitySchemes[schemeName]
+  if (!scheme || typeof scheme !== "object") return { authType: "none" }
+  const s = scheme as Record<string, unknown>
+
+  const type = String(s.type ?? "").toLowerCase()
+  const schemeField = String(s.scheme ?? "").toLowerCase()
+
+  if (type === "http") {
+    if (schemeField === "bearer") return { authType: "bearer" }
+    if (schemeField === "basic") return { authType: "basic" }
+    return { authType: "api-key" }
+  }
+  if (type === "apikey") return { authType: "api-key" }
+  if (type === "oauth2" || type === "openidconnect") return { authType: "oauth2" }
+
+  return { authType: "none" }
+}
+
 function endpointToRequest(
   ep: OpenApiEndpoint,
-  baseUrl?: string,
+  context: EndpointConversionContext,
 ): CollectionImportData["requests"][number] {
   const headers: Record<string, string> = {}
   const queryParams: Array<{ key: string; value: string }> = []
@@ -573,10 +845,16 @@ function endpointToRequest(
   }
 
   // Build full URL
-  if (baseUrl) {
-    const cleanBase = baseUrl.replace(/\/+$/, "")
+  if (context.baseUrl) {
+    const cleanBase = context.baseUrl.replace(/\/+$/, "")
     url = ep.path.startsWith("/") ? `${cleanBase}${ep.path}` : `${cleanBase}/${ep.path}`
   }
+
+  const bodyType = ep.requestBody
+    ? mapContentTypeToBodyType(ep.requestBody.contentType)
+    : undefined
+
+  const { authType, authToken } = mapSecurityToAuth(ep.security, context.securitySchemes)
 
   const request: CollectionImportData["requests"][number] = {
     name: ep.name,
@@ -584,7 +862,10 @@ function endpointToRequest(
     url,
     endpoint: ep.path,
     headers: Object.keys(headers).length > 0 ? headers : undefined,
-    body: ep.requestBody?.example,
+    body: ep.requestBody?.example ?? "",
+    bodyType,
+    authType,
+    authToken,
     queryParams: queryParams.length > 0 ? queryParams : undefined,
   }
 

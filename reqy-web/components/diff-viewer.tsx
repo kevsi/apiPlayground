@@ -120,7 +120,7 @@ export function DiffViewer({
     : 0
 
   const statusColor = (status?: number) => {
-    if (!status) return "bg-muted text-muted-foreground"
+    if (status == null) return "bg-muted text-muted-foreground"
     if (status < 300) return "bg-emerald-500/15 text-emerald-600"
     if (status < 400) return "bg-blue-500/15 text-blue-600"
     if (status < 500) return "bg-amber-500/15 text-amber-600"
@@ -167,7 +167,7 @@ export function DiffViewer({
             <div className="flex items-center justify-between gap-2 px-4 py-2 bg-red-500/5 border-b border-red-500/20 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="flex size-5 items-center justify-center rounded-full bg-red-500/15 text-[10px] font-bold text-red-500">L</span>
-                {leftStatus && (
+                {leftStatus != null && (
                   <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", statusColor(leftStatus))}>
                     {leftStatus}
                   </span>
@@ -211,7 +211,7 @@ export function DiffViewer({
             <div className="flex items-center justify-between gap-2 px-4 py-2 bg-emerald-500/5 border-b border-emerald-500/20 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">R</span>
-                {rightStatus && (
+                {rightStatus != null && (
                   <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", statusColor(rightStatus))}>
                     {rightStatus}
                   </span>

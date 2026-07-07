@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useMemo } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -21,6 +21,8 @@ import {
   Play,
   Copy,
   Loader2,
+  SlidersHorizontal,
+  ArrowUpDown,
 } from "lucide-react"
 import { cn, downloadJson } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -89,12 +91,25 @@ const collectionColors: Record<string, string> = {
   purple: "bg-purple-500",
   red: "bg-red-500",
   pink: "bg-pink-500",
+  slate: "bg-slate-500",
+  indigo: "bg-indigo-500",
+  violet: "bg-violet-500",
+  orange: "bg-orange-500",
+}
+
+const VALID_COLORS = new Set(Object.keys(collectionColors))
+const DEFAULT_COLOR = "emerald"
+const DEFAULT_ICON = "package"
+
+function safeColor(color: string): string {
+  return VALID_COLORS.has(color) ? color : DEFAULT_COLOR
 }
 
 const collectionIcons: Record<string, React.ReactNode> = {
   lock: <Lock className="size-3 text-white" />,
   users: <Users className="size-3 text-white" />,
   package: <Package className="size-3 text-white" />,
+  folder: <Package className="size-3 text-white" />,
 }
 
 
@@ -152,6 +167,9 @@ export function CollectionsPanel({
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [methodFilter, setMethodFilter] = useState<Set<HttpMethod>>(new Set())
+  const [sortBy, setSortBy] = useState<"name" | "updated" | "requests">("name")
+  const [showFilters, setShowFilters] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
@@ -251,6 +269,25 @@ export function CollectionsPanel({
   const clearSelection = () => {
     setSelectedCollectionIds(new Set())
     setSelectedRequestIds(new Set())
+  }
+
+  const allSelected = collections.length > 0 && selectedCollectionIds.size === collections.length
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      clearSelection()
+    } else {
+      setSelectedCollectionIds(new Set(collections.map((c) => c.id)))
+    }
+  }
+
+  const toggleMethodFilter = (method: HttpMethod) => {
+    setMethodFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(method)) next.delete(method)
+      else next.add(method)
+      return next
+    })
   }
 
   // --- Bulk actions ---
@@ -366,38 +403,54 @@ export function CollectionsPanel({
   }
 
   const searchLower = searchQuery.toLowerCase()
-  const filteredCollections = collections
+  const sortedCollections = useMemo(() => {
+    const list = [...collections]
+    if (sortBy === "name") {
+      list.sort((a, b) => a.name.localeCompare(b.name))
+    } else if (sortBy === "updated") {
+      list.sort((a, b) => b.updatedAt - a.updatedAt)
+    } else if (sortBy === "requests") {
+      list.sort((a, b) => b.requests.length - a.requests.length)
+    }
+    return list
+  }, [collections, sortBy])
+
+  const filteredCollections = sortedCollections
     .map((collection) => ({
       ...collection,
       requests: collection.requests.filter(
-        (req) =>
-          (req.name ?? "").toLowerCase().includes(searchLower) ||
-          (req.endpoint ?? "").toLowerCase().includes(searchLower) ||
-          (req.url ?? "").toLowerCase().includes(searchLower) ||
-          (req.method ?? "").toLowerCase().includes(searchLower)
+        (req) => {
+          if (methodFilter.size > 0 && !methodFilter.has(req.method)) return false
+          if (!searchQuery) return true
+          return (
+            (req.name ?? "").toLowerCase().includes(searchLower) ||
+            (req.endpoint ?? "").toLowerCase().includes(searchLower) ||
+            (req.url ?? "").toLowerCase().includes(searchLower) ||
+            (req.method ?? "").toLowerCase().includes(searchLower)
+          )
+        }
       ),
     }))
     .filter(
       (collection) => {
-        if (searchQuery === "") return true
+        if (!searchQuery && methodFilter.size === 0) return true
 
-        // Check collection name
-        if (collection.name.toLowerCase().includes(searchLower)) return true
+        // Collection name matches search
+        if (searchQuery && collection.name.toLowerCase().includes(searchLower)) return true
 
-        // Check requests
+        // Collection has matching requests after filtering
         if (collection.requests.length > 0) return true
 
-        // Check folder names
-        if (collection.folders?.some((f) =>
+        // Collection has folder matching search
+        if (searchQuery && collection.folders?.some((f) =>
           f.name.toLowerCase().includes(searchLower)
         )) return true
 
-        // Check request count in original (before filtering) to show collections with matching folders
-        const originalCollection = collections.find((c) => c.id === collection.id)
-        const hasMatchingFolder = originalCollection?.folders?.some((f) =>
-          f.name.toLowerCase().includes(searchLower)
-        )
-        if (hasMatchingFolder) return true
+        // Show collections that have matching method in original requests
+        if (methodFilter.size > 0) {
+          const originalCollection = collections.find((c) => c.id === collection.id)
+          if (originalCollection?.requests.some((r) => methodFilter.has(r.method))) return true
+        }
 
         return false
       }
@@ -451,26 +504,134 @@ export function CollectionsPanel({
         </div>
       </div>
 
-      {/* Search */}
-      <div className="border-b border-border/60 px-3 py-2.5 shrink-0">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60 pointer-events-none" />
-          <Input
-            placeholder="Search collections & requests..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 pl-8 text-sm bg-muted/30 border-border/50 focus-visible:bg-background transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors"
+      {/* Search + Filters */}
+      <div className="border-b border-border/60 px-3 py-2 shrink-0 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60 pointer-events-none" />
+            <Input
+              placeholder="Search collections & requests..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 pl-9 pr-9 text-sm bg-muted/30 border-border/50 focus-visible:bg-background transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSelectAll}
+              className={cn(
+                "h-9 w-9 p-0",
+                allSelected && "text-primary"
+              )}
+              title={allSelected ? "Tout désélectionner" : "Tout sélectionner"}
             >
-              <X className="size-3.5" />
-            </button>
-          )}
+              {allSelected ? <CheckSquare className="size-4.5" /> : <Square className="size-4.5" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(
+                "h-9 w-9 p-0",
+                (methodFilter.size > 0 || sortBy !== "name") && "text-primary"
+              )}
+              title="Filtres & tri"
+            >
+              <SlidersHorizontal className="size-4.5" />
+            </Button>
+          </div>
         </div>
+
+        {/* Method filter pills + sort */}
+        {showFilters && (
+          <div className="flex items-center gap-3 pt-1.5 pb-0.5">
+            <div className="flex items-center gap-1 flex-wrap">
+              {(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "GRAPHQL"] as HttpMethod[]).map((method) => {
+                const active = methodFilter.has(method)
+                return (
+                  <button
+                    key={method}
+                    onClick={() => toggleMethodFilter(method)}
+                    className={cn(
+                      "px-3 py-1 text-xs font-bold rounded-md border transition-colors",
+                      active
+                        ? `${methodBadgeColors[method]} border-transparent`
+                        : "text-muted-foreground/60 border-border/50 hover:border-border hover:text-foreground"
+                    )}
+                  >
+                    {method}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="ml-auto flex items-center gap-1">
+              <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="h-7 text-xs bg-transparent border-0 text-muted-foreground/70 hover:text-foreground cursor-pointer outline-none font-medium"
+              >
+                <option value="name">Name</option>
+                <option value="updated">Recent</option>
+                <option value="requests">Requests</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Selection toolbar */}
+      {(selectedCollectionIds.size > 0 || selectedRequestIds.size > 0) && (
+        <div className="flex items-center justify-between border-b border-border/60 px-3 py-1.5 shrink-0 bg-primary/5 border-t-0">
+          <span className="text-sm font-medium text-foreground/70">
+            {selectedCollectionIds.size > 0 && `${selectedCollectionIds.size} collection${selectedCollectionIds.size > 1 ? "s" : ""}`}
+            {selectedCollectionIds.size > 0 && selectedRequestIds.size > 0 && " + "}
+            {selectedRequestIds.size > 0 && `${selectedRequestIds.size} requête${selectedRequestIds.size > 1 ? "s" : ""}`}
+            {" sélectionné"}
+          </span>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5 mr-1.5" />
+              Clear
+            </Button>
+            <div className="w-px h-4 bg-border/40 mx-0.5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={bulkExport}
+              disabled={exporting}
+              className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              {exporting ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Download className="size-3.5 mr-1.5" />}
+              Export
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={bulkDelete}
+              className="h-8 px-3 text-xs font-medium text-red-600 hover:text-red-600 hover:bg-red-500/10"
+            >
+              <Trash2 className="size-3.5 mr-1.5" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Collections content */}
       <div data-testid="collection-list" className="flex-1 overflow-y-auto">
@@ -502,9 +663,9 @@ export function CollectionsPanel({
                   </button>
                   <span className={cn(
                     "flex size-5 shrink-0 items-center justify-center rounded",
-                    collectionColors[collection.color]
+                    collectionColors[safeColor(collection.color)]
                   )}>
-                    {collectionIcons[collection.icon] || <Package className="size-2.5 text-white" />}
+                    {collectionIcons[collection.icon] ?? <Package className="size-2.5 text-white" />}
                   </span>
                   {editingCollectionId === collection.id ? (
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

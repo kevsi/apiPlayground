@@ -2,9 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "enables the default permissions",
-  "windows": [
-    "main"
-  ],
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:allow-open",
@@ -15,11 +13,23 @@
     "fs:allow-exists",
     {
       "identifier": "fs:scope",
-      "allow": [
-        "$APPDATA/**"
-      ]
+      "allow": ["$APPDATA/Reqly/**"]
     },
     "deep-link:default",
-    "notification:default"
+    "notification:default",
+    "allow-fetch-proxy",
+    "allow-export-json",
+    "allow-open-external",
+    "allow-start-capture-proxy",
+    "allow-stop-capture-proxy",
+    "allow-ws-connect",
+    "allow-ws-send",
+    "allow-ws-disconnect",
+    "allow-ws-get-status",
+    "allow-start-mcp-server",
+    "allow-stop-mcp-server",
+    "allow-get-mcp-server-status",
+    "allow-read-mcp-bundle",
+    "allow-sync-mcp-collections"
   ]
 }

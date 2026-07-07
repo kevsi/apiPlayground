@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Diff, Trash2, Save, AlertOctagon, AlertTriangle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { persistence } from "@/lib/persistence"
 import {
   buildClientSchema,
   findBreakingChanges,
@@ -20,7 +21,7 @@ interface Snapshot {
 function loadSnapshots(): Record<string, Snapshot> {
   if (typeof window === "undefined") return {}
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = persistence.getItem<string>(STORAGE_KEY)
     return raw ? (JSON.parse(raw) as Record<string, Snapshot>) : {}
   } catch {
     return {}
@@ -30,7 +31,7 @@ function loadSnapshots(): Record<string, Snapshot> {
 function saveSnapshots(snaps: Record<string, Snapshot>) {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snaps))
+    void persistence.setItem(STORAGE_KEY, JSON.stringify(snaps))
   } catch {
     /* ignore quota */
   }

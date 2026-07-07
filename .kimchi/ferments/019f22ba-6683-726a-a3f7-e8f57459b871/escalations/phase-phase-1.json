@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "fermentId": "019f22ba-6683-726a-a3f7-e8f57459b871",
+  "phaseId": "phase-1",
+  "phaseName": "Phase 1 : Mitigations immediates",
+  "timestamp": "2026-07-02T14:33:23.749Z",
+  "question": "Reviewer still blocking phase \"Phase 1 : Mitigations immediates\" after 3 retries. How should we proceed?",
+  "flags": [
+    {
+      "problem": "Project test command (`npm test`) did not validate.",
+      "evidence": "test script references 'vitest' but node_modules/.bin/vitest is missing — run install first",
+      "severity": "block",
+      "redirect": "Wire test properly before completing this phase — make `npm test` a real, installable command (resolve the runner, fix the script)."
+    },
+    {
+      "problem": "Project lint command (`npm run lint`) did not validate.",
+      "evidence": "lint script references 'eslint' but node_modules/.bin/eslint is missing — run install first",
+      "severity": "block",
+      "redirect": "Wire lint properly before completing this phase — make `npm run lint` a real, installable command (resolve the runner, fix the script)."
+    }
+  ],
+  "options": [
+    {
+      "id": "override",
+      "label": "Override and proceed (mark phase done)"
+    },
+    {
+      "id": "pause",
+      "label": "Pause ferment for manual fix",
+      "recommendation": true
+    },
+    {
+      "id": "abandon",
+      "label": "Abandon ferment"
+    }
+  ],
+  "recommendation": "pause",
+  "recommendationRationale": "Pausing preserves the in-flight work and lets you inspect the actual code before deciding to override the reviewer or abandon."
+}

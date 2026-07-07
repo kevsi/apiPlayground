@@ -36,7 +36,7 @@ export interface RequestStore {
   variableMappings: VariableMapping[]
   systemNotificationPermission?: string
   activeEnvironmentId: string | null
-  projects: import("@/types").SavedProject[]
+  projects: import("@/lib/types").SavedProject[]
   selectedProjectId: string | null
   currentRequest?: import("@/lib/ai-engine").CurrentRequest | null
   lastResponse?: import("@/lib/ai-engine").LastResponse | null

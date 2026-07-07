@@ -40,9 +40,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isActive = fa
   const colors = FRAMEWORK_COLORS[fw] ?? FRAMEWORK_COLORS.unknown
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        "group relative flex flex-col gap-3 rounded-xl border p-4 transition-all duration-200 cursor-pointer hover:shadow-md hover:-translate-y-0.5",
+        "group relative flex flex-col gap-3 rounded-xl border p-4 transition-all duration-200 cursor-pointer hover:shadow-md hover:-translate-y-0.5 text-left w-full",
         isActive
           ? "border-primary/50 bg-primary/5 shadow-sm shadow-primary/10"
           : "border-border bg-card hover:border-border/80"
@@ -119,6 +120,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isActive = fa
           <FolderOpen className="size-3" /> Ouvrir
         </button>
       </div>
-    </div>
+    </button>
   )
 }

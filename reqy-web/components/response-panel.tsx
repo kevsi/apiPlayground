@@ -408,7 +408,7 @@ export function ResponsePanel({
 
         <TabsContent value="response" data-testid="response-body" className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-auto">
           {/* Giant floating status code background */}
-          {hasResponse && responseStatus && !isLoading && (
+          {hasResponse && responseStatus != null && !isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
               <span className={cn("text-[140px] font-bold leading-none", getGiantCodeColor())}>
                 {responseStatus}

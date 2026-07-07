@@ -19,6 +19,7 @@ import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { Button } from "@/components/ui/button"
+import { persistence } from "@/lib/persistence"
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/", key: "dashboard" },
@@ -50,26 +51,22 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
   const [aiHidden, setAiHidden] = useState<boolean>(() => {
     if (typeof window === "undefined") return false
     try {
-      return localStorage.getItem("reqly-hide-ai-chat") === "true"
+      return persistence.getItem<string>("reqly-hide-ai-chat") === "true"
     } catch {
       return false
     }
   })
 
   useEffect(() => {
-    const onStorage = () => {
+    const check = () => {
       try {
-        setAiHidden(localStorage.getItem("reqly-hide-ai-chat") === "true")
+        setAiHidden(persistence.getItem<string>("reqly-hide-ai-chat") === "true")
       } catch {
         /* ignore */
       }
     }
-    window.addEventListener("storage", onStorage)
-    const interval = window.setInterval(onStorage, 1000)
-    return () => {
-      window.removeEventListener("storage", onStorage)
-      window.clearInterval(interval)
-    }
+    const interval = window.setInterval(check, 1000)
+    return () => window.clearInterval(interval)
   }, [])
 
   const pathname = usePathname()
@@ -175,7 +172,7 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
             className="w-full justify-start text-xs text-muted-foreground"
             onClick={() => {
               try {
-                localStorage.setItem("reqly-hide-ai-chat", "false")
+                void persistence.setItem("reqly-hide-ai-chat", "false")
               } catch {
                 /* ignore */
               }

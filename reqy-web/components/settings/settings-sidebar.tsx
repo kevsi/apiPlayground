@@ -8,6 +8,7 @@ import {
   Keyboard,
   ChevronsLeft,
   ChevronsRight,
+  Server,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -18,6 +19,7 @@ export type SettingsSection =
   | "notifications"
   | "integrations"
   | "keyboard"
+  | "mcp"
 
 interface SectionDef {
   key: SettingsSection
@@ -32,6 +34,7 @@ const SECTIONS: SectionDef[] = [
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "integrations", label: "Outils connectés", icon: Plug },
   { key: "keyboard", label: "Raccourcis clavier", icon: Keyboard },
+  { key: "mcp", label: "Serveur MCP", icon: Server },
 ]
 
 interface SettingsSidebarProps {

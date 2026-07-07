@@ -1,14 +1,13 @@
 /**
- * Phase 5.4 — useChatHistory hook
+ * Phase 5.4 — useChatHistory hook (local-storage backed)
  *
  * Loads, appends, and clears chat history for a given request identifier.
- * Uses the browser Supabase client (RLS ensures user isolation). Falls back
- * gracefully if the user is anonymous (returns empty + a flag).
+ * Uses localStorage so no external service (Supabase) is required.
  */
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase-client";
+import { persistence } from "@/lib/persistence";
 
 export type ChatRole = "user" | "assistant";
 
@@ -35,6 +34,32 @@ export interface UseChatHistoryResult {
   clear: (id?: string) => Promise<void>;
 }
 
+function storageKey(requestId: string) {
+  return `chat-history:${requestId}`;
+}
+
+function loadFromStorage(requestId: string): ChatMessageRecord[] {
+  try {
+    const raw = persistence.getItem<string>(storageKey(requestId));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToStorage(requestId: string, messages: ChatMessageRecord[]) {
+  try {
+    void persistence.setItem(storageKey(requestId), JSON.stringify(messages));
+  } catch {
+    // storage full or unavailable — silently ignore
+  }
+}
+
+let idCounter = 0;
+function nextId() {
+  return `local-${Date.now()}-${++idCounter}`;
+}
+
 /**
  * @param requestId Identifier for the request. Pass null to skip fetching.
  * @param options.enabled Set false to disable fetching (e.g. during streaming).
@@ -47,40 +72,21 @@ export function useChatHistory(
   const [messages, setMessages] = useState<ChatMessageRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authenticated, setAuthenticated] = useState(false);
-  const inflight = useRef(false);
 
   const refetch = useCallback(async () => {
     if (!requestId || !enabled) {
       setMessages([]);
       return;
     }
-    if (inflight.current) return;
-    inflight.current = true;
     setLoading(true);
     setError(null);
     try {
-      const sb = getSupabaseBrowserClient();
-      const { data: userData } = await sb.auth.getUser();
-      if (!userData?.user?.id) {
-        setAuthenticated(false);
-        setMessages([]);
-        return;
-      }
-      setAuthenticated(true);
-      // Cast: supabase types are not generated in this project; runtime enforces schema.
-      const { data, error: err } = await (sb.from("chat_history") as any)
-        .select("id, request_id, role, content, metadata, created_at")
-        .eq("request_id", requestId)
-        .order("created_at", { ascending: true })
-        .limit(500);
-      if (err) throw err;
-      setMessages((data as ChatMessageRecord[]) ?? []);
+      const data = loadFromStorage(requestId);
+      setMessages(data);
     } catch (e: any) {
       setError(e?.message ?? "Erreur de chargement de l'historique");
     } finally {
       setLoading(false);
-      inflight.current = false;
     }
   }, [requestId, enabled]);
 
@@ -95,25 +101,19 @@ export function useChatHistory(
       metadata: Record<string, unknown> = {}
     ): Promise<ChatMessageRecord | null> => {
       if (!requestId) return null;
-      const sb = getSupabaseBrowserClient();
-      const { data: userData } = await sb.auth.getUser();
-      if (!userData?.user?.id) return null;
-      const { data, error: err } = await (sb.from("chat_history") as any)
-        .insert({
-          user_id: userData.user.id,
-          request_id: requestId,
-          role,
-          content,
-          metadata,
-        })
-        .select("id, request_id, role, content, metadata, created_at")
-        .single();
-      if (err) {
-        setError(err.message);
-        return null;
-      }
-      const record = data as ChatMessageRecord;
-      setMessages((prev) => [...prev, record]);
+      const record: ChatMessageRecord = {
+        id: nextId(),
+        request_id: requestId,
+        role,
+        content,
+        metadata,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => {
+        const next = [...prev, record];
+        saveToStorage(requestId, next);
+        return next;
+      });
       return record;
     },
     [requestId]
@@ -122,24 +122,16 @@ export function useChatHistory(
   const clear = useCallback(
     async (id?: string) => {
       if (!requestId) return;
-      const sb = getSupabaseBrowserClient();
-      const { data: userData } = await sb.auth.getUser();
-      if (!userData?.user?.id) return;
-      let query = (sb.from("chat_history") as any)
-        .delete()
-        .eq("request_id", requestId);
-      if (id) query = query.eq("id", id);
-      const { error: err } = await query;
-      if (err) {
-        setError(err.message);
-        return;
-      }
-      setMessages((prev) => (id ? prev.filter((m) => m.id !== id) : []));
+      setMessages((prev) => {
+        const next = id ? prev.filter((m) => m.id !== id) : [];
+        saveToStorage(requestId, next);
+        return next;
+      });
     },
     [requestId]
   );
 
-  return { messages, loading, error, authenticated, refetch, append, clear };
+  return { messages, loading, error, authenticated: true, refetch, append, clear };
 }
 
 /**

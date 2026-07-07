@@ -6,6 +6,8 @@
  * any component without a hook ceremony.
  */
 
+import { persistence } from "@/lib/persistence";
+
 export type Rating = "up" | "down" | null;
 
 const STORAGE_KEY = "reqlyai.diagnostic-ratings";
@@ -17,7 +19,7 @@ interface RatingMap {
 function loadAll(): RatingMap {
   if (typeof localStorage === "undefined") return {};
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = persistence.getItem<string>(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return typeof parsed === "object" && parsed !== null ? (parsed as RatingMap) : {};
@@ -29,7 +31,7 @@ function loadAll(): RatingMap {
 function saveAll(map: RatingMap): void {
   if (typeof localStorage === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    void persistence.setItem(STORAGE_KEY, JSON.stringify(map));
   } catch {
     /* quota or serialization issues — fail silent */
   }
@@ -60,7 +62,7 @@ export function getAllRatings(): RatingMap {
 export function clearRatings(): void {
   if (typeof localStorage === "undefined") return;
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    void persistence.removeItem(STORAGE_KEY);
   } catch {
     /* ignore */
   }

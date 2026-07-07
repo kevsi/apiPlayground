@@ -331,8 +331,8 @@ export default function DashboardPage() {
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">When</span>
                     </div>
                     <div className="divide-y divide-border">
-                      {recentRequests.map((request, index) => (
-                        <div key={index} className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors">
+                      {recentRequests.map((request) => (
+                        <div key={request.endpoint + request.timestamp} className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors">
                           <span className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}>
                             {request.method}
                           </span>
@@ -543,8 +543,8 @@ export default function DashboardPage() {
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">When</span>
             </div>
             <div className="divide-y divide-border">
-              {recentRequests.map((request, index) => (
-                <div key={index} className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors">
+              {recentRequests.map((request) => (
+                <div key={request.endpoint + request.timestamp} className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors">
                   <span className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}>
                     {request.method}
                   </span>

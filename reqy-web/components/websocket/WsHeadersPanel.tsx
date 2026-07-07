@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Trash2, Info } from "lucide-react"
@@ -26,6 +26,16 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
       value,
     }))
   )
+
+  useEffect(() => {
+    setRows(
+      Object.entries(headers).map(([key, value]) => ({
+        id: crypto.randomUUID(),
+        key,
+        value,
+      }))
+    )
+  }, [headers])
 
   const emitChange = useCallback(
     (newRows: HeaderRow[]) => {
@@ -81,7 +91,7 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
           size="sm"
           onClick={addRow}
           disabled={disabled || !isTauriAvailable()}
-          className="h-6 gap-1 text-xs font-medium text-muted-foreground/50 hover:text-foreground"
+          className="min-h-9 gap-1 text-xs font-medium text-muted-foreground/50 hover:text-foreground"
         >
           <Plus className="size-3" />
           Add header
@@ -112,7 +122,8 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
             <button
               onClick={() => removeRow(row.id)}
               disabled={disabled}
-              className="flex size-6 items-center justify-center rounded text-muted-foreground/30 hover:text-destructive transition-colors disabled:opacity-30"
+              aria-label={`Delete header ${row.key || "empty"}`}
+              className="flex min-h-9 min-w-9 items-center justify-center rounded text-muted-foreground/30 hover:text-destructive transition-colors disabled:opacity-30"
             >
               <Trash2 className="size-3" />
             </button>

@@ -1,25 +1,23 @@
 use base64::{Engine as _, engine::general_purpose};
-use reqwest::Client;
-use rfd::FileDialog;
 use serde::Serialize;
 use serde::Deserialize;
 
-use std::fs;
-
+use std::io::Write;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock, Mutex};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_fs::{FilePath, FsExt, OpenOptions};
 use tiny_http::{Header, Response, Server};
+use uuid::Uuid;
 
 /// Decode common HTML entities in response bodies.
 /// Some upstream servers/frameworks encode characters like ' → &#x27; in JSON.
 fn decode_html_entities(text: &str) -> String {
-  if !text.contains("&#") && !text.contains("&amp;") && !text.contains("&lt;")
-    && !text.contains("&gt;") && !text.contains("&quot;") && !text.contains("&apos;")
-  {
+  if !text.contains('&') {
     return text.to_string();
   }
   text
@@ -34,6 +32,7 @@ fn decode_html_entities(text: &str) -> String {
 }
 
 mod websocket;
+mod mcp;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,21 +40,41 @@ struct TauriFetchResponse {
   status: u16,
   body: String,
   headers: Vec<(String, String)>,
-  duration_ms: u128,
+  duration_ms: u64,
   encoding: String,
 }
 
-#[tauri::command]
-fn export_json(content: String, default_name: String) -> Result<String, String> {
-  let path = FileDialog::new()
-    .set_file_name(&default_name)
-    .add_filter("JSON", &["json"])
-    .save_file();
+#[derive(Clone)]
+struct SharedClient(reqwest::Client);
 
-  match path {
-    Some(p) => {
-      fs::write(&p, content).map_err(|e| e.to_string())?;
-      Ok(p.to_string_lossy().to_string())
+#[tauri::command]
+fn export_json(
+  app: AppHandle,
+  content: String,
+  default_name: String,
+) -> Result<String, String> {
+  let file_path: Option<FilePath> = app
+    .dialog()
+    .file()
+    .add_filter("JSON", &["json"])
+    .set_file_name(&default_name)
+    .blocking_save_file();
+
+  match file_path {
+    Some(fp) => {
+      let path = fp
+        .into_path()
+        .map_err(|e| format!("Invalid file path: {}", e))?;
+      let mut opts = OpenOptions::new();
+      opts.write(true).create(true).truncate(true);
+      let mut file = app
+        .fs()
+        .open(&path, opts)
+        .map_err(|e| e.to_string())?;
+      file
+        .write_all(content.as_bytes())
+        .map_err(|e| e.to_string())?;
+      Ok(path.to_string_lossy().to_string())
     }
     None => Err("cancelled".to_string()),
   }
@@ -70,7 +89,7 @@ fn open_external(url: String) -> Result<(), String> {
     .unwrap_or("")
     .to_lowercase();
   
-  let allowed_schemes = vec!["http", "https", "mailto"];
+  let allowed_schemes = ["http", "https", "mailto"];
   
   if !allowed_schemes.contains(&scheme.as_str()) {
     return Err(format!("Blocked dangerous scheme: {}. Only http, https, mailto are allowed.", scheme));
@@ -92,6 +111,7 @@ async fn fetch_proxy(
   url: String,
   headers: Vec<(String, String)>,
   body: Option<String>,
+  client: tauri::State<'_, SharedClient>,
 ) -> Result<TauriFetchResponse, String> {
   // Parse and validate URL
   let parsed_url = reqwest::Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
@@ -102,15 +122,7 @@ async fn fetch_proxy(
     return Err("Invalid URL: missing host".to_string());
   }
   let start = Instant::now();
-  let client = Client::builder()
-    .timeout(std::time::Duration::from_secs(30))
-    .gzip(true)
-    .brotli(true)
-    .deflate(true)
-    .build()
-    .map_err(|e| e.to_string())?;
-
-  let mut request = client
+  let mut request = client.0
     .request(method.parse::<reqwest::Method>().map_err(|e| e.to_string())?, &url);
 
   // Ajouter les headers
@@ -163,7 +175,7 @@ async fn fetch_proxy(
     (decode_html_entities(&text), "utf8".to_string())
   };
 
-  let duration_ms = start.elapsed().as_millis();
+  let duration_ms = start.elapsed().as_millis() as u64;
 
   Ok(TauriFetchResponse {
     status,
@@ -176,15 +188,13 @@ async fn fetch_proxy(
 
 // ── Capture Proxy ────────────────────────────────────────────────────────────
 
+#[derive(Default)]
 struct CaptureProxyState {
-  shutdown_flag: Arc<AtomicBool>,
+  shutdown_flag: Option<Arc<AtomicBool>>,
+  server_thread: Option<std::thread::JoinHandle<()>>,
 }
 
-static CAPTURE_PROXY_STATE: OnceLock<Mutex<CaptureProxyState>> = OnceLock::new();
-
-fn get_capture_proxy_state() -> Option<&'static Mutex<CaptureProxyState>> {
-  CAPTURE_PROXY_STATE.get()
-}
+type ManagedCaptureProxyState = Arc<Mutex<CaptureProxyState>>;
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -200,7 +210,7 @@ pub struct CapturedRequest {
   pub status: Option<u16>,
   pub response_headers: Option<Vec<(String, String)>>,
   pub response_body: Option<String>,
-  pub duration_ms: Option<u128>,
+  pub duration_ms: Option<u64>,
   pub error: Option<String>,
 }
 
@@ -211,20 +221,16 @@ impl CapturedRequest {
     headers: &[(String, String)],
     body: Option<String>,
   ) -> Self {
+    let now = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap();
     CapturedRequest {
-      id: format!("cap-{}-{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis(),
-        rand_id()),
+      id: format!("cap-{}", Uuid::new_v4()),
       method: method.to_string(),
       url: url.to_string(),
       headers: headers.to_vec(),
       body,
-      timestamp: std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64,
+      timestamp: now.as_millis() as u64,
       status: None,
       response_headers: None,
       response_body: None,
@@ -234,73 +240,65 @@ impl CapturedRequest {
   }
 }
 
-fn rand_id() -> String {
-  use std::time::SystemTime;
-  let now = SystemTime::now()
-    .duration_since(SystemTime::UNIX_EPOCH)
-    .unwrap()
-    .as_nanos();
-  (now % 99999).to_string()
-}
-
-/// Forward an HTTP request using reqwest (sync helper via blocking task).
-fn forward_request_sync(
+/// Forward an HTTP request using reqwest (async, used inside proxy thread via rt.block_on).
+async fn forward_request_async(
+  client: &reqwest::Client,
   method: &str,
   url: &str,
   headers: &[(String, String)],
   body: Option<&str>,
 ) -> Result<(u16, Vec<(String, String)>, String), String> {
-  let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-  rt.block_on(async {
-    let _parsed_url = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+  let _parsed_url = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
 
-    // No SSRF blocking here — same rationale as fetch_proxy: Reqly is a
-    // desktop client, testing local/LAN APIs is a core use case.
+  // No SSRF blocking here — same rationale as fetch_proxy: Reqly is a
+  // desktop client, testing local/LAN APIs is a core use case.
 
-    let client = Client::builder()
-      .timeout(std::time::Duration::from_secs(30))
-      .gzip(true)
-      .brotli(true)
-      .deflate(true)
-      .build()
-      .map_err(|e| e.to_string())?;
+  let mut request = client
+    .request(method.parse::<reqwest::Method>().map_err(|e| e.to_string())?, url);
 
-    let mut request = client
-      .request(method.parse::<reqwest::Method>().map_err(|e| e.to_string())?, url);
+  for (key, value) in headers {
+    request = request.header(key, value);
+  }
 
-    for (key, value) in headers {
-      request = request.header(key, value);
-    }
+  if let Some(b) = body {
+    request = request.body(reqwest::Body::from(b.to_string()));
+  }
 
-    if let Some(b) = body {
-      request = request.body(reqwest::Body::from(b.to_string()));
-    }
+  let response = request.send().await.map_err(|e| e.to_string())?;
+  let status = response.status().as_u16();
+  let resp_headers: Vec<(String, String)> = response
+    .headers()
+    .iter()
+    .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
+    .collect();
+  let body_str = response.text().await.map_err(|e| e.to_string())?;
 
-    let response = request.send().await.map_err(|e| e.to_string())?;
-    let status = response.status().as_u16();
-    let resp_headers: Vec<(String, String)> = response
-      .headers()
-      .iter()
-      .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
-      .collect();
-    let body_str = response.text().await.map_err(|e| e.to_string())?;
-
-    Ok((status, resp_headers, body_str))
-  })
+  Ok((status, resp_headers, body_str))
 }
 
-fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
+fn start_proxy_server(
+  app_handle: AppHandle,
+  port: u16,
+  state: &ManagedCaptureProxyState,
+  client: reqwest::Client,
+) -> Result<(), String> {
   let addr = SocketAddr::from(([127, 0, 0, 1], port));
-  let server = Server::http(&addr).map_err(|e| format!("Failed to bind port {}: {}", port, e))?;
+  let server = Server::http(addr).map_err(|e| format!("Failed to bind port {}: {}", port, e))?;
 
   let shutdown_flag = Arc::new(AtomicBool::new(false));
   let flag_for_server = shutdown_flag.clone();
 
-  // Spawn the blocking proxy loop in a tokio task
+  {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.shutdown_flag = Some(shutdown_flag);
+  }
+
+  // Spawn the blocking proxy loop in a std thread with a dedicated runtime
   let handle = app_handle.clone();
-  std::thread::spawn(move || {
+  let server_handle = std::thread::spawn(move || {
+    let rt = tokio::runtime::Runtime::new().expect("failed to create proxy runtime");
     for mut request in server.incoming_requests() {
-      if flag_for_server.load(Ordering::Relaxed) {
+      if flag_for_server.load(Ordering::SeqCst) {
         break;
       }
 
@@ -353,18 +351,19 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
 
       // Forward the request
       let start = Instant::now();
-      let forward_result = forward_request_sync(
+      let forward_result = rt.block_on(forward_request_async(
+        &client,
         &method,
         &full_url,
         &req_headers,
         body_str.as_deref(),
-      );
+      ));
 
       let (status, resp_headers, resp_body) = match forward_result {
         Ok((s, h, b)) => (s, Some(h), Some(b)),
         Err(e) => {
           captured.error = Some(e.clone());
-          captured.duration_ms = Some(start.elapsed().as_millis());
+          captured.duration_ms = Some(start.elapsed().as_millis() as u64);
           let _ = handle.emit("captured-request-updated", &captured);
           let _ = request.respond(
             Response::from_string(format!("Proxy error: {}", e))
@@ -378,7 +377,7 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
       captured.status = Some(status);
       captured.response_headers = resp_headers.clone();
       captured.response_body = resp_body.clone();
-      captured.duration_ms = Some(start.elapsed().as_millis());
+      captured.duration_ms = Some(start.elapsed().as_millis() as u64);
 
       let _ = handle.emit("captured-request-updated", &captured);
 
@@ -408,40 +407,50 @@ fn start_proxy_server(app_handle: AppHandle, port: u16) -> Result<(), String> {
     }
   });
 
-  let state = CaptureProxyState {
-    shutdown_flag,
-  };
-  let _ = CAPTURE_PROXY_STATE.set(Mutex::new(state));
+  let mut guard = state.lock().map_err(|e| e.to_string())?;
+  guard.server_thread = Some(server_handle);
 
   Ok(())
 }
 
 #[tauri::command]
-fn start_capture_proxy(app_handle: AppHandle, port: u16) -> Result<(), String> {
+fn start_capture_proxy(
+  app_handle: AppHandle,
+  port: u16,
+  state: tauri::State<'_, ManagedCaptureProxyState>,
+  client: tauri::State<'_, SharedClient>,
+) -> Result<(), String> {
   if port < 1024 {
     return Err("Port must be between 1024 and 65535".to_string());
   }
 
-  if get_capture_proxy_state().is_some() {
-    return Err("Capture proxy is already running".to_string());
+  {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    if guard.shutdown_flag.is_some() {
+      return Err("Capture proxy is already running".to_string());
+    }
   }
 
-  start_proxy_server(app_handle, port)
+  start_proxy_server(app_handle, port, &state, client.0.clone())
 }
 
 #[tauri::command]
-fn stop_capture_proxy() -> Result<(), String> {
-  let state = get_capture_proxy_state()
-    .ok_or_else(|| "Capture proxy is not running".to_string())?;
-
-  let state = state.lock().map_err(|e| e.to_string())?;
-  state.shutdown_flag.store(true, Ordering::Relaxed);
-
-  drop(state);
-  // Clear the state so start can be called again
-  let _ = CAPTURE_PROXY_STATE.get().map(|m| m.lock().map(|_| ()));
-
-  Ok(())
+fn stop_capture_proxy(
+  state: tauri::State<'_, ManagedCaptureProxyState>,
+) -> Result<(), String> {
+  let mut guard = state.lock().map_err(|e| e.to_string())?;
+  if let Some(flag) = guard.shutdown_flag.take() {
+    flag.store(true, Ordering::SeqCst);
+    if let Some(handle) = guard.server_thread.take() {
+      drop(guard);
+      handle
+        .join()
+        .map_err(|_| "Failed to join proxy thread".to_string())?;
+    }
+    Ok(())
+  } else {
+    Err("Capture proxy is not running".to_string())
+  }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -455,10 +464,23 @@ pub fn run() {
     }));
   }
 
+  let http_client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(30))
+    .gzip(true)
+    .brotli(true)
+    .deflate(true)
+    .build()
+    .expect("failed to create HTTP client");
+
   builder
     .plugin(tauri_plugin_deep_link::init())
     .plugin(tauri_plugin_notification::init())
+    .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_fs::init())
     .manage(websocket::manager::ConnectionManager::new())
+    .manage(SharedClient(http_client))
+    .manage::<ManagedCaptureProxyState>(Arc::new(Mutex::new(CaptureProxyState::default())))
+    .manage::<mcp::ManagedMcpState>(Arc::new(Mutex::new(mcp::McpProcessState::default())))
     .invoke_handler(tauri::generate_handler![
       fetch_proxy,
       export_json,
@@ -469,6 +491,11 @@ pub fn run() {
       websocket::commands::ws_send,
       websocket::commands::ws_disconnect,
       websocket::commands::ws_get_status,
+      mcp::start_mcp_server,
+      mcp::stop_mcp_server,
+      mcp::get_mcp_server_status,
+      mcp::read_mcp_bundle,
+      mcp::sync_mcp_collections,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -478,8 +505,6 @@ pub fn run() {
             .build(),
         )?;
       }
-      app.handle().plugin(tauri_plugin_dialog::init())?;
-      app.handle().plugin(tauri_plugin_fs::init())?;
       // Enregistrer le schéma de deep-link pour que le navigateur externe puisse rediriger vers reqly://
       app.deep_link().register("reqly").ok();
       Ok(())

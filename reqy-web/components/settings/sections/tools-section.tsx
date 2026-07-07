@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { ToolAssociationModal, type Tool } from "./tool-association-modal"
 
@@ -10,7 +10,8 @@ const TOOLS: Tool[] = [
     id: "postman",
     name: "Postman",
     description: "Import et export de collections Postman.",
-    logoEmoji: "📮",
+    logoEmoji: "📬",
+    logo: "/icones/postman.png",
     scopes: [],
     apiKey: {
       endpoint: "/api/postman-auth",
@@ -24,16 +25,9 @@ const TOOLS: Tool[] = [
     name: "GitHub",
     description: "Accès à vos repositories et gists.",
     logoEmoji: "🐙",
+    logo: "/icones/github.png",
     scopes: ["Lecture de vos repositories", "Lecture de votre profil", "Création de gists"],
     oauthUrl: "/api/github-auth/start",
-  },
-  {
-    id: "linear",
-    name: "Linear",
-    description: "Synchronisation avec vos tickets Linear (bêta).",
-    logoEmoji: "⚡",
-    scopes: ["Lecture de vos tickets"],
-    // Pas de oauthUrl → stub
   },
 ]
 
@@ -66,16 +60,22 @@ function useToolStatus(toolId: string, refreshKey = 0): "connected" | "disconnec
   return status
 }
 
-function ToolCard({ tool, refreshKey, onAssociate }: { tool: Tool; refreshKey: number; onAssociate: () => void }) {
+function ToolRow({ tool, refreshKey, onAssociate }: { tool: Tool; refreshKey: number; onAssociate: (connected: boolean) => void }) {
   const status = useToolStatus(tool.id, refreshKey)
   return (
-    <Card className="flex flex-col gap-3 p-5 transition-all hover:border-primary/30 hover:shadow-md">
-      <div className="flex items-center gap-3">
-        <span className="text-3xl" aria-hidden="true">{tool.logoEmoji}</span>
-        <h3 className="text-base font-semibold">{tool.name}</h3>
+    <div className="flex items-center justify-between gap-4 py-3">
+      <div className="flex items-center gap-3 min-w-0">
+        {tool.logo ? (
+          <img src={tool.logo} alt="" className="size-6 shrink-0 rounded object-contain" />
+        ) : (
+          <span className="text-xl shrink-0" aria-hidden="true">{tool.logoEmoji}</span>
+        )}
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{tool.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{tool.description}</p>
+        </div>
       </div>
-      <p className="line-clamp-2 text-sm text-muted-foreground">{tool.description}</p>
-      <div className="mt-auto flex items-center justify-between gap-2">
+      <div className="flex items-center gap-3 shrink-0">
         {status === "loading" ? (
           <span className="size-2 animate-pulse rounded-full bg-muted-foreground/30" />
         ) : (
@@ -94,16 +94,17 @@ function ToolCard({ tool, refreshKey, onAssociate }: { tool: Tool; refreshKey: n
             {status === "connected" ? "Connecté" : "Non connecté"}
           </span>
         )}
-        <Button size="sm" variant={status === "connected" ? "outline" : "default"} onClick={onAssociate}>
+        <Button size="sm" variant={status === "connected" ? "outline" : "default"} onClick={() => onAssociate(status === "connected")}>
           {status === "connected" ? "Gérer" : "Associer"}
         </Button>
       </div>
-    </Card>
+    </div>
   )
 }
 
 export function ToolsSection() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null)
+  const [activeConnected, setActiveConnected] = useState(false)
   const [open, setOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -115,14 +116,15 @@ export function ToolsSection() {
           Connectez vos services tiers pour importer et synchroniser vos données.
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="divide-y divide-border rounded-lg border border-border px-4">
         {TOOLS.map((tool) => (
-          <ToolCard
+          <ToolRow
             key={tool.id}
             tool={tool}
             refreshKey={refreshKey}
-            onAssociate={() => {
+            onAssociate={(connected) => {
               setActiveTool(tool)
+              setActiveConnected(connected)
               setOpen(true)
             }}
           />
@@ -133,6 +135,7 @@ export function ToolsSection() {
         open={open}
         onOpenChange={setOpen}
         onConnected={() => setRefreshKey((k) => k + 1)}
+        connected={activeConnected}
       />
     </div>
   )

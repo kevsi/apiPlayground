@@ -5,8 +5,6 @@ import { Separator } from "@/components/ui/separator"
 import { ThemeCards } from "./theme-cards"
 import { AccentPicker } from "./accent-picker"
 import { AnimationsToggle } from "./animations-toggle"
-import { TablesViewPreview } from "./tables-view-preview"
-
 export function ApparenceSection() {
   return (
     <div className="space-y-6">
@@ -24,8 +22,6 @@ export function ApparenceSection() {
           <AccentPicker />
           <Separator />
           <AnimationsToggle />
-          <Separator />
-          <TablesViewPreview />
         </CardContent>
       </Card>
     </div>

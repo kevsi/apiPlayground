@@ -210,8 +210,8 @@ export async function POST(request: NextRequest) {
     // debug mode can be requested either via header `x-proxy-debug: 1` or via
     // a `debug: true` boolean in the JSON payload.
     debugMode = String(request.headers.get("x-proxy-debug") || "").trim() === "1"
-    if (!debugMode && payload && typeof (payload as any).debug === "boolean") {
-      debugMode = Boolean((payload as any).debug)
+    if (!debugMode && payload && typeof payload.debug === "boolean") {
+      debugMode = Boolean(payload.debug)
     }
 
     let bodyToSend: string | undefined

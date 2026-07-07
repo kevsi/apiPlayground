@@ -42,6 +42,7 @@ const SUGGESTIONS = [
 interface ChatMessage {
   role: "user" | "assistant"
   content: string
+  id?: string
 }
 
 interface ConversationSession {
@@ -81,7 +82,7 @@ export default function AiInsightsPage() {
     }
     const routes = selectedProject.routes.slice(0, 8)
     if (routes.length === 0) return "Aucun endpoint détecté"
-    return routes.map((route) => `${route.method} ${route.path}`).join("\n")
+    return routes.map((route: { method: string; path: string }) => `${route.method} ${route.path}`).join("\n")
   })()
 
   const requestSummary = currentHistory.length === 0
@@ -202,7 +203,7 @@ export default function AiInsightsPage() {
       return
     }
 
-    const userMessage: ChatMessage = { role: "user", content: prompt }
+    const userMessage: ChatMessage = { role: "user", content: prompt, id: crypto.randomUUID() }
     setMessages((prev) => {
       const updatedMessages = [...prev, userMessage]
       addMessagesToSession(updatedMessages)
@@ -240,6 +241,7 @@ export default function AiInsightsPage() {
       const assistantMessage: ChatMessage = {
         role: "assistant",
         content: assistantContent || "L'IA n'a pas renvoyé de réponse.",
+        id: crypto.randomUUID(),
       }
       setMessages((prev) => {
         const updatedMessages = [...prev, assistantMessage]
@@ -359,6 +361,7 @@ export default function AiInsightsPage() {
       const assistantMessage: ChatMessage = {
         role: "assistant",
         content: assistantContent || "L'IA n'a pas renvoyé de réponse.",
+        id: crypto.randomUUID(),
       }
       setMessages((prev) => {
         const updatedMessages = [...prev, assistantMessage]
@@ -510,8 +513,7 @@ export default function AiInsightsPage() {
                         try {
                           const res = await requestSystemNotificationPermission()
                           if (res === "granted") {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            toast({ title: "Notifications système activées", meta: { event: "notificationPermission" } } as any)
+                            toast({ title: "Notifications système activées", meta: { event: "notificationPermission" } })
                           }
                         } catch {
                           // ignore notification permission failures
@@ -579,7 +581,7 @@ export default function AiInsightsPage() {
             ) : (
               <div className="mx-auto max-w-3xl space-y-6 pb-4">
                 {messages.map((message, index) => (
-                  <div key={index} className={cn("flex gap-4", message.role === "user" ? "justify-end" : "justify-start")}> 
+                  <div key={message.id ?? index} className={cn("flex gap-4", message.role === "user" ? "justify-end" : "justify-start")}> 
                     {message.role === "assistant" ? (
                       <>
                         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">

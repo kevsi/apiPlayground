@@ -19,6 +19,7 @@ export interface Tool {
   name: string
   description: string
   logoEmoji: string
+  logo?: string
   scopes: string[]
   oauthUrl?: string
   apiKey?: {
@@ -33,6 +34,7 @@ interface ToolAssociationModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onConnected?: () => void
+  connected?: boolean
 }
 
 function ApiKeyForm({ tool, onSuccess }: { tool: Tool; onSuccess: () => void }) {
@@ -154,7 +156,49 @@ function OAuthFlow({ tool, onOpenChange }: { tool: Tool; onOpenChange: (v: boole
   )
 }
 
-export function ToolAssociationModal({ tool, open, onOpenChange, onConnected }: ToolAssociationModalProps) {
+function DisconnectView({ tool, onDisconnected }: { tool: Tool; onDisconnected: () => void }) {
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(false)
+  const endpoint =
+    tool.id === "github"
+      ? "/api/github-auth/logout"
+      : tool.id === "postman"
+        ? "/api/postman-auth"
+        : null
+
+  async function handleDisconnect() {
+    if (!endpoint) return
+    setLoading(true)
+    try {
+      const res = await fetch(endpoint, { method: "DELETE", credentials: "include" })
+      if (!res.ok) throw new Error()
+      toast({ title: "Déconnecté", description: `${tool.name} a été déconnecté.` })
+      onDisconnected()
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de se déconnecter, réessayez." })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Vous êtes actuellement connecté à <strong>{tool.name}</strong>.
+      </p>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onDisconnected()}>
+          Fermer
+        </Button>
+        <Button variant="destructive" onClick={handleDisconnect} disabled={loading}>
+          {loading ? "Déconnexion…" : "Se déconnecter"}
+        </Button>
+      </DialogFooter>
+    </div>
+  )
+}
+
+export function ToolAssociationModal({ tool, open, onOpenChange, onConnected, connected }: ToolAssociationModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -162,14 +206,20 @@ export function ToolAssociationModal({ tool, open, onOpenChange, onConnected }: 
           <>
             <DialogHeader>
               <div className="flex items-start gap-3">
-                <span className="text-3xl" aria-hidden="true">{tool.logoEmoji}</span>
+                {tool.logo ? (
+                  <img src={tool.logo} alt="" className="size-8 shrink-0 rounded object-contain" />
+                ) : (
+                  <span className="text-3xl" aria-hidden="true">{tool.logoEmoji}</span>
+                )}
                 <div>
-                  <DialogTitle>Associer {tool.name}</DialogTitle>
+                  <DialogTitle>{connected ? tool.name : `Associer ${tool.name}`}</DialogTitle>
                   <DialogDescription>{tool.description}</DialogDescription>
                 </div>
               </div>
             </DialogHeader>
-            {tool.apiKey ? (
+            {connected ? (
+              <DisconnectView tool={tool} onDisconnected={() => { onOpenChange(false); onConnected?.() }} />
+            ) : tool.apiKey ? (
               <ApiKeyForm tool={tool} onSuccess={() => { onOpenChange(false); onConnected?.() }} />
             ) : (
               <OAuthFlow tool={tool} onOpenChange={onOpenChange} />

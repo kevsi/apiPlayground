@@ -73,9 +73,9 @@ const MyProjectsPage: React.FC = () => {
       if (selectedProject?.id === projectId) {
         setSelectedProjectLocal(updatedProject)
       }
-      toast({ title: `Réanalyse terminée`, description: `${updatedProject.routes.length} route(s) mises à jour`, meta: { event: 'projectReanalyze' } } as any)
+      toast({ title: `Réanalyse terminée`, description: `${updatedProject.routes.length} route(s) mises à jour`, meta: { event: 'projectReanalyze' } })
     } catch (err) {
-      toast({ title: `Échec de la réanalyse`, description: String(err), variant: 'destructive' } as any)
+      toast({ title: `Échec de la réanalyse`, description: String(err), variant: 'destructive' })
     } finally {
       setReanalyzingProjectId(null)
     }

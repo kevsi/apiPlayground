@@ -15,6 +15,11 @@ import { generateOpenApiSpec } from "@/lib/openapi-export"
 import { generateSdk, GENERATORS, AVAILABLE_LANGUAGES } from "@/lib/openapi-gen/generator"
 import { cn } from "@/lib/utils"
 
+const LANGUAGE_OPTIONS = AVAILABLE_LANGUAGES.map((label) => ({
+  label,
+  id: GENERATORS[label],
+}))
+
 export default function SdksPage() {
   const { collections } = useRequestStore()
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("")
@@ -26,16 +31,6 @@ export default function SdksPage() {
   const selectedCollection = useMemo(
     () => collections.find((c) => c.id === selectedCollectionId) ?? collections[0],
     [collections, selectedCollectionId],
-  )
-
-  // Get available display labels for selected generator
-  const languageOptions = useMemo(
-    () =>
-      AVAILABLE_LANGUAGES.map((label) => ({
-        label,
-        id: GENERATORS[label],
-      })),
-    [],
   )
 
   const currentLabel = useMemo(
@@ -137,12 +132,12 @@ export default function SdksPage() {
             <CardContent className="space-y-4">
               {/* Source collection */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Source Collection</label>
+                <label htmlFor="source-collection" className="text-sm font-medium">Source Collection</label>
                 <Select
                   value={selectedCollection?.id ?? ""}
                   onValueChange={setSelectedCollectionId}
                 >
-                  <SelectTrigger data-testid="source-collection-select">
+                  <SelectTrigger id="source-collection" data-testid="source-collection-select">
                     <SelectValue placeholder="Select a collection" />
                   </SelectTrigger>
                   <SelectContent>
@@ -157,19 +152,20 @@ export default function SdksPage() {
 
               {/* Target language */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Target Language</label>
+                <label htmlFor="target-language" className="text-sm font-medium">Target Language</label>
                 <Select
                   value={language}
                   onValueChange={setLanguage}
                 >
                   <SelectTrigger
+                    id="target-language"
                     className="w-full"
                     data-testid="language-select"
                   >
                     <SelectValue placeholder="Select a language" />
                   </SelectTrigger>
                   <SelectContent>
-                    {languageOptions.map((opt) => (
+                    {LANGUAGE_OPTIONS.map((opt) => (
                       <SelectItem key={opt.id} value={opt.id}>
                         {opt.label}
                       </SelectItem>

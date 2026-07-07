@@ -77,7 +77,7 @@ export interface PostmanUser {
 
 export async function validatePostmanApiKey(apiKey: string): Promise<PostmanUser> {
   try {
-    const data = await postmanFetchJson<any>(apiKey, "/me")
+    const data = await postmanFetchJson<{ user?: { username?: string; email?: string }; username?: string; email?: string }>(apiKey, "/me")
     return {
       username: data.user?.username ?? data.username ?? "unknown",
       email: data.user?.email ?? data.email,

@@ -51,7 +51,7 @@ function formatTimeAgo(timestamp: number): string {
 }
 
 function getStatusIcon(status?: number) {
-  if (!status) return <Clock className="size-3.5 text-muted-foreground" />
+  if (status == null) return <Clock className="size-3.5 text-muted-foreground" />
   if (status >= 200 && status < 300) return <CheckCircle2 className="size-3.5 text-emerald-500" />
   if (status >= 400 && status < 500) return <XCircle className="size-3.5 text-amber-500" />
   if (status >= 500) return <AlertCircle className="size-3.5 text-red-500" />
@@ -59,7 +59,7 @@ function getStatusIcon(status?: number) {
 }
 
 function getStatusColor(status?: number) {
-  if (!status) return "text-muted-foreground"
+  if (status == null) return "text-muted-foreground"
   if (status >= 200 && status < 300) return "text-emerald-500"
   if (status >= 400 && status < 500) return "text-amber-500"
   if (status >= 500) return "text-red-500"

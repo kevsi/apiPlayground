@@ -62,7 +62,7 @@ export default function IntegrationsSection({
               {githubStatus === "connected" && githubUser ? (
                 <div className="flex items-center gap-3">
                   {githubUser.avatar_url ? (
-                    <img src={githubUser.avatar_url} alt="Avatar GitHub" className="h-10 w-10 rounded-full" />
+                    <img src={githubUser.avatar_url} alt="Avatar GitHub" loading="lazy" className="h-10 w-10 rounded-full" />
                   ) : null}
                   <div>
                     <p className="text-sm font-semibold">{githubUser.login}</p>

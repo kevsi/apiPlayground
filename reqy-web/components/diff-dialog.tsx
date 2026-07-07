@@ -57,7 +57,7 @@ export function DiffDialog({
         setRightId(mostRecent.id)
       }
     }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, currentResponse, historyWithResponses])
 
   const leftOptions = [
     ...(currentResponse
@@ -135,7 +135,7 @@ export function DiffDialog({
   }
 
   const statusColor = (status?: number | null) => {
-    if (!status) return "bg-muted text-muted-foreground"
+    if (status == null) return "bg-muted text-muted-foreground"
     if (status < 300) return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
     if (status < 400) return "bg-blue-500/15 text-blue-600 border-blue-500/30"
     if (status < 500) return "bg-amber-500/15 text-amber-600 border-amber-500/30"
@@ -201,7 +201,7 @@ export function DiffDialog({
             <div className="flex items-center gap-1.5">
               <span className="flex size-5 items-center justify-center rounded-full bg-red-500/15 text-[10px] font-bold text-red-500">L</span>
               <span className="text-xs font-medium text-muted-foreground">Base</span>
-              {leftMeta?.status && (
+              {leftMeta?.status != null && (
                 <Badge
                   variant="outline"
                   className={cn("h-4 px-1.5 text-[10px] font-semibold border", statusColor(leftMeta.status))}
@@ -221,7 +221,7 @@ export function DiffDialog({
                 {leftOptions.map((opt) => (
                   <SelectItem key={opt.id} value={opt.id} className="text-xs">
                     <div className="flex items-center gap-2">
-                      {opt.status && (
+                      {opt.status != null && (
                         <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", statusColor(opt.status))}>
                           {opt.status}
                         </span>
@@ -249,7 +249,7 @@ export function DiffDialog({
             <div className="flex items-center gap-1.5">
               <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">R</span>
               <span className="text-xs font-medium text-muted-foreground">Compare</span>
-              {rightMeta?.status && (
+              {rightMeta?.status != null && (
                 <Badge
                   variant="outline"
                   className={cn("h-4 px-1.5 text-[10px] font-semibold border", statusColor(rightMeta.status))}
@@ -269,7 +269,7 @@ export function DiffDialog({
                 {rightOptions.map((opt) => (
                   <SelectItem key={opt.id} value={opt.id} className="text-xs">
                     <div className="flex items-center gap-2">
-                      {opt.status && (
+                      {opt.status != null && (
                         <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", statusColor(opt.status))}>
                           {opt.status}
                         </span>

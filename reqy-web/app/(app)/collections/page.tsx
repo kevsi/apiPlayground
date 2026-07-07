@@ -16,6 +16,7 @@ import { resolveUniqueCollectionName } from "@/lib/import-schemas"
 import { generateOpenApiSpec } from "@/lib/openapi-export"
 import { postmanImportResponseSchema } from "@/lib/import-schemas"
 import { toast } from "@/hooks/use-toast"
+import type { HttpMethod } from "@/lib/types"
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 
@@ -70,7 +71,7 @@ export default function CollectionsPage() {
     return () => window.removeEventListener("focus", onFocus)
   }, [])
 
-  const handleImportPostmanCollection = (collection: { name: string; description?: string; routes: any[] }) => {
+  const handleImportPostmanCollection = (collection: { name: string; description?: string; routes?: any[]; requests?: Partial<RequestItem>[] }) => {
     const uniqueName = resolveUniqueCollectionName(
       collection.name,
       collections.map((c) => c.name),
@@ -79,17 +80,26 @@ export default function CollectionsPage() {
       name: uniqueName,
       color: "emerald",
       icon: "package",
+      description: collection.description,
     })
 
-    collection.routes.forEach((route) => {
+    const source = collection.requests && collection.requests.length > 0 ? collection.requests : (collection.routes ?? [])
+
+    source.forEach((item) => {
+      const route = item as { method?: string; path?: string; url?: string; name?: string; headers?: Record<string, string>; body?: string; bodyType?: RequestItem["bodyType"]; authType?: RequestItem["authType"]; authToken?: string; queryParams?: RequestItem["queryParams"] }
+      const method = (route.method || "GET") as HttpMethod
+      const path = route.path || route.url || "/"
       addRequestToCollection(newCollectionId, {
-        name: route.name || `${route.method} ${route.path}`,
-        method: (route.method || "GET") as any,
-        url: route.path || "/",
-        endpoint: route.path || "/",
-        headers: {},
-        body: route.body || "",
-        queryParams: [],
+        name: route.name || `${method} ${path}`,
+        method,
+        url: path,
+        endpoint: path,
+        headers: route.headers || {},
+        body: route.body ?? "",
+        bodyType: route.bodyType,
+        authType: route.authType,
+        authToken: route.authToken,
+        queryParams: route.queryParams || [],
       })
     })
 
@@ -145,9 +155,9 @@ export default function CollectionsPage() {
       }
 
       const data = await response.json()
-      toast({ title: "Export vers Postman réussi", description: data.message || "Collection créée dans Postman", meta: { event: "importExport" } } as any)
+      toast({ title: "Export vers Postman réussi", description: data.message || "Collection créée dans Postman", meta: { event: "importExport" } })
     } catch (err) {
-      toast({ title: "Erreur", description: err instanceof Error ? err.message : "Impossible d'exporter vers Postman", variant: "destructive", meta: { event: "importExport" } } as any)
+      toast({ title: "Erreur", description: err instanceof Error ? err.message : "Impossible d'exporter vers Postman", variant: "destructive", meta: { event: "importExport" } })
     } finally {
       setExportingPostman(false)
     }
@@ -166,6 +176,13 @@ export default function CollectionsPage() {
       authType: request.authType,
       authToken: request.authToken,
       queryParams: request.queryParams,
+      assertions: request.assertions,
+      runnerAssertions: request.runnerAssertions,
+      preRequestScript: request.preRequestScript,
+      postResponseScript: request.postResponseScript,
+      datasetKey: request.datasetKey,
+      protocol: request.protocol,
+      graphql: request.graphql,
     })
     toast({ title: "Requête chargée dans l'éditeur" })
     router.push("/")
@@ -184,6 +201,13 @@ export default function CollectionsPage() {
       authType: request.authType,
       authToken: request.authToken,
       queryParams: request.queryParams,
+      assertions: request.assertions,
+      runnerAssertions: request.runnerAssertions,
+      preRequestScript: request.preRequestScript,
+      postResponseScript: request.postResponseScript,
+      datasetKey: request.datasetKey,
+      protocol: request.protocol,
+      graphql: request.graphql,
       sendImmediately: true,
     })
     toast({ title: `"${request.name}" loaded and sent` })
@@ -216,7 +240,14 @@ export default function CollectionsPage() {
       endpoint: string
       headers?: Record<string, string>
       body?: string
+      bodyType?: "json" | "form-data" | "x-www-form" | "raw" | "binary"
+      authType?: "none" | "bearer" | "basic" | "api-key" | "oauth2"
+      authToken?: string
       queryParams?: Array<{ key: string; value: string }>
+      assertions?: RequestItem["assertions"]
+      runnerAssertions?: RequestItem["runnerAssertions"]
+      preRequestScript?: string
+      postResponseScript?: string
     }>
   }>) => {
     let createdCount = 0
@@ -236,12 +267,19 @@ export default function CollectionsPage() {
       for (const req of col.requests) {
         addRequestToCollection(newCollectionId, {
           name: req.name,
-          method: (req.method as any) || "GET",
+          method: (req.method as HttpMethod) || "GET",
           url: req.url,
           endpoint: req.endpoint,
           headers: req.headers || {},
-          body: req.body || "",
+          body: req.body ?? "",
+          bodyType: req.bodyType,
+          authType: req.authType,
+          authToken: req.authToken,
           queryParams: req.queryParams || [],
+          assertions: req.assertions,
+          runnerAssertions: req.runnerAssertions,
+          preRequestScript: req.preRequestScript,
+          postResponseScript: req.postResponseScript,
         })
         createdCount++
       }
@@ -251,7 +289,7 @@ export default function CollectionsPage() {
       title: `Import OpenAPI terminé`,
       description: `${createdCount} requête${createdCount > 1 ? "s" : ""} importée${createdCount > 1 ? "s" : ""} dans ${collections.length} collection${collections.length > 1 ? "s" : ""}.`,
       meta: { event: "importExport" },
-    } as any)
+    })
   }
 
   const handleExportOpenApi = async (exportOptions?: { inferFromHistory?: boolean }) => {

@@ -4,7 +4,7 @@ import { CommitFn, WORKSPACE_PERSONAL_ID } from "./types"
 export function createCollectionsMutations(commit: CommitFn) {
   const addCollection = (
     data: Omit<Collection, "id" | "createdAt" | "updatedAt" | "requests"> & { requests?: RequestItem[] }) => {
-      const id = `col-${Date.now()}`
+      const id = `col-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
       commit((prev) => {
         const wsId = prev.activeWorkspaceId ?? WORKSPACE_PERSONAL_ID
         return {
@@ -49,7 +49,7 @@ export function createCollectionsMutations(commit: CommitFn) {
         const source = prev.collections.find((c) => c.id === id)
         if (!source) return prev
         const now = Date.now()
-        const newId = `col-${now}`
+        const newId = `col-${now}-${Math.random().toString(36).slice(2, 6)}`
         const duplicate: Collection = {
           ...source,
           id: newId,

@@ -40,18 +40,18 @@ export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose }: P
                 <span className="ml-1 text-amber-500">●</span>
               )}
             </span>
-            <span
-              role="button"
-              tabIndex={-1}
+            <button
+              type="button"
+              aria-label={`Close ${tab.name}`}
               onClick={(e) => {
                 e.stopPropagation()
                 onClose(tab.id)
               }}
-              className="shrink-0 opacity-60 hover:opacity-100 hover:text-red-500"
+              className="shrink-0 opacity-60 hover:opacity-100 hover:text-red-500 cursor-pointer"
               data-testid={`graphql-tab-close-${tab.id}`}
             >
               <X className="w-3 h-3" />
-            </span>
+            </button>
           </button>
         )
       })}

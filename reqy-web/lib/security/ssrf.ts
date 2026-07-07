@@ -64,8 +64,8 @@ export function ipToBigInt(ip: string): bigint {
     return BigInt(n >>> 0)
   }
   const groups = ip.split(":")
-  let head: number[] = []
-  let tail: number[] = []
+  const head: number[] = []
+  const tail: number[] = []
   let hasEmpty = false
   for (const g of groups) {
     if (g === "") {

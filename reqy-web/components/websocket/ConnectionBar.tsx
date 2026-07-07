@@ -129,6 +129,7 @@ export function ConnectionBar({ url, status, connectedAt, onUrlChange, onConnect
               size="sm"
               onClick={onSave}
               disabled={true}
+              aria-label="Save connection"
               className="h-7 gap-1.5 px-2 text-xs font-medium text-muted-foreground/50 cursor-not-allowed opacity-50"
             >
               <Save className="size-3.5" />

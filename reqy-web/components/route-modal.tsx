@@ -58,7 +58,14 @@ export function RouteModal({ project, open, onClose }: RouteModalProps) {
           method: route.method as any,
           url: `${baseUrl}${route.path}`,
           endpoint: route.path,
-          headers: {},
+          headers: Object.fromEntries(
+            (route.headers ?? []).map((h) => [h.key, h.value])
+          ),
+          body: route.body || undefined,
+          bodyType: route.bodyType === "json" ? "json" : route.bodyType === "form" ? "form-data" : undefined,
+          queryParams: (route.headers ?? []).filter(
+            (h): h is { key: string; value: string } => h.key.startsWith("?")
+          ).map((h) => ({ key: h.key.slice(1), value: h.value })),
         })
         added.push(`${route.method} ${route.path}`)
       }

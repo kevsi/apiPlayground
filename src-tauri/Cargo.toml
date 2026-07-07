@@ -24,7 +24,7 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 reqwest = { version = "0.11", features = ["rustls-tls", "gzip", "brotli", "deflate"] }
 tauri = { version = "2.11.1", features = [] }
-tokio-tungstenite = { version = "0.23", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 futures-util = "0.3"
@@ -36,6 +36,5 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-notification = "2"
 open = "5.3"
-rfd = "0.15"
 base64 = "0.22"
 tiny_http = "0.12"

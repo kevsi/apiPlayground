@@ -142,7 +142,7 @@ export function ResponseContentRenderer({
         if (isImage(responseData, responseHeaders)) {
           return (
             <div className="flex h-full items-center justify-center bg-code-bg">
-              <img src={mediaUrl} alt="Response image" className="max-h-full max-w-full object-contain" />
+              <img src={mediaUrl} alt="Response image" loading="lazy" className="max-h-full max-w-full object-contain" />
             </div>
           )
         }
@@ -192,7 +192,7 @@ export function ResponseContentRenderer({
             <div className="grid gap-4 p-4 grid-cols-1 sm:grid-cols-2 bg-code-bg min-h-full">
               {imageUrls.map((url: string, index: number) => (
                 <div key={`${url}-${index}`} className="overflow-hidden rounded-lg border border-border/50 bg-black/50">
-                  <img src={url} alt={`Preview image ${index + 1}`} className="h-48 w-full object-cover" />
+                  <img src={url} alt={`Preview image ${index + 1}`} loading="lazy" className="h-48 w-full object-cover" />
                 </div>
               ))}
             </div>
@@ -299,7 +299,7 @@ export function ResponseContentRenderer({
     if (responseData instanceof Blob && mediaUrl) {
       return (
         <div className="flex h-full items-center justify-center">
-          <img src={mediaUrl} alt="Response image" className="max-h-full max-w-full object-contain" />
+          <img src={mediaUrl} alt="Response image" loading="lazy" className="max-h-full max-w-full object-contain" />
         </div>
       )
     }

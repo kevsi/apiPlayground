@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
+import { InMemoryRateLimiter } from "@/lib/rate-limiter"
 import { formatZodError, githubImportBodySchema, githubImportResponseSchema } from "@/lib/import-schemas"
 import {
   type DetectedRoute,
@@ -19,6 +20,16 @@ import {
 const MAX_FILES = 200
 const GITHUB_API_BASE = "https://api.github.com"
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
+const FETCH_TIMEOUT = 15000
+
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 20 })
+
+function getRateLimitKey(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  return forwarded?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "127.0.0.1"
+}
 
 const LANGUAGE_EXTENSION_MAP_FETCH: Record<string, string[]> = {
   JavaScript: ["js", "jsx", "ts", "tsx"],
@@ -44,8 +55,21 @@ function getGithubHeaders(token?: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateKey = getRateLimitKey(request)
+  const rateResult = await rateLimiter.check(rateKey)
+  if (!rateResult.allowed) {
+    return NextResponse.json({ message: "Rate limit exceeded" }, { status: 429 })
+  }
+
+  let rawBody: unknown
   try {
-    const bodyResult = githubImportBodySchema.safeParse(await request.json())
+    rawBody = await request.json()
+  } catch {
+    return NextResponse.json({ message: "Invalid JSON in request body" }, { status: 400 })
+  }
+
+  try {
+    const bodyResult = githubImportBodySchema.safeParse(rawBody)
     if (!bodyResult.success) {
       return NextResponse.json({ message: formatZodError(bodyResult.error) }, { status: 400 })
     }
@@ -57,7 +81,10 @@ export async function POST(request: NextRequest) {
 
     // 1. Fetch Git Tree (all paths instantly)
     const treeUrl = `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`
-    const treeRes = await fetch(treeUrl, { headers: getGithubHeaders(token) })
+    const treeController = new AbortController()
+    const treeTimeout = setTimeout(() => treeController.abort(), FETCH_TIMEOUT)
+    const treeRes = await fetch(treeUrl, { headers: getGithubHeaders(token), signal: treeController.signal })
+      .finally(() => clearTimeout(treeTimeout))
     if (!treeRes.ok) {
       if (treeRes.status === 403) throw new Error("GitHub access denied or rate limit reached")
       throw new Error("Failed to fetch repository tree")
@@ -83,8 +110,13 @@ export async function POST(request: NextRequest) {
       const pkgContent = await fetchFileContentRaw(owner, repo, defaultBranch, packageJsonPath, token)
       if (pkgContent) {
         try {
-          const pkg = JSON.parse(pkgContent) as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> }
-          const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+          const pkg: unknown = JSON.parse(pkgContent)
+          if (typeof pkg !== "object" || pkg === null) throw new Error("Invalid package.json")
+          const pkgObj = pkg as Record<string, unknown>
+          const deps: Record<string, unknown> = {
+            ...(typeof pkgObj.dependencies === "object" && pkgObj.dependencies !== null ? pkgObj.dependencies as Record<string, unknown> : {}),
+            ...(typeof pkgObj.devDependencies === "object" && pkgObj.devDependencies !== null ? pkgObj.devDependencies as Record<string, unknown> : {}),
+          }
           for (const [dep, fw] of Object.entries(frameworkDetectMap)) {
             if (deps[dep]) { framework = fw; break }
           }
@@ -227,7 +259,12 @@ export async function POST(request: NextRequest) {
 }
 
 async function getDefaultBranch(owner: string, repo: string, githubToken?: string): Promise<string> {
-  const res = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, { headers: getGithubHeaders(githubToken) })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+  const res = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, {
+    headers: getGithubHeaders(githubToken),
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout))
   if (!res.ok) {
     if (res.status === 403) throw new Error("GitHub access denied or rate limit reached")
     throw new Error("Repository not found or access denied")
@@ -238,7 +275,10 @@ async function getDefaultBranch(owner: string, repo: string, githubToken?: strin
 
 async function fetchFileContentRaw(owner: string, repo: string, branch: string, path: string, githubToken?: string): Promise<string | undefined> {
   const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${path}?ref=${branch}`
-  const res = await fetch(url, { headers: getGithubHeaders(githubToken) })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+  const res = await fetch(url, { headers: getGithubHeaders(githubToken), signal: controller.signal })
+    .finally(() => clearTimeout(timeout))
   if (!res.ok) return undefined
   const item = await res.json()
   if (item.type === "file" && item.content) {

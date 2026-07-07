@@ -1,5 +1,15 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
+import { InMemoryRateLimiter } from "@/lib/rate-limiter"
+
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 })
+
+function getRateLimitKey(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  return forwarded?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "127.0.0.1"
+}
 
 interface ExportRequest {
   name: string
@@ -21,36 +31,39 @@ function buildPostmanItem(request: ExportRequest) {
     value: String(value),
   }))
 
-  const item: Record<string, unknown> = {
-    name: request.name || `${request.method} ${request.url}`,
-    request: {
-      method: request.method || "GET",
-      header: headers,
-      url: {
-        raw: request.url || "/",
-      },
+  const requestBody: Record<string, unknown> = {
+    method: request.method || "GET",
+    header: headers,
+    url: {
+      raw: request.url || "/",
     },
   }
 
   if (request.body) {
-    item.request = {
-      ...(item.request as Record<string, unknown>),
-      body: {
-        mode: "raw",
-        raw: request.body,
-        options: {
-          raw: {
-            language: "json",
-          },
+    requestBody.body = {
+      mode: "raw",
+      raw: request.body,
+      options: {
+        raw: {
+          language: "json",
         },
       },
     }
   }
 
-  return item
+  return {
+    name: request.name || `${request.method} ${request.url}`,
+    request: requestBody,
+  }
 }
 
 export async function POST(request: NextRequest) {
+  const rateKey = getRateLimitKey(request)
+  const rateResult = await rateLimiter.check(rateKey)
+  if (!rateResult.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
+  }
+
   try {
     const body: ExportBody = await request.json()
 

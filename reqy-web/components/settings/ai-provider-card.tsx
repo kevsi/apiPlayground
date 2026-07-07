@@ -17,22 +17,23 @@ export interface ProviderInfo {
   value: AIProvider
   label: string
   description: string
-  /** Path to a PNG icon in /icones/ia/ (e.g. "/icones/ia/openai.png") */
+  /** Path to a PNG icon in /icones/ (e.g. "/icones/openai.png") */
   iconPath?: string
   /** Fallback Lucide icon when no iconPath is available */
   fallbackIcon: LucideIcon
   gradient: string
 }
 
-/** Map each provider to its PNG icon path (if a file exists in icones/ia/) */
+/** Map each provider to its PNG icon path (if a file exists in /icones/) */
 const ICON_MAP: Partial<Record<AIProvider, string>> = {
-  openai: "/icones/ia/openai.png",
-  anthropic: "/icones/ia/claude.png",
-  openrouter: "/icones/ia/openrouter.png",
-  gemini: "/icones/ia/gemini.png",
-  ollama: "/icones/ia/ollama.png",
-  "opencode-zen": "/icones/ia/opencode.png",
-  grok: "/icones/ia/grok.png",
+  openai: "/icones/openai.png",
+  anthropic: "/icones/claude-color.png",
+  openrouter: "/icones/openrouter.png",
+  gemini: "/icones/gemini-color.png",
+  ollama: "/icones/ollama.png",
+  "opencode-zen": "/icones/opencode.png",
+  grok: "/icones/grok.png",
+  deepseek: "/icones/deepseek.png",
 }
 
 export const PROVIDER_INFOS: ProviderInfo[] = [
@@ -72,6 +73,7 @@ export const PROVIDER_INFOS: ProviderInfo[] = [
     value: "deepseek",
     label: "DeepSeek",
     description: "DeepSeek Chat, Coder",
+    iconPath: ICON_MAP.deepseek,
     fallbackIcon: Cpu,
     gradient: "from-cyan-500/20 to-cyan-600/10",
   },

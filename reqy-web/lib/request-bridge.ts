@@ -19,6 +19,17 @@ export interface PendingCollectionRequest {
   authType?: "none" | "bearer" | "basic" | "api-key" | "oauth2"
   authToken?: string
   queryParams?: Array<{ key: string; value: string }>
+  assertions?: import("@/lib/types").RequestTestAssertion[]
+  runnerAssertions?: import("@/lib/test-runner/types").Assertion[]
+  preRequestScript?: string
+  postResponseScript?: string
+  datasetKey?: string
+  protocol?: "rest" | "graphql"
+  graphql?: {
+    query: string
+    variables: string
+    operationName?: string
+  }
   sendImmediately?: boolean
   collectionId?: string
   background?: boolean

@@ -1,11 +1,21 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
+import { InMemoryRateLimiter } from "@/lib/rate-limiter"
 import {
   formatZodError,
   postmanImportBodySchema,
   postmanImportResponseSchema,
 } from "@/lib/import-schemas"
 import { postmanFetchJson, PostmanApiError, extractPostmanCollection } from "@/lib/postman"
+
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 })
+
+function getRateLimitKey(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  return forwarded?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "127.0.0.1"
+}
 
 /**
  * Legacy Postman import endpoint.
@@ -20,6 +30,12 @@ import { postmanFetchJson, PostmanApiError, extractPostmanCollection } from "@/l
  * the legacy fields and lets the extra ones pass through.
  */
 export async function POST(request: NextRequest) {
+  const rateKey = getRateLimitKey(request)
+  const rateResult = await rateLimiter.check(rateKey)
+  if (!rateResult.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
+  }
+
   let raw: unknown
   try {
     raw = await request.json()
@@ -45,19 +61,26 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const data = await postmanFetchJson<any>(apiKey, `/collections/${collectionId}`)
+    const data = await postmanFetchJson<{ collection: { info?: { name?: string; description?: string }; item?: unknown[] } }>(apiKey, `/collections/${collectionId}`)
     const collection = data.collection
     const { folders, requests } = extractPostmanCollection(collection?.item ?? [])
 
-    // Map the rich extracted requests down to the legacy flat `routes` shape.
-    // The legacy modal expects only method/path/name/description/sourceFile,
-    // so we strip the domain off full URLs to mirror the original behaviour.
+    // Map the rich extracted requests down to the legacy `routes` shape while
+    // preserving body, auth, headers and query params so the legacy import
+    // modal can hydrate the request editor without losing data.
     const routes = requests.map((r) => ({
       method: r.method,
       path: stripDomain(r.url),
+      url: r.url,
       name: r.name,
       description: "",
       sourceFile: `postman:${r.name}`,
+      headers: r.headers,
+      body: r.body,
+      bodyType: r.bodyType,
+      authType: r.authType,
+      authToken: r.authToken,
+      queryParams: r.queryParams,
     }))
 
     const payload = {

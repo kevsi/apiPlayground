@@ -1,0 +1,71 @@
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-fetch-proxy"
+description = "Allows the fetch_proxy command"
+commands.allow = ["fetch_proxy"]
+
+[[permission]]
+identifier = "allow-export-json"
+description = "Allows the export_json command"
+commands.allow = ["export_json"]
+
+[[permission]]
+identifier = "allow-open-external"
+description = "Allows the open_external command"
+commands.allow = ["open_external"]
+
+[[permission]]
+identifier = "allow-start-capture-proxy"
+description = "Allows the start_capture_proxy command"
+commands.allow = ["start_capture_proxy"]
+
+[[permission]]
+identifier = "allow-stop-capture-proxy"
+description = "Allows the stop_capture_proxy command"
+commands.allow = ["stop_capture_proxy"]
+
+[[permission]]
+identifier = "allow-ws-connect"
+description = "Allows the ws_connect command"
+commands.allow = ["ws_connect"]
+
+[[permission]]
+identifier = "allow-ws-send"
+description = "Allows the ws_send command"
+commands.allow = ["ws_send"]
+
+[[permission]]
+identifier = "allow-ws-disconnect"
+description = "Allows the ws_disconnect command"
+commands.allow = ["ws_disconnect"]
+
+[[permission]]
+identifier = "allow-ws-get-status"
+description = "Allows the ws_get_status command"
+commands.allow = ["ws_get_status"]
+
+[[permission]]
+identifier = "allow-start-mcp-server"
+description = "Allows the start_mcp_server command"
+commands.allow = ["start_mcp_server"]
+
+[[permission]]
+identifier = "allow-stop-mcp-server"
+description = "Allows the stop_mcp_server command"
+commands.allow = ["stop_mcp_server"]
+
+[[permission]]
+identifier = "allow-get-mcp-server-status"
+description = "Allows the get_mcp_server_status command"
+commands.allow = ["get_mcp_server_status"]
+
+[[permission]]
+identifier = "allow-read-mcp-bundle"
+description = "Allows the read_mcp_bundle command"
+commands.allow = ["read_mcp_bundle"]
+
+[[permission]]
+identifier = "allow-sync-mcp-collections"
+description = "Allows the sync_mcp_collections command"
+commands.allow = ["sync_mcp_collections"]

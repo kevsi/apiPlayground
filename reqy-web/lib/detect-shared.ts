@@ -1724,6 +1724,35 @@ export function detectNextjsPagesRouter(f: { path: string; content: string }): D
 
 // ── Handler body analysis ─────────────────────────────────────────────────
 
+/** Extract body field names from destructuring patterns like `const { email, password } = req.body`. */
+function extractBodyFields(body: string): string[] {
+  const fields = new Set<string>()
+
+  // const { a, b } = req.body  /  const { a, b } = request.body
+  const destructureRe = /(?:const|let|var)\s*\{\s*([^}]+)\s*\}\s*=\s*(?:req(?:uest)?)\.body/g
+  let m: RegExpExecArray | null
+  while ((m = destructureRe.exec(body)) !== null) {
+    for (const raw of m[1].split(",")) {
+      const name = raw.split(":").map((s) => s.trim())[0].split(/\s+as\s+/)[0].trim()
+      if (name && /^[a-zA-Z_$][\w]*$/.test(name)) fields.add(name)
+    }
+  }
+
+  // const a = req.body.a, const b = req.body.b
+  const dotAccessRe = /(?:const|let|var)\s+(\w+)\s*=\s*(?:req(?:uest)?)\.body\.(\w+)/g
+  while ((m = dotAccessRe.exec(body)) !== null) {
+    fields.add(m[2])
+  }
+
+  // req.body.a  (in conditions, assignments, etc.)
+  const usageRe = /(?:req(?:uest)?)\.body\.(\w+)/g
+  while ((m = usageRe.exec(body)) !== null) {
+    fields.add(m[1])
+  }
+
+  return [...fields]
+}
+
 export function analyzeHandlerBody(body: string, r: DetectedRoute): void {
   if (/cookies\(\)\.get\(\s*['"](?:token|auth|session|access_token|github_token)['"]\)|request\.cookies\.get\(\s*['"](?:token|auth|session)['"]\)/.test(body)) { r.authRequired = true; r.authType = r.authType || "cookie"; r.reasonings?.push("Auth token en cookie") }
   if (/[Aa]uthorization.*[Bb]earer|headers\[['"]authorization['"]\]|getAuthHeader|extractBearerToken/.test(body)) { r.authRequired = true; r.authType = r.authType || "jwt"; r.reasonings?.push("Bearer token") }
@@ -1733,6 +1762,17 @@ export function analyzeHandlerBody(body: string, r: DetectedRoute): void {
   if (/(?:status|statusCode)\s*[:=]\s*(?:401|403)|new\s+Response\([^)]*401|NextResponse\.json\([^)]*401|res\.status\(401\)|res\.status\(403\)/.test(body)) { if (!r.authRequired) { r.authRequired = true; r.authType = r.authType || "middleware"; r.reasonings?.push("401/403 response") } }
   if (/await\s+req(?:uest)?\.json\(\)|body\s*=\s*await/.test(body)) { r.bodyType = "json"; r.reasonings?.push("JSON body") }
   if (/await\s+req(?:uest)?\.formData\(\)/.test(body)) { r.bodyType = "form"; r.reasonings?.push("FormData body") }
+
+  // Detect body fields from destructuring/access patterns and generate example body
+  if (r.bodyType === "json" && !r.body) {
+    const fields = extractBodyFields(body)
+    if (fields.length > 0) {
+      const example: Record<string, string> = {}
+      for (const f of fields) example[f] = "string"
+      r.body = JSON.stringify(example, null, 2)
+      r.reasonings?.push(`Champs body détectés: ${fields.join(", ")}`)
+    }
+  }
 }
 
 // ── Auth helpers ─────────────────────────────────────────────────────────

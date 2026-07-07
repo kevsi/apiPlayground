@@ -48,12 +48,14 @@ export function comboEqual(a: KeyCombo, b: KeyCombo): boolean {
     && Boolean(a.alt) === Boolean(b.alt)
 }
 
+import { persistence } from "@/lib/persistence"
+
 export const STORAGE_KEY = "reqly-custom-shortcuts"
 
 export function loadCustomShortcuts(): Record<string, KeyCombo> {
   if (typeof window === "undefined") return {}
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = persistence.getItem<string>(STORAGE_KEY)
     if (!raw) return {}
     return JSON.parse(raw)
   } catch {
@@ -64,17 +66,17 @@ export function loadCustomShortcuts(): Record<string, KeyCombo> {
 export function saveCustomShortcut(id: string, combo: KeyCombo): void {
   const all = loadCustomShortcuts()
   all[id] = combo
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
+  void persistence.setItem(STORAGE_KEY, JSON.stringify(all))
 }
 
 export function resetCustomShortcut(id: string): void {
   const all = loadCustomShortcuts()
   delete all[id]
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
+  void persistence.setItem(STORAGE_KEY, JSON.stringify(all))
 }
 
 export function resetAllCustomShortcuts(): void {
-  localStorage.removeItem(STORAGE_KEY)
+  void persistence.removeItem(STORAGE_KEY)
 }
 
 export function resolveCombo(id: string): KeyCombo {

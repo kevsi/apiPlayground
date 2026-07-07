@@ -1,11 +1,27 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server"
+import { InMemoryRateLimiter } from "@/lib/rate-limiter"
 import { validatePostmanApiKey, PostmanApiError } from "@/lib/postman"
-import { buildApiKeyCookie, buildClearApiKeyCookie } from "./cookies"
+
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 })
+
+function getRateLimitKey(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  return forwarded?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "127.0.0.1"
+}
+import { buildApiKeyCookie, buildUserCookie, buildClearCookies } from "./cookies"
 
 const API_KEY_REGEX = /^PMAK-[A-Za-z0-9_-]+$/
 
 export async function POST(request: NextRequest) {
+  const rateKey = getRateLimitKey(request)
+  const rateResult = await rateLimiter.check(rateKey)
+  if (!rateResult.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
+  }
+
   let body: { apiKey?: string }
   try {
     body = await request.json()
@@ -25,6 +41,7 @@ export async function POST(request: NextRequest) {
     const user = await validatePostmanApiKey(apiKey)
     const response = NextResponse.json({ connected: true, user })
     response.cookies.set(buildApiKeyCookie(apiKey))
+    response.cookies.set(buildUserCookie(user))
     return response
   } catch (err) {
     if (err instanceof PostmanApiError) {
@@ -36,6 +53,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   const response = NextResponse.json({ ok: true })
-  response.cookies.set(buildClearApiKeyCookie())
+  for (const cookie of buildClearCookies()) {
+    response.cookies.set(cookie)
+  }
   return response
 }
