@@ -13,7 +13,6 @@ const ACTIVE_PAGE_MAP: Record<string, string> = {
   "": "api-endpoints",
   "dashboard": "dashboard",
   "collections": "collections",
-  "mocks": "mocks",
   "settings": "settings",
   "runner": "runner",
   "ai-insights": "ai-insights",
