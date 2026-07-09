@@ -1,4 +1,4 @@
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "GRAPHQL";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "TRACE" | "CONNECT" | "GRAPHQL";
 export type BodyType = "none" | "json" | "form-data" | "x-www-form" | "raw" | "binary";
 export type AuthType = "none" | "bearer" | "basic" | "api-key" | "oauth2";
 export interface Header {
@@ -9,7 +9,7 @@ export interface Header {
 export interface QueryParam {
     key: string;
     value: string;
-    enabled: boolean;
+    enabled?: boolean;
 }
 export interface EnvironmentVariable {
     key: string;
@@ -17,85 +17,39 @@ export interface EnvironmentVariable {
     enabled: boolean;
 }
 export interface Environment {
-    id: string;
+    id?: string;
     name: string;
+    color?: string;
     variables: EnvironmentVariable[];
 }
-export interface RequestItem {
-    id: string;
-    name: string;
-    method: HttpMethod;
-    url: string;
-    headers: Header[];
-    queryParams: QueryParam[];
-    body: string;
-    bodyType: BodyType;
-    authType: AuthType;
-    authToken: string;
-    sortOrder: number;
-}
-export interface Collection {
-    id: string;
-    name: string;
-    requests: RequestItem[];
-    folders?: CollectionFolder[];
-}
-export interface CollectionFolder {
-    id: string;
-    name: string;
-    requests: string[];
-    children?: CollectionFolder[];
+export interface GraphQLConfig {
+    query: string;
+    variables?: Record<string, unknown> | string;
+    operationName?: string;
 }
 export interface Assertion {
-    key: string;
-    operator: string;
-    value: string;
+    /** Format texte: `status == 200` (recli) ou structuré (reqy-mcp) */
+    expr?: string;
+    name?: string;
+    id?: string;
     type?: string;
+    target?: string;
+    operator?: string;
+    value?: string;
+    enabled?: boolean;
+    schema?: Record<string, unknown>;
 }
 export interface AssertionResult {
-    assertion: Assertion;
     passed: boolean;
-    actual: unknown;
-    expected: unknown;
     error?: string;
-}
-export interface RunResult {
-    id: string;
-    collectionId: string;
-    timestamp: string;
-    results: RequestRunResult[];
-    summary: RunSummary;
-}
-export interface RequestRunResult {
-    requestId: string;
-    requestName: string;
-    method: HttpMethod;
-    url: string;
-    status: number;
-    statusText: string;
-    headers: Record<string, string>;
-    body: string;
-    duration: number;
-    assertions: AssertionResult[];
-    error?: string;
-}
-export interface RunSummary {
-    total: number;
-    passed: number;
-    failed: number;
-    errors: number;
-    totalDuration: number;
-}
-export interface GraphQLConfig {
-    url: string;
-    query: string;
-    variables?: string;
-    operationName?: string;
-    headers: Header[];
-}
-export interface ExportBundle {
-    version: string;
-    collections: Collection[];
-    environments: Environment[];
+    /** Nom de l'assertion (recli) */
+    name?: string;
+    /** Expression brute (recli) */
+    rawExpr?: string;
+    expected?: unknown;
+    actual?: unknown;
+    /** Assertion structurée (reqy-mcp) */
+    assertion?: Assertion;
+    actualValue?: unknown;
 }
 //# sourceMappingURL=types.d.ts.map

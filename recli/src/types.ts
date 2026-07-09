@@ -1,3 +1,4 @@
+// Recli types — complétés par les types canoniques dans @reqly/shared
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "TRACE" | "CONNECT" | "GRAPHQL"
 
 export interface EnvironmentVariable {
