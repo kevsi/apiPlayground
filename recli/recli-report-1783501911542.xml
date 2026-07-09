@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="recli" tests="4" failures="0" errors="0" time="1.797">
+    <testcase name="Get Post 1" classname="Get_Post_1" time="0.468">
+    </testcase>
+    <testcase name="Get Comments for Post" classname="Get_Comments_for_Post" time="0.120">
+    </testcase>
+    <testcase name="Create New Post" classname="Create_New_Post" time="0.874">
+    </testcase>
+    <testcase name="Get All Posts (should be fast)" classname="Get_All_Posts__should_be_fast_" time="0.335">
+    </testcase>
+</testsuite>

@@ -7,6 +7,7 @@ import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { proxyAuthHeaders } from "@/lib/proxy-auth"
 import { cn } from "@/lib/utils"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { persistence } from "@/lib/persistence"
@@ -188,7 +189,9 @@ export default function SettingsPage() {
 
   const fetchPostmanStatus = useCallback(async () => {
     try {
-      const response = await fetch("/api/postman-auth/status")
+      const response = await fetch("/api/postman-auth/status", {
+        headers: { ...proxyAuthHeaders() },
+      })
       if (!response.ok) throw new Error("Échec")
       const data = await response.json()
       if (data.connected) { setPostmanStatus("connected"); setPostmanUser(data.user || null) }

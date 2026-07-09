@@ -62,7 +62,7 @@ export function RouteModal({ project, open, onClose }: RouteModalProps) {
             (route.headers ?? []).map((h) => [h.key, h.value])
           ),
           body: route.body || undefined,
-          bodyType: route.bodyType === "json" ? "json" : route.bodyType === "form" ? "form-data" : undefined,
+          bodyType: route.bodyType === "json" ? "json" : route.bodyType === "form" ? "form-data" : route.body ? "raw" : undefined,
           queryParams: (route.headers ?? []).filter(
             (h): h is { key: string; value: string } => h.key.startsWith("?")
           ).map((h) => ({ key: h.key.slice(1), value: h.value })),
@@ -324,7 +324,12 @@ export function RouteModal({ project, open, onClose }: RouteModalProps) {
                                     {route.authRequired ? <Lock className="size-3" /> : <Unlock className="size-3" />}
                                     {route.authType || (route.authRequired ? "protégée" : "publique")}
                                   </span>
-                                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                  <span className={cn(
+                                    "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium",
+                                    route.bodyType === "none"
+                                      ? "bg-muted/50 text-muted-foreground/50"
+                                      : "bg-muted text-muted-foreground"
+                                  )}>
                                     <Code2 className="size-3" /> body: {route.bodyType}
                                   </span>
                                   <span className={cn(

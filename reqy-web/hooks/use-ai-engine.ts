@@ -26,7 +26,7 @@ export interface AIConfig {
 }
 
 interface AIRequestStore {
-  currentRequest: CurrentRequest
+  currentRequest?: CurrentRequest
   lastResponse?: LastResponse | null
   environmentVariables: Record<string, string>
   collectionHistory: CurrentRequest[]
@@ -35,7 +35,7 @@ interface AIRequestStore {
   addAssertions: (assertions: TestAssertion[]) => void
   setVariable: (name: string, value: string, description?: string) => void
   setDoc: (markdown: string, title?: string) => void
-  notify: (message: string) => void
+  notify?: (message: string) => void
   addNotification: (notif: { title: string; body?: string; type?: "info" | "success" | "warning" | "error"; event?: string }) => any
   aiAutoApply?: boolean
   executeRequest?: (request: Partial<CurrentRequest> | CurrentRequest) => Promise<any>
@@ -140,12 +140,7 @@ function mergeHandlers(store: AIRequestStore, overrides?: AIEngineHandlers) {
 }
 
 export function useAIEngine(handlerOverrides?: AIEngineHandlers): UseAIEngineResult {
-  // The flat useRequestStore() does not expose every method listed in
-  // AIRequestStore (e.g. patchRequest, addAssertions, setDoc) — those live
-  // on action helpers imported elsewhere. The cast lets the AI engine call
-  // them with optional chaining; the engine falls back to no-ops when a
-  // method is missing. Tighten when the store interface is unified.
-  const store = useRequestStore() as unknown as AIRequestStore
+  const store = useRequestStore()
   const [isLoading, setIsLoading] = useState(false)
   const [lastSummary, setLastSummary] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -170,7 +165,7 @@ export function useAIEngine(handlerOverrides?: AIEngineHandlers): UseAIEngineRes
       const config = parseAiConfig()
       const aiRes = await callAI(prompt, config)
       await dispatchAIActions(aiRes.actions, mergeHandlers(store, handlerOverrides), ctx, {
-        allowAutoApply: Boolean((store as AIRequestStore).aiAutoApply),
+        allowAutoApply: Boolean(store.aiAutoApply),
       })
       return aiRes
     },

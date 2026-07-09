@@ -1,6 +1,7 @@
 import type { RequestResponse } from "./types"
 import { invokeTauriFetch, isTauriAvailable } from "@/lib/tauri"
 import { parseJsonSafe } from "@/lib/utils"
+import { proxyAuthHeaders } from "@/lib/proxy-auth"
 
 export interface RunnerExecutorOptions {
   workspaceId?: string | null
@@ -29,6 +30,7 @@ async function executeViaProxy(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...proxyAuthHeaders(),
       ...(workspaceId ? { "x-workspace-id": workspaceId } : {}),
     },
     body: JSON.stringify({

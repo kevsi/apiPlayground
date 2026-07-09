@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { HistoryItem } from "@/lib/types"
 
 import type { AIProvider } from "@/lib/types"
+import { proxyAuthHeaders } from "@/lib/proxy-auth"
 export const generatedRequestSchema = z.object({
   name: z.string().min(1),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
@@ -119,7 +120,10 @@ export type AiProxyPayload = {
 export async function callAiProxy(payload: AiProxyPayload): Promise<string> {
   const response = await fetch("/api/proxy-ai", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...proxyAuthHeaders(),
+    },
     body: JSON.stringify(payload),
   })
 

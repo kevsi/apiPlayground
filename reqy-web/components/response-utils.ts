@@ -75,8 +75,7 @@ export function escapeHtml(text: string): string {
 }
 
 export function highlightJson(jsonText: string): string {
-  const escaped = escapeHtml(jsonText)
-  return escaped.replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, (match) => {
+  return jsonText.replace(/"([^"\\]|\\.)*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g, (match) => {
     let cls: string
     if (/^"/.test(match)) {
       cls = /:\s*$/.test(match) ? "text-sky-300" : "text-amber-300"
@@ -87,13 +86,25 @@ export function highlightJson(jsonText: string): string {
     } else {
       cls = "text-rose-300"
     }
-    return `<span class="${cls}">${match}</span>`
+    return `<span class="${cls}">${escapeHtml(match)}</span>`
   })
 }
 
 export function highlightMarkup(text: string): string {
-  const escaped = escapeHtml(text)
-  return escaped
+  // Prevent pre-escaping from corrupting existing HTML entities (double-escape)
+  const entities: string[] = []
+  const textWithoutEntities = text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z][a-zA-Z0-9]*);/g, (match) => {
+    if (/^&(#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);$/.test(match)) {
+      entities.push(match)
+      return `__ENT_${entities.length - 1}__`
+    }
+    return match
+  })
+
+  const escaped = escapeHtml(textWithoutEntities)
+  const withEntities = entities.reduce((acc, entity, i) => acc.replace(`__ENT_${i}__`, entity), escaped)
+
+  return withEntities
     .replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="text-emerald-300">$1</span>')
     .replace(/(&lt;\/?[a-zA-Z0-9\-:]+)([^&]*?)(&gt;)/g, (_, tagStart, attrs, tagEnd) => {
       const highlightedAttrs = attrs.replace(/([a-zA-Z0-9\-:]+)(=)("[^"]*")/g, '<span class="text-sky-300">$1</span>$2<span class="text-amber-300">$3</span>')

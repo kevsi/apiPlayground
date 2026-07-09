@@ -8,13 +8,13 @@ import {
 import type { AIProvider } from "@/lib/types"
 import type { AiProxyPayload } from "@/lib/ai-request-generator"
 
-const MODEL_MAP: Record<AIProvider, string> = {
+export const DEFAULT_MODELS: Record<AIProvider, string> = {
   anthropic: "claude-sonnet-4-20250514",
-  openai: "gpt-3.5-turbo",
+  openai: "gpt-4o",
   openrouter: "openai/gpt-5.2",
   gemini: "gemini-2.0-flash",
   deepseek: "deepseek-chat",
-  ollama: "llama2",
+  ollama: "llama3",
   "opencode-zen": "gpt-5",
   custom: "gpt-4o-mini",
   grok: "grok-2",
@@ -38,7 +38,7 @@ export function buildAiProxyPayload(
   return {
     provider,
     apiKey,
-    model: provider === "ollama" ? ollama.model || MODEL_MAP.ollama : MODEL_MAP[provider],
+    model: provider === "ollama" ? ollama.model || DEFAULT_MODELS.ollama : DEFAULT_MODELS[provider],
     host: ollama.host,
     port: ollama.port,
     system,

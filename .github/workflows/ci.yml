@@ -43,10 +43,6 @@ jobs:
         working-directory: sync-server
         run: npx tsc --noEmit
 
-      - name: Type check (reqy-cli)
-        working-directory: reqy-cli
-        run: npx tsc --noEmit
-
       - name: Type check (reqy-mcp)
         working-directory: reqy-mcp
         run: npx tsc --noEmit

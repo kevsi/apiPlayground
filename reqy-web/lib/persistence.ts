@@ -198,27 +198,21 @@ class Persistence {
    */
   async setItem(key: string, value: unknown): Promise<void> {
     this.cache.set(key, value)
+    // Keep localStorage in sync so synchronous reads on the NEXT page load
+    // (before the async init() completes) still find the value.
+    try {
+      localStorage.setItem(
+        key,
+        typeof value === "string" ? value : JSON.stringify(value),
+      )
+    } catch {
+      // ignore
+    }
 
     try {
       await set(key, value)
     } catch (e) {
-      console.warn("[persistence] IndexedDB write failed, falling back to localStorage:", e)
-      try {
-        localStorage.setItem(
-          key,
-          typeof value === "string" ? value : JSON.stringify(value),
-        )
-      } catch {
-        // give up
-      }
-      return
-    }
-
-    // Clean up any leftover localStorage copy
-    try {
-      localStorage.removeItem(key)
-    } catch {
-      // ignore
+      console.warn("[persistence] IndexedDB write failed:", e)
     }
   }
 

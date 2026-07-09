@@ -89,7 +89,7 @@ describe("proxy: protected routes without valid token return 401", () => {
     const res = proxy(makeMockRequest({ pathname: "/api/proxy" }))
     expect(res.status).toBe(401)
     const body = await res.json()
-    expect(body).toEqual({ error: "Unauthorized" })
+    expect(body).toMatchObject({ error: "Unauthorized", code: "PROXY_AUTH_REQUIRED" })
   })
 
   it("rejects /api/proxy-ai with malformed Authorization header", async () => {

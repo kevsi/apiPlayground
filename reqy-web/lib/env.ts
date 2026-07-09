@@ -14,9 +14,6 @@ import { z } from "zod"
  */
 
 const ServerEnvSchema = z.object({
-  // Optional because the auth flow that consumes this secret is currently
-  // disabled (see middleware.ts). When auth is re-enabled, restore the
-  // .min(32, ...) constraint.
   AUTH_SIGNING_SECRET: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   GITHUB_OAUTH_CLIENT_ID: z.string().min(1).optional(),
@@ -93,12 +90,6 @@ export function getPublicEnv(): PublicEnv {
   return cachedPublicEnv
 }
 
-/**
- * Synchronous, build-time validator. Currently a no-op because the only
- * env var it used to require (AUTH_SIGNING_SECRET) is optional while auth
- * is disabled. When auth is re-enabled, add AUTH_SIGNING_SECRET back to
- * the required list.
- */
 export function validateBuildTimeEnv(): void {
   // Reserved for future build-time env requirements.
 }

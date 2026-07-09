@@ -44,6 +44,7 @@ import { createProjectsMutations } from "./store/projects"
 import { createEnvironmentsMutations } from "./store/environments"
 import { createWorkspacesMutations } from "./store/workspaces"
 import { createDatasetsMutations } from "./store/datasets"
+import { createAiActionsMutations } from "./store/ai-actions"
 
 const STORAGE_KEY = "reqly-request-store"
 
@@ -420,6 +421,7 @@ type MutationMethods = ReturnType<typeof createNotificationsMutations>
   & ReturnType<typeof createEnvironmentsMutations>
   & ReturnType<typeof createWorkspacesMutations>
   & ReturnType<typeof createDatasetsMutations>
+  & ReturnType<typeof createAiActionsMutations>
 
 type FullStore = MergedState & MutationMethods & { isLoaded: boolean }
 
@@ -481,6 +483,7 @@ export function useRequestStore<T = MergedState>(
         ...createEnvironmentsMutations(commit),
         ...createWorkspacesMutations(commit),
         ...createDatasetsMutations(commit),
+        ...createAiActionsMutations(commit),
       }
     },
     [],

@@ -11,6 +11,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { toast } from "sonner"
+import { proxyAuthHeaders } from "@/lib/proxy-auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -243,7 +244,10 @@ export function AiProviderModal({
       } else if (provider === "opencode-zen") {
         const res = await fetch("/api/proxy-models", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...proxyAuthHeaders(),
+          },
           body: JSON.stringify({ provider, apiKey }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -357,15 +361,21 @@ export function AiProviderModal({
 
       const res = await fetch("/api/proxy-ai", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...proxyAuthHeaders(),
+        },
         body: JSON.stringify(body),
       })
 
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
+        if (data.code === "PROXY_AUTH_REQUIRED") {
+          throw new Error("Authentification du proxy refusée. Vérifie la configuration du token dans .env.local")
+        }
         const errMsg = data.error || `HTTP ${res.status}`
-        throw new Error(errMsg)
+        throw new Error(`Clé API ${errMsg.includes("key") ? "" : "invalide"} : ${errMsg}`)
       }
 
       const content = typeof data.content === "string" ? data.content.trim() : ""

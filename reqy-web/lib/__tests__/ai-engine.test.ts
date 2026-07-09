@@ -350,6 +350,6 @@ describe('callAIText', () => {
       status: 500,
       text: async () => 'Server Error',
     })
-    await expect(callAIText('test', { provider: 'openai', apiKey: 'sk-test' })).rejects.toThrow('proxy error')
+    await expect(callAIText('test', { provider: 'openai', apiKey: 'sk-test' })).rejects.toThrow('Erreur HTTP 500')
   })
 })

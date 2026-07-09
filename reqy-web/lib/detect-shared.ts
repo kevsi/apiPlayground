@@ -41,6 +41,8 @@ export interface DetectedRoute {
   inferredUsageFrequency?: number | null
   reachable?: boolean
   detectedIssues?: string[]
+  requiredBodyFields?: string[]
+  bodyFieldTypes?: Record<string, string>
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -389,6 +391,16 @@ function getObjectLiteralPropertyString(node: ts.ObjectLiteralExpression, key: s
   return null
 }
 
+function getObjectLiteralPropertyNode(node: ts.ObjectLiteralExpression, key: string): ts.Expression | undefined {
+  for (const prop of node.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue
+    const name = ts.isIdentifier(prop.name) ? prop.name.text : ts.isStringLiteral(prop.name) ? prop.name.text : null
+    if (name !== key) continue
+    return prop.initializer
+  }
+  return undefined
+}
+
 const HTTP_METHODS_LOWER = new Set(["get", "post", "put", "delete", "patch", "options", "head"])
 const HTTP_METHODS_UPPER = new Set(["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 const HTTP_METHODS_UPPER_ALL = new Set(["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD", "ALL"])
@@ -404,7 +416,7 @@ function detectExpressAST(content: string): DetectedRoute[] {
   const routes: DetectedRoute[] = []
   const seen = new Set<string>()
 
-  function addRoute(method: string, path: string, middlewares?: string[]) {
+  function addRoute(method: string, path: string, middlewares?: string[], handlerNode?: ts.Node) {
     const normalized = normalizePath(path)
     const key = `${method}|${normalized}`
     if (!seen.has(key)) {
@@ -417,6 +429,10 @@ function detectExpressAST(content: string): DetectedRoute[] {
           route.authRequired = true
           route.authType = "middleware"
         }
+      }
+      if (handlerNode && (ts.isFunctionExpression(handlerNode) || ts.isArrowFunction(handlerNode))) {
+        const handlerText = handlerNode.getText(sourceFile)
+        analyzeHandlerBody(handlerText, route, content)
       }
       routes.push(route)
     }
@@ -475,12 +491,14 @@ function detectExpressAST(content: string): DetectedRoute[] {
       if (pathArg && isHttpMethodName(methodName)) {
         if (ts.isIdentifier(receiver) && (appVars.has(receiver.text) || routerVars.has(receiver.text))) {
           const mws = getMiddlewaresFromCall(node)
-          addRoute(methodName.toUpperCase(), pathArg, mws.length > 0 ? mws : undefined)
+          const handler = node.arguments[node.arguments.length - 1]
+          addRoute(methodName.toUpperCase(), pathArg, mws.length > 0 ? mws : undefined, handler)
         } else if (ts.isCallExpression(receiver)) {
           const chainedPath = extractRoutePathFromChain(receiver)
           if (chainedPath) {
             const mws = getMiddlewaresFromCall(node)
-            addRoute(methodName.toUpperCase(), chainedPath, mws.length > 0 ? mws : undefined)
+            const handler = node.arguments[node.arguments.length - 1]
+            addRoute(methodName.toUpperCase(), chainedPath, mws.length > 0 ? mws : undefined, handler)
           }
         }
       }
@@ -490,9 +508,11 @@ function detectExpressAST(content: string): DetectedRoute[] {
         let current: ts.Node = node.parent
         while (current) {
           if (ts.isPropertyAccessExpression(current) && isHttpMethodName(current.name.text) && ts.isCallExpression(current.parent)) {
-            const mws = getMiddlewaresFromCall(current.parent as ts.CallExpression)
-            addRoute(current.name.text.toUpperCase(), routePath, mws.length > 0 ? mws : undefined)
-            current = current.parent.parent
+            const callExpr = current.parent as ts.CallExpression
+            const mws = getMiddlewaresFromCall(callExpr)
+            const handler = callExpr.arguments[callExpr.arguments.length - 1]
+            addRoute(current.name.text.toUpperCase(), routePath, mws.length > 0 ? mws : undefined, handler)
+            current = callExpr.parent
           } else {
             break
           }
@@ -538,12 +558,17 @@ function detectFastifyAST(content: string): DetectedRoute[] {
   const routes: DetectedRoute[] = []
   const seen = new Set<string>()
 
-  function addRoute(method: string, path: string) {
+  function addRoute(method: string, path: string, handlerNode?: ts.Node) {
     const normalized = normalizePath(path)
     const key = `${method}|${normalized}`
     if (!seen.has(key)) {
       seen.add(key)
-      routes.push(makeRoute(method as HttpMethod, normalized, ""))
+      const route = makeRoute(method as HttpMethod, normalized, "")
+      if (handlerNode && (ts.isFunctionExpression(handlerNode) || ts.isArrowFunction(handlerNode))) {
+        const handlerText = handlerNode.getText(sourceFile)
+        analyzeHandlerBody(handlerText, route, content)
+      }
+      routes.push(route)
     }
   }
 
@@ -561,7 +586,8 @@ function detectFastifyAST(content: string): DetectedRoute[] {
       const pathArg = getStringLiteralValue(node.arguments[0])
 
       if (pathArg && ts.isIdentifier(receiver) && appNames.has(receiver.text) && isHttpMethodName(methodName)) {
-        addRoute(methodName.toUpperCase(), pathArg)
+        const handler = node.arguments[node.arguments.length - 1]
+        addRoute(methodName.toUpperCase(), pathArg, handler)
       }
 
       if (methodName === "route" && ts.isIdentifier(receiver) && appNames.has(receiver.text) && node.arguments[0] && ts.isObjectLiteralExpression(node.arguments[0])) {
@@ -591,12 +617,17 @@ function detectKoaAST(content: string): DetectedRoute[] {
   const routes: DetectedRoute[] = []
   const seen = new Set<string>()
 
-  function addRoute(method: string, path: string) {
+  function addRoute(method: string, path: string, handlerNode?: ts.Node) {
     const normalized = normalizePath(path)
     const key = `${method}|${normalized}`
     if (!seen.has(key)) {
       seen.add(key)
-      routes.push(makeRoute(method as HttpMethod, normalized, ""))
+      const route = makeRoute(method as HttpMethod, normalized, "")
+      if (handlerNode && (ts.isFunctionExpression(handlerNode) || ts.isArrowFunction(handlerNode))) {
+        const handlerText = handlerNode.getText(sourceFile)
+        analyzeHandlerBody(handlerText, route, content)
+      }
+      routes.push(route)
     }
   }
 
@@ -613,7 +644,8 @@ function detectKoaAST(content: string): DetectedRoute[] {
       const receiver = node.expression.expression
       const pathArg = getStringLiteralValue(node.arguments[0])
       if (pathArg && ts.isIdentifier(receiver) && routerNames.has(receiver.text) && isHttpMethodName(methodName)) {
-        addRoute(methodName.toUpperCase(), pathArg)
+        const handler = node.arguments[node.arguments.length - 1]
+        addRoute(methodName.toUpperCase(), pathArg, handler)
       }
     }
 
@@ -630,13 +662,29 @@ function detectHapiAST(content: string): DetectedRoute[] {
   const routes: DetectedRoute[] = []
   const seen = new Set<string>()
 
-  function addRoute(method: string, path: string) {
+  function addRoute(method: string, path: string, handlerNode?: ts.Node) {
     const normalized = normalizePath(path)
     const key = `${method}|${normalized}`
     if (!seen.has(key)) {
       seen.add(key)
-      routes.push(makeRoute(method as HttpMethod, normalized, ""))
+      const route = makeRoute(method as HttpMethod, normalized, "")
+      if (handlerNode && (ts.isFunctionExpression(handlerNode) || ts.isArrowFunction(handlerNode))) {
+        const handlerText = handlerNode.getText(sourceFile)
+        analyzeHandlerBody(handlerText, route, content)
+      }
+      routes.push(route)
     }
+  }
+
+  function getHapiHandler(config: ts.ObjectLiteralExpression): ts.Node | undefined {
+    const handlerProp = getObjectLiteralPropertyNode(config, "handler")
+    if (handlerProp && (ts.isFunctionExpression(handlerProp) || ts.isArrowFunction(handlerProp))) return handlerProp
+    const optionsProp = getObjectLiteralPropertyNode(config, "options")
+    if (optionsProp && ts.isObjectLiteralExpression(optionsProp)) {
+      const nestedHandler = getObjectLiteralPropertyNode(optionsProp, "handler")
+      if (nestedHandler && (ts.isFunctionExpression(nestedHandler) || ts.isArrowFunction(nestedHandler))) return nestedHandler
+    }
+    return undefined
   }
 
   function visit(node: ts.Node) {
@@ -656,7 +704,8 @@ function detectHapiAST(content: string): DetectedRoute[] {
         const config = node.arguments[0]
         const method = getObjectLiteralPropertyString(config, "method") || "GET"
         const path = getObjectLiteralPropertyString(config, "path") || getObjectLiteralPropertyString(config, "url")
-        if (path) addRoute(method.toUpperCase(), path)
+        const handler = getHapiHandler(config)
+        if (path) addRoute(method.toUpperCase(), path, handler)
       }
     }
 
@@ -1156,50 +1205,69 @@ function hasNestJSAuthDecorator(decorators: readonly ts.Decorator[] | undefined)
   })
 }
 
-function detectNestJSAST(content: string): DetectedRoute[] {
-  const sourceFile = ts.createSourceFile("detect.ts", content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
-  const routes: DetectedRoute[] = []
-  const seen = new Set<string>()
-
-  function visit(node: ts.Node) {
-    if (ts.isClassDeclaration(node)) {
-      const classDecorators = (node as any).decorators || []
-      const controllerPrefix = classDecorators?.flatMap((decorator: ts.Decorator) => {
-        const expression = decorator.expression
-        const name = ts.isCallExpression(expression) ? getDecoratorName(expression.expression) : getDecoratorName(expression)
-        if (name !== "Controller") return []
-        const path = parseNestJSDecoratorPath(decorator)
-        return path === null ? [] : [path ?? ""]
-      })[0] ?? ""
-
-      const classAuth = hasNestJSAuthDecorator(classDecorators)
-
-      for (const member of node.members) {
-        const methodDecorators = (member as any).decorators || []
-        if (!ts.isMethodDeclaration(member) || !methodDecorators.length) continue
-        for (const decorator of methodDecorators) {
-          const parsed = parseNestJSMethodDecorator(decorator)
-          if (!parsed) continue
-          const route = makeRoute(parsed.method as HttpMethod, normalizePath(`${controllerPrefix}/${parsed.path}`) || "/", "")
-          route.authRequired = classAuth || hasNestJSAuthDecorator(methodDecorators)
-          if (route.authRequired) {
-            route.authType = "middleware"
-            route.reasonings?.push("NestJS @UseGuards / @Roles / @UseInterceptors")
-          }
-          const key = `${route.method}|${route.path}`
-          if (!seen.has(key)) {
-            seen.add(key)
-            routes.push(route)
-          }
+  function getDecoratorsForAST(node: ts.Node): readonly ts.Decorator[] {
+    const decorators: ts.Decorator[] = []
+    for (const child of node.getChildren()) {
+      if (ts.isSyntaxList(child)) {
+        for (const inner of child.getChildren()) {
+          if (ts.isDecorator(inner)) decorators.push(inner)
         }
       }
     }
-    ts.forEachChild(node, visit)
+    return decorators
   }
 
-  visit(sourceFile)
-  return routes
-}
+  function detectNestJSAST(content: string): DetectedRoute[] {
+    const sourceFile = ts.createSourceFile("detect.ts", content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    const routes: DetectedRoute[] = []
+    const seen = new Set<string>()
+
+    function visit(node: ts.Node) {
+      if (ts.isClassDeclaration(node)) {
+        const classDecorators = getDecoratorsForAST(node)
+        const controllerPrefix = classDecorators.flatMap((decorator) => {
+          const expression = decorator.expression
+          const name = ts.isCallExpression(expression) ? getDecoratorName(expression.expression) : getDecoratorName(expression)
+          if (name !== "Controller") return []
+          const path = parseNestJSDecoratorPath(decorator)
+          return path === null ? [] : [path ?? ""]
+        })[0] ?? ""
+
+        const classAuth = hasNestJSAuthDecorator(classDecorators)
+
+        for (const member of node.members) {
+          const methodDecorators = getDecoratorsForAST(member)
+          if (!ts.isMethodDeclaration(member) || !methodDecorators.length) continue
+          for (const decorator of methodDecorators) {
+            const parsed = parseNestJSMethodDecorator(decorator)
+            if (!parsed) continue
+            const route = makeRoute(parsed.method as HttpMethod, normalizePath(`${controllerPrefix}/${parsed.path}`) || "/", "")
+
+            const hasBodyDecorator = /@Body\s*\(/.test(member.getText(sourceFile))
+            if (hasBodyDecorator) {
+              route.bodyType = "json"
+              const methodText = member.getText(sourceFile)
+              analyzeHandlerBody(methodText, route, content)
+            }
+            route.authRequired = classAuth || hasNestJSAuthDecorator(methodDecorators)
+            if (route.authRequired) {
+              route.authType = "middleware"
+              route.reasonings?.push("NestJS @UseGuards / @Roles / @UseInterceptors")
+            }
+            const key = `${route.method}|${route.path}`
+            if (!seen.has(key)) {
+              seen.add(key)
+              routes.push(route)
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+    return routes
+  }
 
 export function detectNestJS(content: string): DetectedRoute[] {
   const astRoutes = detectNestJSAST(content)
@@ -1207,7 +1275,7 @@ export function detectNestJS(content: string): DetectedRoute[] {
 
   const routes: DetectedRoute[] = []
   const seen = new Set<string>()
-  const CLASS_RE = /@Controller\s*\(\s*(?:['"`]([^'"`]*)['"`]|\{[^}]*path\s*:\s*['"`]([^'"`]*)['"`][^}]*\})?\s*\)\s*(?:export\s+)?class\s+[A-Za-z_]\w*\s*\{([\s\S]*?)(?=(?:^\s*@Controller|\Z))/gmi
+  const CLASS_RE = /@Controller\s*\(\s*(?:['"`]([^'"`]*)['"`]|\{[^}]*path\s*:\s*['"`]([^'"`]*)['"`][^}]*\})?\s*\)\s*(?:export\s+)?class\s+[A-Za-z_]\w*\s*\{([\s\S]*?)(?=\n\s*@Controller|$)/gi
   for (const m of content.matchAll(CLASS_RE)) {
     const classPrefix = m[1] || m[2] || ""
     const classBody = m[3]
@@ -1221,6 +1289,11 @@ export function detectNestJS(content: string): DetectedRoute[] {
       const preceding = classBody.slice(Math.max(0, idx - 300), idx)
       if (/@UseGuards\s*\(|@Roles\s*\(|@UseInterceptors\s*\(/.test(preceding)) {
         r.authRequired = true; r.authType = "middleware"; r.reasonings?.push("NestJS @UseGuards / @Roles / @UseInterceptors")
+      }
+      if (/@Body\s*\(/.test(preceding) || /@Body\s*\(/.test(classBody.slice(idx, idx + 200))) {
+        r.bodyType = "json"
+        const handlerText = classBody.slice(idx, idx + 500)
+        analyzeHandlerBody(handlerText, r, content)
       }
       const key = `${r.method}|${r.path}`
       if (!seen.has(key)) { seen.add(key); routes.push(r) }
@@ -1237,6 +1310,11 @@ export function detectNestJS(content: string): DetectedRoute[] {
       const preceding = content.slice(Math.max(0, idx - 300), idx)
       if (/@UseGuards\s*\(|@Roles\s*\(|@UseInterceptors\s*\(/.test(preceding)) {
         r.authRequired = true; r.authType = "middleware"; r.reasonings?.push("NestJS @UseGuards / @Roles / @UseInterceptors")
+      }
+      if (/@Body\s*\(/.test(preceding) || /@Body\s*\(/.test(content.slice(idx, idx + 200))) {
+        r.bodyType = "json"
+        const handlerText = content.slice(idx, idx + 500)
+        analyzeHandlerBody(handlerText, r, content)
       }
       const key = `${r.method}|${r.path}`
       if (!seen.has(key)) { seen.add(key); routes.push(r) }
@@ -1696,7 +1774,7 @@ export function detectNextjsAppRouter(f: { path: string; content: string }): Det
   const EXPORT_METHOD_RE = /export\s+(?:async\s+)?(?:function\s+|const\s+)(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b([\s\S]{0,2000}?)(?=\nexport|\nconst|\nfunction|$)/g
   for (const m of f.content.matchAll(EXPORT_METHOD_RE)) {
     const method = m[1]; const body = m[2] || ""; const r = makeRoute(method, urlPath, ""); r.sourceFile = f.path
-    analyzeHandlerBody(body, r); routes.push(r)
+    analyzeHandlerBody(body, r, f.content); routes.push(r)
   }
   return routes
 }
@@ -1718,7 +1796,7 @@ export function detectNextjsPagesRouter(f: { path: string; content: string }): D
   for (const m of content.matchAll(/case\s+['"](\w+)['"]\s*:/g)) { const verb = m[1].toUpperCase(); if (HTTP_METHODS_UPPER.has(verb)) methods.add(verb) }
   for (const m of content.matchAll(/req\.method\s*===?\s*['"]([^'"]+)['"]/g)) { methods.add(m[1].toUpperCase()) }
   if (methods.size === 0) methods.add("GET")
-  for (const method of methods) { const r = makeRoute(method, urlPath, ""); r.sourceFile = f.path; analyzeHandlerBody(content, r); routes.push(r) }
+  for (const method of methods) { const r = makeRoute(method, urlPath, ""); r.sourceFile = f.path; analyzeHandlerBody(content, r, content); routes.push(r) }
   return routes
 }
 
@@ -1753,7 +1831,263 @@ function extractBodyFields(body: string): string[] {
   return [...fields]
 }
 
-export function analyzeHandlerBody(body: string, r: DetectedRoute): void {
+/** Find matching closing bracket, handling nesting (no string-literal awareness). */
+function findMatchingClose(text: string, openIdx: number, openChar: string, closeChar: string): number {
+  let depth = 1
+  let i = openIdx + 1
+  while (i < text.length && depth > 0) {
+    if (text[i] === openChar) depth++
+    else if (text[i] === closeChar) depth--
+    i++
+  }
+  return depth === 0 ? i - 1 : -1
+}
+
+/** Split an object-literal body on top-level commas (not inside nested braces or parens). */
+function splitTopLevelCommas(content: string): string[] {
+  const parts: string[] = []
+  let depth = 0, parenDepth = 0, start = 0
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === "{" || content[i] === "[") depth++
+    else if (content[i] === "}" || content[i] === "]") depth--
+    else if (content[i] === "(") parenDepth++
+    else if (content[i] === ")") parenDepth--
+    else if (content[i] === "," && depth === 0 && parenDepth === 0) {
+      parts.push(content.slice(start, i))
+      start = i + 1
+    }
+  }
+  const last = content.slice(start).trim()
+  if (last) parts.push(last)
+  return parts
+}
+
+/** Parse Zod-syntax property lines: `key: z.type().modifier()` */
+function parseZodProperties(objContent: string): { fields: Record<string, string>; required: string[] } {
+  const fields: Record<string, string> = {}
+  const required: string[] = []
+  for (const prop of splitTopLevelCommas(objContent)) {
+    const pm = prop.match(/^\s*(\w+)\s*:\s*(z\.\S[\s\S]*?)(?:\/\/.*)?$/)
+    if (!pm) continue
+    const key = pm[1]
+    const value = pm[2].trim()
+
+    let type = "string"
+    if (/^z\.number\b/.test(value)) type = "number"
+    else if (/^z\.boolean\b/.test(value)) type = "boolean"
+    else if (/^z\.array\b/.test(value)) type = "array"
+    else if (/^z\.object\b/.test(value)) type = "object"
+    else if (/^z\.bigint\b/.test(value)) type = "number"
+    // else z.string(), z.literal(), z.date(), z.enum() — all string
+
+    const isOptional = /\.(?:optional|nullable|default)\s*\(/.test(value)
+    fields[key] = type
+    if (!isOptional) required.push(key)
+  }
+  return { fields, required }
+}
+
+/** Parse Joi-syntax property lines: `key: Joi.type().modifier()` */
+function parseJoiProperties(objContent: string): { fields: Record<string, string>; required: string[] } {
+  const fields: Record<string, string> = {}
+  const required: string[] = []
+  for (const prop of splitTopLevelCommas(objContent)) {
+    const pm = prop.match(/^\s*(\w+)\s*:\s*(Joi\.\S[\s\S]*?)(?:\/\/.*)?$/i)
+    if (!pm) continue
+    const key = pm[1]
+    const value = pm[2].trim()
+
+    let type = "string"
+    if (/Joi\.number\b/.test(value)) type = "number"
+    else if (/Joi\.boolean\b/.test(value)) type = "boolean"
+    else if (/Joi\.array\b/.test(value)) type = "array"
+    else if (/Joi\.object\b/.test(value)) type = "object"
+    else if (/Joi\.binary\b/.test(value)) type = "binary"
+    else if (/Joi\.date\b/.test(value)) type = "date"
+
+    // Joi: optional by default, required only if .required() is explicit
+    const isOptional = !/\brequired\s*\(/.test(value)
+    fields[key] = type
+    if (!isOptional) required.push(key)
+  }
+  return { fields, required }
+}
+
+/** Extract the body of the first `{…}` literal reachable from a given position. */
+function extractObjectBody(text: string, fromIdx: number): string | null {
+  const brace = text.indexOf("{", fromIdx)
+  if (brace === -1) return null
+  const close = findMatchingClose(text, brace, "{", "}")
+  if (close === -1) return null
+  return text.slice(brace + 1, close)
+}
+
+/**
+ * Try to detect a Zod schema (`z.object({…})`) in `searchSpace`,
+ * then check whether the handler body references the variable name.
+ */
+function tryDetectZod(searchSpace: string, handlerBody: string): { fields: Record<string, string>; required: string[] } | null {
+  const declRe = /(?:const|let|var)\s+(\w+)\s*=\s*z\.object\s*\(/g
+  const candidates: Array<{ name: string; fields: Record<string, string>; required: string[] }> = []
+  let m: RegExpExecArray | null
+  while ((m = declRe.exec(searchSpace)) !== null) {
+    const name = m[1]
+    const objBody = extractObjectBody(searchSpace, m.index + m[0].length)
+    if (!objBody) continue
+    const parsed = parseZodProperties(objBody)
+    if (Object.keys(parsed.fields).length > 0) candidates.push({ name, ...parsed })
+  }
+  for (const c of candidates) {
+    if (new RegExp(`\\b${c.name}\\b`).test(handlerBody)) return { fields: c.fields, required: c.required }
+  }
+  // Inline z.object({…}) inside handler body (no variable)
+  const inlineRe = /z\.object\s*\(/g
+  while ((m = inlineRe.exec(handlerBody)) !== null) {
+    const objBody = extractObjectBody(handlerBody, m.index + m[0].length)
+    if (!objBody) continue
+    const parsed = parseZodProperties(objBody)
+    if (Object.keys(parsed.fields).length > 0) return { fields: parsed.fields, required: parsed.required }
+  }
+  return null
+}
+
+/**
+ * Try to detect a Joi schema (`Joi.object({…})`) in `searchSpace`,
+ * then check whether the handler body references the variable name.
+ */
+function tryDetectJoi(searchSpace: string, handlerBody: string): { fields: Record<string, string>; required: string[] } | null {
+  const declRe = /(?:const|let|var)\s+(\w+)\s*=\s*Joi\.object\s*\(/gi
+  const candidates: Array<{ name: string; fields: Record<string, string>; required: string[] }> = []
+  let m: RegExpExecArray | null
+  while ((m = declRe.exec(searchSpace)) !== null) {
+    const name = m[1]
+    const objBody = extractObjectBody(searchSpace, m.index + m[0].length)
+    if (!objBody) continue
+    const parsed = parseJoiProperties(objBody)
+    if (Object.keys(parsed.fields).length > 0) candidates.push({ name, ...parsed })
+  }
+  for (const c of candidates) {
+    if (new RegExp(`\\b${c.name}\\b`).test(handlerBody)) return { fields: c.fields, required: c.required }
+  }
+  // Inline Joi.object({…}) inside handler body
+  const inlineRe = /Joi\.object\s*\(/gi
+  while ((m = inlineRe.exec(handlerBody)) !== null) {
+    const objBody = extractObjectBody(handlerBody, m.index + m[0].length)
+    if (!objBody) continue
+    const parsed = parseJoiProperties(objBody)
+    if (Object.keys(parsed.fields).length > 0) return { fields: parsed.fields, required: parsed.required }
+  }
+  return null
+}
+
+/**
+ * Try to detect express-validator chains (`body('field').isEmail()`).
+ * Looks in the full search space (covers middleware arrays before the handler).
+ */
+function tryDetectExpressValidator(searchSpace: string): { fields: Record<string, string>; required: string[] } | null {
+  const fields: Record<string, string> = {}
+  const required: string[] = []
+  const bodyRe = /body\s*\(\s*['"]([^'"]+)['"]\s*\)([^,;\]]+)/g
+  let m: RegExpExecArray | null
+  let found = false
+  while ((m = bodyRe.exec(searchSpace)) !== null) {
+    found = true
+    const key = m[1]
+    const chain = m[2]
+    let type = "string"
+    if (/\.(?:isInt|isFloat)\s*\(/.test(chain)) type = "number"
+    else if (/\.isBoolean\s*\(/.test(chain)) type = "boolean"
+    else if (/\.isArray\s*\(/.test(chain)) type = "array"
+    fields[key] = type
+    if (!/\.optional\s*\(/.test(chain)) required.push(key)
+  }
+  return found ? { fields, required } : null
+}
+
+/**
+ * Try to detect a class-validator DTO (NestJS pattern).
+ * Finds `@Body() param: DtoClass` in handler, then locates `class DtoClass {…}`
+ * in the full file content and parses its decorated properties.
+ */
+function tryDetectClassValidator(searchSpace: string, handlerBody: string): { fields: Record<string, string>; required: string[] } | null {
+  const bodyParamRe = /@Body\s*\([^)]*\)\s*\w+\s*:\s*(\w+)/g
+  let m: RegExpExecArray | null
+  let dtoClass: string | null = null
+  while ((m = bodyParamRe.exec(handlerBody)) !== null) { dtoClass = m[1]; break }
+  if (!dtoClass) return null
+
+  const classRe = new RegExp(`class\\s+${dtoClass}\\s*\\{([\\s\\S]*?)\\}`, "g")
+  const cm = classRe.exec(searchSpace)
+  if (!cm) return null
+
+  const classBody = cm[1]
+  const fields: Record<string, string> = {}
+  const required: string[] = []
+
+  // Match decorator groups + optional property declaration
+  const propRe = /((?:@\w+(?:\([^)]*\))?\s*\n?\s*)*)(\w+)\??\s*:\s*(\w+)/g
+  let pm: RegExpExecArray | null
+  while ((pm = propRe.exec(classBody)) !== null) {
+    const decorators = pm[1]
+    const propName = pm[2]
+    const tsType = pm[3]
+
+    let type = "string"
+    if (/@(?:IsNumber|IsInt|IsFloat)\b/.test(decorators)) type = "number"
+    else if (/@IsBoolean\b/.test(decorators)) type = "boolean"
+    else if (/@IsArray\b/.test(decorators)) type = "array"
+    else if (/@IsEmail\b/.test(decorators) || /@IsString\b/.test(decorators)) type = "string"
+    else if (tsType === "number" || tsType === "Number") type = "number"
+    else if (tsType === "boolean" || tsType === "Boolean") type = "boolean"
+    // else default to string for TS string, String, or unknown types
+
+    const isOptional = /@IsOptional\b/.test(decorators) || /\?\s*:/.test(pm[0])
+    fields[propName] = type
+    if (!isOptional) required.push(propName)
+  }
+
+  return Object.keys(fields).length > 0 ? { fields, required } : null
+}
+
+/**
+ * Detect body schema from validation libraries (Zod / Joi / express-validator / class-validator).
+ * Returns structured fields with type info and required-array.
+ * Returns `null` when no schema is found (caller falls back to extractBodyFields).
+ */
+/** Return a text window around handlerBody within fullFileContent (up to 2000 chars before). */
+function extractProximateScope(handlerBody: string, fullFileContent: string): string {
+  const idx = fullFileContent.indexOf(handlerBody)
+  if (idx === -1) return fullFileContent
+  const start = Math.max(0, idx - 2000)
+  return fullFileContent.slice(start, idx + handlerBody.length)
+}
+
+function detectValidationSchema(
+  handlerBody: string,
+  fullFileContent?: string,
+): { fields: Record<string, string>; required: string[] } | null {
+  const searchSpace = fullFileContent || handlerBody
+
+  const zod = tryDetectZod(searchSpace, handlerBody)
+  if (zod) return zod
+
+  const joi = tryDetectJoi(searchSpace, handlerBody)
+  if (joi) return joi
+
+  // Scope express-validator search to a window around the handler to avoid field leakage between routes
+  const evSearchSpace = fullFileContent
+    ? extractProximateScope(handlerBody, fullFileContent)
+    : handlerBody
+  const ev = tryDetectExpressValidator(evSearchSpace)
+  if (ev) return ev
+
+  const cv = tryDetectClassValidator(searchSpace, handlerBody)
+  if (cv) return cv
+
+  return null
+}
+
+export function analyzeHandlerBody(body: string, r: DetectedRoute, fullFileContent?: string): void {
   if (/cookies\(\)\.get\(\s*['"](?:token|auth|session|access_token|github_token)['"]\)|request\.cookies\.get\(\s*['"](?:token|auth|session)['"]\)/.test(body)) { r.authRequired = true; r.authType = r.authType || "cookie"; r.reasonings?.push("Auth token en cookie") }
   if (/[Aa]uthorization.*[Bb]earer|headers\[['"]authorization['"]\]|getAuthHeader|extractBearerToken/.test(body)) { r.authRequired = true; r.authType = r.authType || "jwt"; r.reasonings?.push("Bearer token") }
   if (/getServerSession|getSession\(authOptions\)|auth\(\)\s*\.\s*then|const\s+session\s*=\s*await\s+(?:getServerSession|auth)/.test(body)) { r.authRequired = true; r.authType = r.authType || "cookie"; r.reasonings?.push("NextAuth getServerSession") }
@@ -1762,15 +2096,29 @@ export function analyzeHandlerBody(body: string, r: DetectedRoute): void {
   if (/(?:status|statusCode)\s*[:=]\s*(?:401|403)|new\s+Response\([^)]*401|NextResponse\.json\([^)]*401|res\.status\(401\)|res\.status\(403\)/.test(body)) { if (!r.authRequired) { r.authRequired = true; r.authType = r.authType || "middleware"; r.reasonings?.push("401/403 response") } }
   if (/await\s+req(?:uest)?\.json\(\)|body\s*=\s*await/.test(body)) { r.bodyType = "json"; r.reasonings?.push("JSON body") }
   if (/await\s+req(?:uest)?\.formData\(\)/.test(body)) { r.bodyType = "form"; r.reasonings?.push("FormData body") }
+  if (/req(?:uest)?\.body\b/.test(body) && r.bodyType === "none") { r.bodyType = "json"; r.reasonings?.push("Express body access") }
 
-  // Detect body fields from destructuring/access patterns and generate example body
+  // Detect body fields — try validation schema first, then fall back to destructuring heuristics
   if (r.bodyType === "json" && !r.body) {
-    const fields = extractBodyFields(body)
-    if (fields.length > 0) {
-      const example: Record<string, string> = {}
-      for (const f of fields) example[f] = "string"
-      r.body = JSON.stringify(example, null, 2)
-      r.reasonings?.push(`Champs body détectés: ${fields.join(", ")}`)
+    const schema = detectValidationSchema(body, fullFileContent)
+    if (schema) {
+      r.bodyFieldTypes = schema.fields
+      r.requiredBodyFields = schema.required
+      r.body = JSON.stringify(schema.fields, null, 2)
+      r.reasonings?.push(`Schéma de validation détecté (${schema.required.length} champ(s) requis)`)
+    } else {
+      const fields = extractBodyFields(body)
+      if (fields.length > 0) {
+        const example: Record<string, string> = {}
+        for (const f of fields) example[f] = "string"
+        r.body = JSON.stringify(example, null, 2)
+        r.reasonings?.push(`Champs body détectés: ${fields.join(", ")}`)
+      } else if (/\b(req(?:uest)?)\.body\b/.test(body)) {
+        // req.body used but no extractable fields (e.g. Object.assign(target, req.body))
+        r.body = "{}"
+        if (!r.reasonings) r.reasonings = []
+        r.reasonings.push("Body accepté mais champs non déterminés (pass-through)")
+      }
     }
   }
 }

@@ -2,6 +2,7 @@ import type { HttpMethod, RequestTestAssertion, TestResult } from "@/lib/types"
 export type { HttpMethod, RequestTestAssertion, TestResult } from "@/lib/types"
 import type { Assertion } from "@/lib/test-runner/types"
 import { interpolate, replaceLocalhostPort, parseJsonSafe } from "@/lib/utils"
+import { proxyAuthHeaders } from "@/lib/proxy-auth"
 import { invokeTauriFetch } from "@/lib/tauri"
 export type BodyType = "json" | "form-data" | "x-www-form" | "raw" | "binary"
 export type AuthType = "none" | "bearer" | "basic" | "api-key" | "oauth2"
@@ -148,6 +149,18 @@ export interface ExecuteRequestContext {
   activeWorkspaceId: string | null
 }
 
+function buildFormDataBody(body: string): { body: string; boundary: string } {
+  const boundary = `----ReqlyFormBoundary${Math.random().toString(36).slice(2, 16)}`
+  const parts = body.split("&").filter(Boolean).map((pair) => {
+    const eq = pair.indexOf("=")
+    const key = decodeURIComponent(eq === -1 ? pair : pair.slice(0, eq))
+    const value = decodeURIComponent(eq === -1 ? "" : pair.slice(eq + 1))
+    return `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}`
+  })
+  parts.push(`--${boundary}--`)
+  return { body: parts.join("\r\n"), boundary }
+}
+
 export const buildRequestPayload = (context: ExecuteRequestContext) => {
   const { tab, allVars, activeProjectPort, activeProject } = context
   const resolvedUrl = activeProject ? replaceLocalhostPort(tab.url, activeProjectPort) : tab.url
@@ -156,10 +169,28 @@ export const buildRequestPayload = (context: ExecuteRequestContext) => {
   const rawBody = tab.body || ""
 
   const finalUrl = interpolate(rawUrl, allVars)
-  const finalBody = interpolate(rawBody, allVars)
+  let finalBody = interpolate(rawBody, allVars)
   const headers = Object.fromEntries(
     Object.entries(rawHeaders).map(([key, value]) => [interpolate(key, allVars), interpolate(value, allVars)])
   )
+
+  const hasContentType = Object.keys(headers).some(
+    (k) => k.toLowerCase() === "content-type"
+  )
+
+  if (!hasContentType && tab.body && tab.bodyType) {
+    if (tab.bodyType === "json") {
+      headers["Content-Type"] = "application/json"
+    } else if (tab.bodyType === "x-www-form") {
+      headers["Content-Type"] = "application/x-www-form-urlencoded"
+    } else if (tab.bodyType === "form-data") {
+      const mp = buildFormDataBody(finalBody)
+      finalBody = mp.body
+      headers["Content-Type"] = `multipart/form-data; boundary=${mp.boundary}`
+    } else if (tab.bodyType === "raw") {
+      headers["Content-Type"] = "text/plain"
+    }
+  }
 
   return { finalUrl, finalBody, headers }
 }
@@ -209,6 +240,7 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
         headers: ({
           "Content-Type": "application/json",
           ...debugHeaders,
+          ...proxyAuthHeaders(),
           ...(activeWorkspaceId ? { "x-workspace-id": activeWorkspaceId } : {}),
         } as unknown) as Record<string, string>,
         body: JSON.stringify({

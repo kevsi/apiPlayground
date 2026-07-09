@@ -41,7 +41,9 @@ export function RoutePanel({ project, onClose }: RoutePanelProps) {
               <p className="text-sm text-muted-foreground">{route.path}</p>
               <p className="mt-2 text-sm">{route.description || 'Pas de description fournie.'}</p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full bg-muted px-2 py-1">Body: {route.bodyType}</span>
+                {route.bodyType !== "none" && (
+                  <span className="rounded-full bg-muted px-2 py-1">Body: {route.bodyType}</span>
+                )}
                 <span className={cn(
                   "rounded-full px-2 py-1 text-xs font-semibold",
                   route.authRequired ? "bg-emerald-100 text-emerald-700" : "bg-muted"

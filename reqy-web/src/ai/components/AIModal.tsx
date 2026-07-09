@@ -8,7 +8,7 @@
  *
  * Replaces the previous multi-tab AI layout (Chat + ReqlyAI).
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   Bot,
   Loader2,
@@ -17,12 +17,12 @@ import {
   FileText,
   FlaskConical,
   Lightbulb,
-  Wrench,
-  BookOpen,
-  Bug,
   CheckCircle2,
+  Settings,
+  Key,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -32,6 +32,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { analyze } from "@/src/ai/local-engine/analyzer";
 import { buildRequestContext } from "@/src/ai/local-engine/context";
 import { buildTestSuggestionsPrompt, isValidSuggestion } from "@/src/ai/cloud-engine/test-suggestions";
@@ -46,9 +53,19 @@ import { streamLLM, type StreamLLMOptions } from "@/src/ai/cloud-engine/llm";
 import { extractCitations } from "@/src/ai/cloud-engine/citations";
 import { detectLanguage } from "@/src/ai/cloud-engine/language";
 import { cn } from "@/lib/utils";
-import { loadAIProvider, loadApiKey, loadAiModel, loadAiBaseUrl, loadOllamaConfig } from "@/lib/projects-store";
+import { toast } from "sonner";
+import { isAiConfigured } from "@/lib/ai-config";
+import {
+  loadAIProvider,
+  loadApiKey,
+  loadAiModel,
+  loadAiBaseUrl,
+  loadOllamaConfig,
+  saveAIProvider,
+  saveApiKey,
+} from "@/lib/projects-store";
 
-type AiTab = "analyse" | "debug" | "tests" | "explain" | "generate" | "optimize";
+type AiTab = "analyse" | "assistant" | "explain";
 
 export interface AIModalContext {
   method: string;
@@ -66,13 +83,10 @@ interface AIModalProps extends AIModalContext {
   onOpenChange: (open: boolean) => void;
 }
 
-const TABS: Array<{ id: AiTab; label: string; icon: typeof Sparkles }> = [
-  { id: "analyse", label: "Analyse", icon: Sparkles },
-  { id: "debug", label: "Debug", icon: Bug },
-  { id: "tests", label: "Tests", icon: FlaskConical },
-  { id: "explain", label: "Explain", icon: FileText },
-  { id: "generate", label: "Generate", icon: BookOpen },
-  { id: "optimize", label: "Optimize", icon: Wrench },
+const TABS: Array<{ id: AiTab; label: string; icon: typeof Sparkles; desc: string }> = [
+  { id: "analyse", label: "Analyse", icon: Sparkles, desc: "Diagnostic local instantané — repère les problèmes courants (auth manquante, CORS, etc.)" },
+  { id: "assistant", label: "Assistant", icon: Bot, desc: "Génère des tests, débugge les erreurs, optimise les appels, ou répond à tes questions" },
+  { id: "explain", label: "Explain", icon: FileText, desc: "Décode les headers JWT, explique la structure JSON et les en-têtes de réponse" },
 ];
 
 export function AIModal(props: AIModalProps) {
@@ -82,6 +96,11 @@ export function AIModal(props: AIModalProps) {
   const [llmLoading, setLlmLoading] = useState(false);
   const [llmError, setLlmError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Inline AI config state (shown when no API key is set)
+  const [showConfig, setShowConfig] = useState(false);
+  const [configProvider, setConfigProvider] = useState<string>("openai");
+  const [configApiKey, setConfigApiKey] = useState("");
 
   // Build the RequestContext once per modal render
   const ctx = useMemo(() => {
@@ -124,25 +143,20 @@ export function AIModal(props: AIModalProps) {
     switch (activeTab) {
       case "analyse":
         return `Analyse cette requête/réponse HTTP et liste les problèmes potentiels.\n\nMéthode: ${props.method}\nURL: ${props.url}\nStatus: ${props.responseStatus ?? "inconnu"}\n\nRéponse (extrait):\n${(props.responseBody ?? "").slice(0, 1000)}`;
-      case "debug":
-        return `Debug cette réponse HTTP. Si le status indique une erreur (4xx/5xx), explique la cause probable et propose un fix concret.\n\n${props.method} ${props.url}\nStatus: ${props.responseStatus}\n\nBody:\n${(props.responseBody ?? "").slice(0, 2000)}`;
-      case "tests":
-        return buildTestSuggestionsPrompt({
-          method: props.method,
-          url: props.url,
-          headers: props.responseHeaders,
-          body: props.requestBody,
-          lastStatus: props.responseStatus,
-        });
+      case "assistant": {
+        const hasError = props.responseStatus != null && props.responseStatus >= 400;
+        return hasError
+          ? `Debug cette réponse HTTP. Si le status indique une erreur (4xx/5xx), explique la cause probable et propose un fix concret.\n\n${props.method} ${props.url}\nStatus: ${props.responseStatus}\n\nBody:\n${(props.responseBody ?? "").slice(0, 2000)}`
+          : buildTestSuggestionsPrompt({
+              method: props.method,
+              url: props.url,
+              headers: props.responseHeaders,
+              body: props.requestBody,
+              lastStatus: props.responseStatus,
+            });
+      }
       case "explain":
         return `Explique les headers et le body de cette réponse de manière pédagogique. Si le body contient du JSON, annote la structure. Si un header Authorization est présent, décode le JWT.\n\n${props.method} ${props.url}\nStatus: ${props.responseStatus}\n\nHeaders: ${JSON.stringify(props.responseHeaders ?? {}, null, 2)}\n\nBody (extrait):\n${(props.responseBody ?? "").slice(0, 2000)}`;
-      case "generate":
-        return buildNaturalLanguagePrompt(
-          userPrompt || "Décris la requête ci-dessus et propose des tests additionnels",
-          {}
-        );
-      case "optimize":
-        return `Analyse cette requête/réponse et propose des optimisations concrètes : cache, pagination, compression, retry logic, etc.\n\n${props.method} ${props.url}\nStatus: ${props.responseStatus} (${ctx.response?.duration ?? 0}ms)\n\nHeaders de réponse: ${JSON.stringify(props.responseHeaders ?? {}, null, 2).slice(0, 800)}`;
       default:
         return "";
     }
@@ -163,24 +177,37 @@ export function AIModal(props: AIModalProps) {
   const lang = useMemo(() => detectLanguage(prompt), [prompt]);
   const langDirective = lang === "en" ? "\n\nRespond in English." : "";
 
+  const handleSaveConfig = useCallback(() => {
+    if (!configApiKey.trim()) {
+      toast.error("Veuillez entrer une clé API");
+      return;
+    }
+    saveAIProvider(configProvider as any);
+    saveApiKey(configProvider as any, configApiKey.trim());
+    toast.success("Clé API enregistrée");
+    setShowConfig(false);
+  }, [configProvider, configApiKey]);
+
   async function handleRunLLM() {
     if (!prompt) return;
+
+    // Check AI config — if missing, show config form instead
+    const provider = loadAIProvider();
+    const apiKey = loadApiKey(provider);
+    if (!isAiConfigured()) {
+      setConfigProvider(provider);
+      setConfigApiKey("");
+      setShowConfig(true);
+      return;
+    }
+
     setLlmLoading(true);
     setLlmError(null);
     setLlmOutput("");
     try {
-      // Provider config from persistence store
-      const provider = loadAIProvider();
-      const apiKey = loadApiKey(provider);
       const model = loadAiModel(provider);
       const openaiUrl = loadAiBaseUrl(provider);
       const ollamaConfig = loadOllamaConfig();
-
-      if (provider !== "ollama" && !apiKey) {
-        setLlmError("Aucune clé API configurée. Va dans Settings → AI pour ajouter ta clé.");
-        setLlmLoading(false);
-        return;
-      }
 
       const streamOpts: StreamLLMOptions = {
         provider: provider as any,
@@ -215,8 +242,7 @@ export function AIModal(props: AIModalProps) {
     setTimeout(() => setCopied(false), 1500);
   }
 
-  // Local-only tabs (no LLM needed)
-  const localOnly = activeTab === "analyse" || activeTab === "explain";
+  const isLocalTab = activeTab === "analyse" || activeTab === "explain";
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -240,10 +266,12 @@ export function AIModal(props: AIModalProps) {
               <button
                 key={t.id}
                 type="button"
+                title={t.desc}
                 onClick={() => {
                   setActiveTab(t.id);
                   setLlmOutput("");
                   setLlmError(null);
+                  setShowConfig(false);
                 }}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
@@ -260,13 +288,15 @@ export function AIModal(props: AIModalProps) {
           })}
         </div>
 
+        {/* Description sous la tab bar */}
+        <p className="text-xs text-muted-foreground px-1 -mt-2">
+          {TABS.find((t) => t.id === activeTab)?.desc}
+        </p>
+
         {/* Content */}
         <div className="min-h-[260px] max-h-[420px] overflow-y-auto p-1">
           {activeTab === "analyse" && (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Diagnostic local déterministe (P95 &lt; 50ms, zéro réseau).
-              </p>
               {diagnostics.length === 0 ? (
                 <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-700">
                   <CheckCircle2 className="size-4" />
@@ -318,36 +348,58 @@ export function AIModal(props: AIModalProps) {
             />
           )}
 
-          {activeTab === "generate" && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Décris la requête à générer — l'IA crée un prompt optimisé (tu peux le copier vers ChatGPT, Claude, etc.).
-              </p>
+          {activeTab === "assistant" && !isLocalTab && (
+            <div className="space-y-3">
+              {/* Inline config when no API key */}
+              {showConfig && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
+                    <Key className="size-3.5" />
+                    Configure ta clé API pour utiliser l'assistant
+                  </div>
+                  <div className="flex gap-2">
+                    <Select value={configProvider} onValueChange={setConfigProvider}>
+                      <SelectTrigger className="w-[160px] h-9 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="openai">OpenAI</SelectItem>
+                        <SelectItem value="anthropic">Anthropic</SelectItem>
+                        <SelectItem value="openrouter">OpenRouter</SelectItem>
+                        <SelectItem value="gemini">Gemini</SelectItem>
+                        <SelectItem value="deepseek">DeepSeek</SelectItem>
+                        <SelectItem value="grok">Grok</SelectItem>
+                        <SelectItem value="ollama">Ollama (local)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="password"
+                      placeholder="sk-..."
+                      value={configApiKey}
+                      onChange={(e) => setConfigApiKey(e.target.value)}
+                      className="flex-1 h-9 text-xs"
+                    />
+                    <Button size="sm" variant="default" onClick={handleSaveConfig}
+                      className="h-9 shrink-0">
+                      <Key className="size-3 mr-1" />
+                      OK
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Prompt + user input */}
               <Textarea
                 value={userPrompt}
                 onChange={(e) => setUserPrompt(e.target.value)}
-                placeholder="Ex : crée un endpoint POST pour ajouter un utilisateur avec email et nom"
-                rows={4}
+                placeholder={props.responseStatus != null && props.responseStatus >= 400
+                  ? "Explique l'erreur et propose un correctif..."
+                  : "Génère des assertions de test, optimise la requête, ou pose une question..."
+                }
+                rows={3}
                 className="resize-none text-sm"
-                data-testid="ai-generate-input"
+                data-testid="ai-assistant-input"
               />
-            </div>
-          )}
-
-          {(activeTab === "debug" ||
-            activeTab === "tests" ||
-            activeTab === "optimize" ||
-            (activeTab === "generate" && userPrompt)) && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                {activeTab === "tests"
-                  ? "Prompt pour générer des assertions de test (nominal / erreur / edge cases)."
-                  : activeTab === "debug"
-                    ? "Prompt pour débugger la réponse (causes probables + fix concret)."
-                    : activeTab === "optimize"
-                      ? "Prompt pour optimiser (cache, retry, compression, pagination)."
-                      : "Prompt pour générer une requête depuis ta description."}
-              </p>
 
               <Button
                 type="button"
@@ -365,7 +417,7 @@ export function AIModal(props: AIModalProps) {
                 ) : (
                   <>
                     <Sparkles className="size-3 mr-1" />
-                    Lancer le LLM
+                    {showConfig ? "Configurer d'abord" : "Lancer l'assistant"}
                   </>
                 )}
               </Button>
@@ -405,17 +457,19 @@ export function AIModal(props: AIModalProps) {
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            disabled={!prompt}
-            data-testid="ai-copy-prompt"
-          >
-            <Clipboard className="size-3.5 mr-1" />
-            {copied ? "Copié !" : "Copier le prompt"}
-          </Button>
+          {!isLocalTab && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              disabled={!prompt}
+              data-testid="ai-copy-prompt"
+            >
+              <Clipboard className="size-3.5 mr-1" />
+              {copied ? "Copié !" : "Copier le prompt"}
+            </Button>
+          )}
           <div className="flex-1" />
           <Button
             type="button"

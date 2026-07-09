@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { loadApiKey, saveApiKey, loadAIProvider, loadOllamaConfig, type AIProvider } from "@/lib/projects-store"
+import { isAiConfigured } from "@/lib/ai-config"
 import { useAIEngine } from "@/hooks/use-ai-engine"
 import { toast } from "@/hooks/use-toast"
 import { fireSystemNotification, pushInAppNotification } from "@/lib/system-notifications"
@@ -60,7 +61,7 @@ export default function AiInsightsPage() {
   const [apiKey, setApiKey] = useState(() => loadApiKey(loadAIProvider()))
   const aiEngine = useAIEngine()
   
-  const isProviderConfigured = provider === "ollama" || (loadAIProvider() === provider && apiKey.trim().length > 0)
+  const isProviderConfigured = isAiConfigured()
   
   const [query, setQuery] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])

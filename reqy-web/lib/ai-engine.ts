@@ -22,11 +22,15 @@ export type CurrentRequest = {
   params: KeyValue;
   body?: unknown;
   auth?: unknown;
+  aiAssertions?: TestAssertion[];
+  documentation?: string;
 };
 
 // Re-exported from types.ts for convenience
 import type { AIProvider as AIProviderType } from "@/lib/types"
 export type AIProvider = AIProviderType;
+import { DEFAULT_MODELS } from "@/lib/ai-config"
+import { proxyAuthHeaders } from "@/lib/proxy-auth"
 
 export type LastResponse = {
   status: number;
@@ -262,12 +266,41 @@ function isValidAIResponse(value: unknown): value is AIResponse {
 
 const FETCH_TIMEOUT = 30000;
 
+/**
+ * Extracts a user-friendly error message from a failed /api/proxy-* response.
+ * Distinguishes middleware auth failures (PROXY_AUTH_REQUIRED) from upstream
+ * AI provider errors so the user sees actionable messages.
+ */
+function extractProxyError(res: Response, bodyText: string, provider: string): string {
+  let data: { error?: string; code?: string } = {}
+  try { data = JSON.parse(bodyText) } catch { /* ignore parse errors */ }
+
+  if (data.code === "PROXY_AUTH_REQUIRED") {
+    return `Authentification du proxy refusée. Vérifie que PROXY_SERVICE_TOKEN et NEXT_PUBLIC_PROXY_SERVICE_TOKEN sont identiques dans .env.local`
+  }
+
+  if (data.error) {
+    return `${provider}: ${data.error}`
+  }
+
+  return `${provider}: Erreur HTTP ${res.status}${bodyText ? ` — ${bodyText.slice(0, 200)}` : ""}`
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number }): Promise<Response> {
   const timeout = options.timeout ?? FETCH_TIMEOUT;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
+
+  const headers: Record<string, string> = {}
+  if (typeof options.headers === "object" && !Array.isArray(options.headers)) {
+    Object.assign(headers, options.headers as Record<string, string>)
+  }
+  if (url.startsWith("/api/proxy")) {
+    Object.assign(headers, proxyAuthHeaders())
+  }
+
   try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
+    const res = await fetch(url, { ...options, headers, signal: controller.signal });
     return res;
   } finally {
     clearTimeout(id);
@@ -389,21 +422,7 @@ export async function callAI(
   }
 ): Promise<AIResponse> {
   const provider = config.provider;
-  const model = config.model
-    ? config.model
-    : provider === "anthropic"
-    ? "claude-sonnet-4-20250514"
-    : provider === "openai"
-    ? "gpt-4o"
-    : provider === "deepseek"
-    ? "deepseek-chat"
-    : provider === "opencode-zen"
-    ? "gpt-5"
-    : provider === "custom"
-    ? "gpt-4o-mini"
-    : provider === "grok"
-    ? "grok-2"
-    : "llama3";
+  const model = config.model || DEFAULT_MODELS[provider] || "gpt-4o-mini";
 
   const system = SYSTEM_PROMPT;
 
@@ -426,7 +445,7 @@ export async function callAI(
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`${provider} proxy error ${res.status}: ${text}`);
+        throw new Error(extractProxyError(res, text, provider));
       }
 
       const data = await res.json();
@@ -450,7 +469,7 @@ export async function callAI(
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`${provider} proxy error ${res.status}: ${text}`);
+        throw new Error(extractProxyError(res, text, provider));
       }
 
       const data = await res.json();
@@ -474,7 +493,7 @@ export async function callAI(
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`${provider} proxy error ${res.status}: ${text}`);
+        throw new Error(extractProxyError(res, text, provider));
       }
 
       const data = await res.json();
@@ -529,21 +548,7 @@ export async function callAIText(
   }
 ): Promise<string> {
   const provider = config.provider;
-  const model = config.model
-    ? config.model
-    : provider === "anthropic"
-    ? "claude-sonnet-4-20250514"
-    : provider === "openai"
-    ? "gpt-4o"
-    : provider === "deepseek"
-    ? "deepseek-chat"
-    : provider === "opencode-zen"
-    ? "gpt-5"
-    : provider === "custom"
-    ? "gpt-4o-mini"
-    : provider === "grok"
-    ? "grok-2"
-    : "llama3";
+  const model = config.model || DEFAULT_MODELS[provider] || "gpt-4o-mini";
 
   const system = config.system ?? SYSTEM_PROMPT;
 
@@ -565,7 +570,7 @@ export async function callAIText(
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`${provider} proxy error ${res.status}: ${text}`);
+      throw new Error(extractProxyError(res, text, provider));
     }
 
     const data = await res.json();
@@ -588,7 +593,7 @@ export async function callAIText(
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`${provider} proxy error ${res.status}: ${text}`);
+      throw new Error(extractProxyError(res, text, provider));
     }
 
     const data = await res.json();

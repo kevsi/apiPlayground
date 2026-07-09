@@ -358,8 +358,11 @@ export function useRequestTabExecution(state: RequestTabsState) {
 
         const resolvedUrl = interpolate(tabToSend.url, allVars)
         const resolvedBody = interpolate(tabToSend.body || "", allVars)
+        const resolvedToken = interpolate(tabToSend.authToken, allVars)
         const unresolved =
-          hasUnresolvedPlaceholders(resolvedUrl) || hasUnresolvedPlaceholders(resolvedBody)
+          hasUnresolvedPlaceholders(resolvedUrl) ||
+          hasUnresolvedPlaceholders(resolvedBody) ||
+          hasUnresolvedPlaceholders(resolvedToken)
 
         if (unresolved) {
           notifyUnresolvedVariables()

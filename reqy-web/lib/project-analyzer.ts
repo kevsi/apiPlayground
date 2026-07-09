@@ -3,6 +3,7 @@
 import path from "path"
 import type { AIProvider, SavedProject, AnalysisMode } from "@/lib/types"
 import { loadOllamaConfig } from "@/lib/config"
+import { proxyAuthHeaders } from "@/lib/proxy-auth"
 import { readDir, readTextFile } from "@tauri-apps/plugin-fs"
 import {
   type DetectedRoute,
@@ -613,7 +614,10 @@ async function queryAI(provider: AIProvider, apiKey: string | undefined, message
   const ollamaConfig = provider === "ollama" ? loadOllamaConfig() : null
   const response = await fetch("/api/proxy-ai", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...proxyAuthHeaders(),
+    },
     body: JSON.stringify({
       provider,
       apiKey,

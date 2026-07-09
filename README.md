@@ -6,7 +6,7 @@ API testing platform. Web UI, desktop app, CLI runner, MCP server, optional work
 
 ```
 reqy-web/       Next.js 16 web app (React 19, TypeScript 5.7)
-reqy-cli/       Headless collection runner (commander)
+recli/          API testing CLI — assertions, scripts, GraphQL, snapshots, parallel
 reqy-mcp/       MCP server — exposes collections to AI agents
 sync-server/    Hono + better-sqlite3 workspace sync backend
 src-tauri/      Rust desktop shell wrapping reqy-web
@@ -39,7 +39,10 @@ AUTH_SIGNING_SECRET=$(openssl rand -hex 32) pnpm --dir sync-server dev
 | `pnpm --dir reqy-web test:e2e` | Playwright E2E |
 | `pnpm --dir reqy-web lint` | ESLint |
 | `pnpm --dir sync-server build` | Compile sync-server (Node.js) |
-| `pnpm --dir reqy-cli build` | Compile CLI |
+
+| `pnpm --dir recli build` | Compile recli |
+| `pnpm --dir recli test` | Run recli tests (Vitest) |
+| `pnpm recli:dev` | Dev mode recli (auto-rebuild) |
 | `pnpm tauri:dev` | Run desktop app (dev) |
 | `pnpm tauri:build` | Build desktop app |
 
@@ -71,7 +74,6 @@ reqy-web/
   tests/e2e/            Playwright specs
 src-tauri/              Rust + WebView
 sync-server/src/        Hono routes (workspaces, memberships, sync)
-reqy-cli/src/           CLI runner (commander-based)
 reqy-mcp/src/           MCP server (stdio transport)
 ```
 
@@ -82,3 +84,8 @@ limiter, streaming proxy response, lazy tree-sitter, postman module merged,
 sync-server Hono migration. Auth gate is disabled (Supabase non-functional);
 the HMAC session parser is preserved in `reqy-web/lib/session.ts` for
 future re-enablement.
+
+### recli (new)
+
+`recli/` is a standalone API testing CLI with 9 commands, 103 tests, and zero
+HTTP dependencies. See [`recli/README.md`](./recli/README.md) for full docs.
