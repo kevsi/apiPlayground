@@ -4,7 +4,6 @@
   "description": "enables the default permissions",
   "windows": ["main"],
   "permissions": [
-    "core:default",
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:allow-read-text-file",
@@ -13,7 +12,7 @@
     "fs:allow-exists",
     {
       "identifier": "fs:scope",
-      "allow": ["$APPDATA/Reqly/**"]
+      "allow": ["$APPDATA/Reqly/**", "$APPDATA/com.reqly.app/**"]
     },
     "deep-link:default",
     "notification:default",
