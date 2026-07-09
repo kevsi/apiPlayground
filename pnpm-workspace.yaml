@@ -2,6 +2,7 @@ packages:
   - 'reqy-web'
   - 'reqy-mcp'
   - 'recli'
+  - 'packages/*'
 allowBuilds:
   esbuild: false
   sharp: true
