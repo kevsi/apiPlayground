@@ -31,13 +31,13 @@ AUTH_SIGNING_SECRET=$(openssl rand -hex 32) pnpm --dir sync-server dev
 
 ## Build & test
 
-| Command | Purpose |
-|---|---|
-| `pnpm --dir reqy-web dev` | Dev server (Turbopack) |
-| `pnpm --dir reqy-web build` | Production build |
-| `pnpm --dir reqy-web test` | Vitest unit tests |
-| `pnpm --dir reqy-web test:e2e` | Playwright E2E |
-| `pnpm --dir reqy-web lint` | ESLint |
+| Command                        | Purpose                       |
+| ------------------------------ | ----------------------------- |
+| `pnpm --dir reqy-web dev`      | Dev server (Turbopack)        |
+| `pnpm --dir reqy-web build`    | Production build              |
+| `pnpm --dir reqy-web test`     | Vitest unit tests             |
+| `pnpm --dir reqy-web test:e2e` | Playwright E2E                |
+| `pnpm --dir reqy-web lint`     | ESLint                        |
 | `pnpm --dir sync-server build` | Compile sync-server (Node.js) |
 
 | `pnpm --dir recli build` | Compile recli |
@@ -52,16 +52,34 @@ Copy `.env.example` to `reqy-web/.env.local`. All variables are optional
 except those you actually need (auth is currently disabled — see
 `reqy-web/middleware.ts`).
 
-| Variable | Required when | Purpose |
-|---|---|---|
-| `AUTH_SIGNING_SECRET` | Future auth re-enable | HMAC session cookie secret |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase OAuth | OAuth provider (currently unused) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase server-side calls | (currently unused) |
-| `GITHUB_OAUTH_CLIENT_ID` / `_SECRET` | GitHub OAuth flow | Repo import |
-| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth | (configured, not wired) |
-| `NEXT_PUBLIC_SYNC_URL` | Sync server usage | URL of sync-server |
-| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Distributed rate limit | Falls back to in-memory if unset |
-| `ALLOW_LOCAL_HOSTS` | Local dev against private APIs | Allows 127.0.0.1 / 10.* / etc. |
+| Variable                             | Required when                  | Purpose                           |
+| ------------------------------------ | ------------------------------ | --------------------------------- |
+| `AUTH_SIGNING_SECRET`                | Future auth re-enable          | HMAC session cookie secret        |
+| `NEXT_PUBLIC_SUPABASE_URL`           | Supabase OAuth                 | OAuth provider (currently unused) |
+| `SUPABASE_SERVICE_ROLE_KEY`          | Supabase server-side calls     | (currently unused)                |
+| `GITHUB_OAUTH_CLIENT_ID` / `_SECRET` | GitHub OAuth flow              | Repo import                       |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth                   | (configured, not wired)           |
+| `NEXT_PUBLIC_SYNC_URL`               | Sync server usage              | URL of sync-server                |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN`  | Distributed rate limit         | Falls back to in-memory if unset  |
+| `ALLOW_LOCAL_HOSTS`                  | Local dev against private APIs | Allows 127.0.0.1 / 10.* / etc.    |
+
+## Security
+
+Secrets are managed via `.env.local` (gitignored). Never commit real values.
+
+If a secret leaks, consider it compromised and rotate it immediately in the provider
+dashboard, then update `reqy-web/.env.local`.
+
+| Secret                                                    | Where to rotate                              |
+| --------------------------------------------------------- | -------------------------------------------- |
+| `GITHUB_OAUTH_CLIENT_SECRET`                              | GitHub > Developer settings > OAuth Apps     |
+| `GOOGLE_OAUTH_CLIENT_SECRET`                              | Google Cloud > APIs & Services > Credentials |
+| `AUTH_SIGNING_SECRET`                                     | Generate with `openssl rand -hex 32`         |
+| `JINA_API_KEY`                                            | https://jina.ai/dashboard                    |
+| `PROXY_SERVICE_TOKEN` / `NEXT_PUBLIC_PROXY_SERVICE_TOKEN` | Generate with `openssl rand -hex 32`         |
+| `UPSTASH_REDIS_REST_TOKEN`                                | Upstash dashboard                            |
+
+A CI check should scan `*.env*` for high-entropy values before any commit.
 
 ## Layout
 
