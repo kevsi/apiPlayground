@@ -1,63 +1,122 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
-import { useWebSocket } from "@/hooks/use-websocket"
-import { useWsStore } from "@/hooks/use-websocket-store"
-import { ConnectionBar } from "./ConnectionBar"
-import { WsHeadersPanel } from "./WsHeadersPanel"
-import { MessageLog } from "./MessageLog"
-import { MessageComposer } from "./MessageComposer"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { AlertCircle, RefreshCw } from "lucide-react"
+import { useState, useCallback, useEffect } from "react";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useWsStore } from "@/hooks/use-websocket-store";
+import { buildAuthHeaders, applyAuthToUrl } from "@/lib/ws-auth";
+import { ConnectionBar } from "./ConnectionBar";
+import { WsHeadersPanel } from "./WsHeadersPanel";
+import { WsAuthPanel } from "./WsAuthPanel";
+import { MessageLog } from "./MessageLog";
+import { MessageComposer } from "./MessageComposer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import type { WsAuthConfig } from "@/types/websocket";
+
+const DEFAULT_AUTH: WsAuthConfig = { type: "none", token: "", queryName: "token" };
+const STORAGE_KEY = "reqy:websocket-config";
+
+interface SavedWsConfig {
+  url: string;
+  headers: Record<string, string>;
+  auth: WsAuthConfig;
+}
+
+function loadSavedConfig(): Partial<SavedWsConfig> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Partial<SavedWsConfig>;
+  } catch {
+    return {};
+  }
+}
+
+function saveConfig(url: string, headers: Record<string, string>, auth: WsAuthConfig) {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ url, headers, auth } satisfies SavedWsConfig),
+    );
+  } catch {
+    // localStorage full or unavailable — silently ignore
+  }
+}
 
 export function WebSocketTab() {
-  const store = useWsStore()
-  const activeId = store.activeConnectionId
-  const { connection, connect, send, disconnect, clearMessages } = useWebSocket(activeId)
+  const saved = loadSavedConfig();
+  const store = useWsStore();
+  const activeId = store.activeConnectionId;
+  const { connection, connect, send, disconnect, clearMessages } = useWebSocket(activeId);
 
-  const [url, setUrl] = useState("wss://echo.websocket.org")
-  const [headers, setHeaders] = useState<Record<string, string>>({})
-  const [messageFilter, setMessageFilter] = useState<"all" | "sent" | "received">("all")
-  const [configTab, setConfigTab] = useState("headers")
-  const [dismissedError, setDismissedError] = useState(false)
+  const [url, setUrl] = useState(saved.url ?? "wss://echo.websocket.org");
+  const [headers, setHeaders] = useState<Record<string, string>>(saved.headers ?? {});
+  const [authConfig, setAuthConfig] = useState<WsAuthConfig>(saved.auth ?? DEFAULT_AUTH);
+  const [messageFilter, setMessageFilter] = useState<"all" | "sent" | "received">("all");
+  const [configTab, setConfigTab] = useState("headers");
+  const [dismissedError, setDismissedError] = useState(false);
+
+  // Pre-fill authConfig on the store when the active connection uses it
+  useEffect(() => {
+    if (activeId && connection?.authConfig) {
+      const conn = store.connections[activeId];
+      if (conn && conn.authConfig) {
+        setAuthConfig(conn.authConfig);
+      }
+    }
+  }, [activeId, connection, store.connections]);
 
   const handleConnect = useCallback(async () => {
-    setDismissedError(false)
+    setDismissedError(false);
+    // Apply auth transformations before connecting
+    const finalUrl = applyAuthToUrl(url, authConfig);
+    const authHeaders = buildAuthHeaders(authConfig);
+    const finalHeaders = { ...headers, ...authHeaders };
     try {
-      await connect(url, headers)
+      const id = await connect(finalUrl, finalHeaders);
+      if (id) {
+        // Store authConfig on the connection for future reference
+        store.setAuthConfig(id, authConfig);
+      }
     } catch (e) {
-      console.warn("WebSocket connect failed:", e)
+      console.warn("WebSocket connect failed:", e);
     }
-  }, [url, headers, connect])
+  }, [url, headers, authConfig, connect, store]);
 
   const handleReconnect = useCallback(async () => {
     if (activeId) {
-      await disconnect()
+      await disconnect();
     }
-    setDismissedError(false)
+    setDismissedError(false);
+    const finalUrl = applyAuthToUrl(url, authConfig);
+    const authHeaders = buildAuthHeaders(authConfig);
+    const finalHeaders = { ...headers, ...authHeaders };
     try {
-      await connect(url, headers)
+      const id = await connect(finalUrl, finalHeaders);
+      if (id) {
+        store.setAuthConfig(id, authConfig);
+      }
     } catch (e) {
-      console.warn("WebSocket reconnect failed:", e)
+      console.warn("WebSocket reconnect failed:", e);
     }
-  }, [url, headers, connect, disconnect, activeId])
+  }, [url, headers, authConfig, connect, disconnect, activeId, store]);
 
   const handleSend = useCallback(
     (content: string) => {
-      send(content).catch((e) => console.warn("WebSocket send failed:", e))
+      send(content).catch((e) => console.warn("WebSocket send failed:", e));
     },
-    [send]
-  )
+    [send],
+  );
 
   const handleSave = useCallback(() => {
-    // TODO: Save connection config to Supabase (requests table, type='websocket')
-    // This will be wired when the persistence layer is ready
-  }, [])
+    saveConfig(url, headers, authConfig);
+  }, [url, headers, authConfig]);
 
-  const status = connection?.status ?? "idle"
-  const messages = connection?.messages ?? []
-  const connectedAt = connection?.connectedAt
+  const status = connection?.status ?? "idle";
+  const messages = connection?.messages ?? [];
+  const connectedAt = connection?.connectedAt;
+  const isConnected = status === "connected";
 
   return (
     <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
@@ -99,20 +158,24 @@ export function WebSocketTab() {
 
       <Tabs value={configTab} onValueChange={setConfigTab} className="shrink-0">
         <TabsList className="mx-4 h-7 w-auto self-start rounded-lg border border-border/40 bg-muted/30 p-0.5">
-          <TabsTrigger value="headers" className="h-6 px-3 text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs">
+          <TabsTrigger
+            value="headers"
+            className="h-6 px-3 text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
+          >
             Headers
           </TabsTrigger>
-          <TabsTrigger value="auth" className="h-6 px-3 text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs">
+          <TabsTrigger
+            value="auth"
+            className="h-6 px-3 text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
+          >
             Auth
           </TabsTrigger>
         </TabsList>
         <TabsContent value="headers" className="m-0">
-          <WsHeadersPanel headers={headers} onChange={setHeaders} disabled={status === "connected"} />
+          <WsHeadersPanel headers={headers} onChange={setHeaders} disabled={isConnected} />
         </TabsContent>
         <TabsContent value="auth" className="m-0">
-          <div className="border-b border-border/60 px-4 py-6 text-center text-xs text-muted-foreground/50">
-            Auth for WebSocket connections will be available in a future update.
-          </div>
+          <WsAuthPanel authConfig={authConfig} onChange={setAuthConfig} disabled={isConnected} />
         </TabsContent>
       </Tabs>
 
@@ -125,5 +188,5 @@ export function WebSocketTab() {
 
       <MessageComposer disabled={status !== "connected"} onSend={handleSend} />
     </div>
-  )
+  );
 }

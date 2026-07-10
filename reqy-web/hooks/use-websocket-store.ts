@@ -1,19 +1,22 @@
-import { create } from "zustand"
-import type { WsConnection, WsMessage, WsStatus } from "@/types/websocket"
+import { create } from "zustand";
+import type { WsConnection, WsMessage, WsStatus, WsAuthConfig } from "@/types/websocket";
+
+const DEFAULT_AUTH: WsAuthConfig = { type: "none", token: "", queryName: "token" };
 
 interface WsStore {
-  connections: Record<string, WsConnection>
-  activeConnectionId: string | null
+  connections: Record<string, WsConnection>;
+  activeConnectionId: string | null;
 
-  createConnection: (id: string, url: string, headers: Record<string, string>) => void
-  removeConnection: (id: string) => void
-  setActiveConnection: (id: string | null) => void
-  setStatus: (id: string, status: WsStatus, reason?: string) => void
-  appendMessage: (id: string, message: WsMessage) => void
-  clearMessages: (id: string) => void
-  setHeaders: (id: string, headers: Record<string, string>) => void
-  setConnectedAt: (id: string) => void
-  setDisconnectedAt: (id: string) => void
+  createConnection: (id: string, url: string, headers: Record<string, string>) => void;
+  removeConnection: (id: string) => void;
+  setActiveConnection: (id: string | null) => void;
+  setStatus: (id: string, status: WsStatus, reason?: string) => void;
+  appendMessage: (id: string, message: WsMessage) => void;
+  clearMessages: (id: string) => void;
+  setHeaders: (id: string, headers: Record<string, string>) => void;
+  setAuthConfig: (id: string, authConfig: WsAuthConfig) => void;
+  setConnectedAt: (id: string) => void;
+  setDisconnectedAt: (id: string) => void;
 }
 
 export const useWsStore = create<WsStore>((set) => ({
@@ -29,6 +32,7 @@ export const useWsStore = create<WsStore>((set) => ({
           url,
           status: "idle",
           headers,
+          authConfig: { ...DEFAULT_AUTH },
           messages: [],
         },
       },
@@ -37,84 +41,96 @@ export const useWsStore = create<WsStore>((set) => ({
 
   removeConnection: (id) =>
     set((state) => {
-      const { [id]: _, ...rest } = state.connections
+      const { [id]: _, ...rest } = state.connections;
       return {
         connections: rest,
         activeConnectionId: state.activeConnectionId === id ? null : state.activeConnectionId,
-      }
+      };
     }),
 
   setActiveConnection: (id) => set({ activeConnectionId: id }),
 
   setStatus: (id, status, reason) =>
     set((state) => {
-      const conn = state.connections[id]
-      if (!conn) return state
+      const conn = state.connections[id];
+      if (!conn) return state;
       return {
         connections: {
           ...state.connections,
           [id]: { ...conn, status, errorReason: reason ?? conn.errorReason },
         },
-      }
+      };
     }),
 
   appendMessage: (id, message) =>
     set((state) => {
-      const conn = state.connections[id]
-      if (!conn) return state
+      const conn = state.connections[id];
+      if (!conn) return state;
       return {
         connections: {
           ...state.connections,
           [id]: { ...conn, messages: [...conn.messages, message] },
         },
-      }
+      };
     }),
 
   clearMessages: (id) =>
     set((state) => {
-      const conn = state.connections[id]
-      if (!conn) return state
+      const conn = state.connections[id];
+      if (!conn) return state;
       return {
         connections: {
           ...state.connections,
           [id]: { ...conn, messages: [] },
         },
-      }
+      };
     }),
 
   setHeaders: (id, headers) =>
     set((state) => {
-      const conn = state.connections[id]
-      if (!conn) return state
+      const conn = state.connections[id];
+      if (!conn) return state;
       return {
         connections: {
           ...state.connections,
           [id]: { ...conn, headers },
         },
-      }
+      };
+    }),
+
+  setAuthConfig: (id, authConfig) =>
+    set((state) => {
+      const conn = state.connections[id];
+      if (!conn) return state;
+      return {
+        connections: {
+          ...state.connections,
+          [id]: { ...conn, authConfig },
+        },
+      };
     }),
 
   setConnectedAt: (id) =>
     set((state) => {
-      const conn = state.connections[id]
-      if (!conn) return state
+      const conn = state.connections[id];
+      if (!conn) return state;
       return {
         connections: {
           ...state.connections,
           [id]: { ...conn, connectedAt: Date.now() },
         },
-      }
+      };
     }),
 
   setDisconnectedAt: (id) =>
     set((state) => {
-      const conn = state.connections[id]
-      if (!conn) return state
+      const conn = state.connections[id];
+      if (!conn) return state;
       return {
         connections: {
           ...state.connections,
           [id]: { ...conn, disconnectedAt: Date.now() },
         },
-      }
+      };
     }),
-}))
+}));

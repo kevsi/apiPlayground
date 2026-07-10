@@ -9,13 +9,9 @@
  * Kept as pure functions so they are easy to unit-test without rendering React.
  */
 
-export type WsAuthType = "none" | "bearer" | "query"
+import type { WsAuthConfig } from "@/types/websocket";
 
-export interface WsAuthConfig {
-  type: WsAuthType
-  token: string
-  queryName: string
-}
+export type { WsAuthType, WsAuthConfig } from "@/types/websocket";
 
 /**
  * Returns the headers that should be merged into a Tauri `ws_connect` invocation.
@@ -23,10 +19,10 @@ export interface WsAuthConfig {
  * token is blank. Trims the token; an all-whitespace token is treated as empty.
  */
 export function buildAuthHeaders(auth: WsAuthConfig): Record<string, string> {
-  if (auth.type !== "bearer") return {}
-  const token = auth.token.trim()
-  if (!token) return {}
-  return { Authorization: `Bearer ${token}` }
+  if (auth.type !== "bearer") return {};
+  const token = auth.token.trim();
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
 }
 
 /**
@@ -38,15 +34,15 @@ export function buildAuthHeaders(auth: WsAuthConfig): Record<string, string> {
  * Throws if `url` is not a valid absolute URL.
  */
 export function applyAuthToUrl(url: string, auth: WsAuthConfig): string {
-  if (auth.type !== "query") return url
-  const token = auth.token.trim()
-  if (!token) return url
+  if (auth.type !== "query") return url;
+  const token = auth.token.trim();
+  if (!token) return url;
 
-  const name = (auth.queryName.trim() || "token")
-  const parsed = new URL(url)
+  const name = auth.queryName.trim() || "token";
+  const parsed = new URL(url);
   // Do not overwrite an existing param of the same name; explicit user value wins.
   if (!parsed.searchParams.has(name)) {
-    parsed.searchParams.set(name, token)
+    parsed.searchParams.set(name, token);
   }
-  return parsed.toString()
+  return parsed.toString();
 }
