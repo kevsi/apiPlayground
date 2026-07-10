@@ -10,6 +10,8 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_fs::{FilePath, FsExt, OpenOptions};
 
+use crate::error::AppError;
+
 /// Maximum size of exported JSON content (50 MB).
 ///
 /// Prevents OOM from accidentally serialising very large datasets.
@@ -21,17 +23,17 @@ const MAX_EXPORT_SIZE: usize = 52_428_800; // 50 × 1024 × 1024
 ///
 /// Returns `Ok(())` if the parameters are acceptable, or an error
 /// message explaining the problem.
-fn validate_export(content: &str, default_name: &str) -> Result<(), String> {
+fn validate_export(content: &str, default_name: &str) -> Result<(), AppError> {
   if content.len() > MAX_EXPORT_SIZE {
-    return Err(format!(
+    return Err(AppError::InvalidInput(format!(
       "Export content too large ({} bytes). Maximum allowed is {} bytes.",
       content.len(),
       MAX_EXPORT_SIZE,
-    ));
+    )));
   }
 
   if default_name.is_empty() {
-    return Err("File name must not be empty.".to_string());
+    return Err(AppError::InvalidInput("File name must not be empty.".into()));
   }
 
   Ok(())
@@ -42,7 +44,7 @@ pub fn export_json(
   app: AppHandle,
   content: String,
   default_name: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
   validate_export(&content, &default_name)?;
 
   let file_path: Option<FilePath> = app
@@ -56,26 +58,24 @@ pub fn export_json(
     Some(fp) => {
       let path = fp
         .into_path()
-        .map_err(|e| format!("Invalid file path: {}", e))?;
+        .map_err(|e| AppError::InvalidInput(format!("Invalid file path: {}", e)))?;
       let mut opts = OpenOptions::new();
       opts.write(true).create(true).truncate(true);
       // `app.handle()` keeps the manager alive for the duration of the call
       let fs = app.fs();
-      let mut file = fs.open(&path, opts).map_err(|e| e.to_string())?;
-      file
-        .write_all(content.as_bytes())
-        .map_err(|e| e.to_string())?;
+      let mut file = fs.open(&path, opts).map_err(|e| AppError::Io(e.to_string()))?;
+      file.write_all(content.as_bytes())?;
       Ok(path.to_string_lossy().to_string())
     }
-    None => Err("cancelled".to_string()),
+    None => Err(AppError::Cancelled),
   }
 }
 
 #[tauri::command]
-pub fn open_external(url: String) -> Result<(), String> {
+pub fn open_external(url: String) -> Result<(), AppError> {
   // SECURITY FIX H4: Whitelist allowed URL schemes to prevent RCE via file://, ms-settings:, etc.
   let scheme = url
-    .split("://")
+    .split(':')
     .next()
     .unwrap_or("")
     .to_lowercase();
@@ -83,13 +83,13 @@ pub fn open_external(url: String) -> Result<(), String> {
   let allowed_schemes = ["http", "https", "mailto"];
 
   if !allowed_schemes.contains(&scheme.as_str()) {
-    return Err(format!(
+    return Err(AppError::InvalidInput(format!(
       "Blocked dangerous scheme: {}. Only http, https, mailto are allowed.",
       scheme
-    ));
+    )));
   }
 
-  open::that(&url).map_err(|e| e.to_string())
+  open::that(&url).map_err(|e| AppError::Network(e.to_string()))
 }
 
 #[cfg(test)]
@@ -101,7 +101,7 @@ mod tests {
   #[test]
   fn validate_rejects_empty_default_name() {
     let err = validate_export("{}", "").unwrap_err();
-    assert!(err.contains("must not be empty"));
+    assert!(err.to_string().contains("must not be empty"));
   }
 
   #[test]
@@ -114,7 +114,7 @@ mod tests {
     // Build a string one byte over MAX_EXPORT_SIZE (52_428_801 bytes)
     let oversized = "X".repeat(super::MAX_EXPORT_SIZE + 1);
     let err = validate_export(&oversized, "export.json").unwrap_err();
-    assert!(err.contains("too large"));
+    assert!(err.to_string().contains("too large"));
   }
 
   #[test]
@@ -129,7 +129,7 @@ mod tests {
   const ALLOWED: &[&str] = &["http", "https", "mailto"];
 
   fn is_allowed(url: &str) -> bool {
-    let scheme = url.split("://").next().unwrap_or("").to_lowercase();
+    let scheme = url.split(':').next().unwrap_or("").to_lowercase();
     ALLOWED.contains(&scheme.as_str())
   }
 

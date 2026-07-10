@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use tauri_plugin_deep_link::DeepLinkExt;
 
+mod error;
 mod websocket;
 mod mcp;
 mod capture;
@@ -14,6 +15,13 @@ use crate::open::{export_json, open_external};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  // Install Rustls crypto provider before any TLS operation.
+  // tokio-tungstenite (rustls 0.23) needs an explicit provider;
+  // reqwest uses an older rustls 0.21 with auto-selected ring.
+  rustls::crypto::ring::default_provider()
+    .install_default()
+    .expect("Failed to install Rustls crypto provider");
+
   let mut builder = tauri::Builder::default();
 
   #[cfg(desktop)]

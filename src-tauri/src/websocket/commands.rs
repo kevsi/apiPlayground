@@ -8,6 +8,7 @@ use futures_util::{SinkExt, StreamExt};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
+use crate::error::AppError;
 use crate::websocket::manager::{ConnectionManager, WsCommand};
 use crate::websocket::types::*;
 
@@ -17,27 +18,27 @@ pub async fn ws_connect(
     headers: HashMap<String, String>,
     app_handle: AppHandle,
     manager: tauri::State<'_, ConnectionManager>,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let connection_id = Uuid::new_v4().to_string();
 
     // Validate URL format, then build a tungstenite::Request (= http::Request<()>)
     // so we can attach custom headers before connecting.
-    let _validated = reqwest::Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
+    let _validated = reqwest::Url::parse(&url).map_err(|e| AppError::InvalidInput(format!("Invalid URL: {}", e)))?;
 
     let mut request = http::Request::builder()
         .uri(&url)
         .body(())
-        .map_err(|e| format!("Failed to build request: {}", e))?;
+        .map_err(|e| AppError::InvalidInput(format!("Failed to build request: {}", e)))?;
 
     for (k, v) in &headers {
-        let name = HeaderName::from_str(k).map_err(|e| format!("Invalid header name '{}': {}", k, e))?;
-        let value = HeaderValue::from_str(v).map_err(|e| format!("Invalid header value for '{}': {}", k, e))?;
+        let name = HeaderName::from_str(k).map_err(|e| AppError::InvalidInput(format!("Invalid header name '{}': {}", k, e)))?;
+        let value = HeaderValue::from_str(v).map_err(|e| AppError::InvalidInput(format!("Invalid header value for '{}': {}", k, e)))?;
         request.headers_mut().append(name, value);
     }
 
     let (ws_stream, _) = connect_async(request)
         .await
-        .map_err(|e| format!("Connection failed: {}", e))?;
+        .map_err(|e| AppError::Network(format!("Connection failed: {}", e)))?;
 
     manager.set_status(&connection_id, WsStatus::Connected).await;
 
@@ -139,29 +140,29 @@ pub async fn ws_send(
     connection_id: String,
     message: String,
     manager: tauri::State<'_, ConnectionManager>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let sender = manager.get_sender(&connection_id)
         .await
-        .ok_or_else(|| "Connection not found".to_string())?;
+        .ok_or_else(|| AppError::NotFound("Connection not found".into()))?;
 
     sender.send(WsCommand::Send(message))
         .await
-        .map_err(|e| format!("Send failed: {}", e))
+        .map_err(|e| AppError::Network(format!("Send failed: {}", e)))
 }
 
 #[tauri::command]
 pub async fn ws_disconnect(
     connection_id: String,
     manager: tauri::State<'_, ConnectionManager>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let sender = manager.get_sender(&connection_id)
         .await
-        .ok_or_else(|| "Connection not found".to_string())?;
+        .ok_or_else(|| AppError::NotFound("Connection not found".into()))?;
 
     manager.set_status(&connection_id, WsStatus::Disconnecting).await;
     sender.send(WsCommand::Close)
         .await
-        .map_err(|e| format!("Disconnect failed: {}", e))?;
+        .map_err(|e| AppError::Network(format!("Disconnect failed: {}", e)))?;
     manager.unregister(&connection_id).await;
 
     Ok(())
@@ -171,8 +172,8 @@ pub async fn ws_disconnect(
 pub async fn ws_get_status(
     connection_id: String,
     manager: tauri::State<'_, ConnectionManager>,
-) -> Result<WsStatus, String> {
+) -> Result<WsStatus, AppError> {
     manager.get_status(&connection_id)
         .await
-        .ok_or_else(|| "Connection not found".to_string())
+        .ok_or_else(|| AppError::NotFound("Connection not found".into()))
 }

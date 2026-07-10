@@ -4,6 +4,8 @@ use std::process::{Child, Command};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::error::AppError;
+
 const MCP_BUNDLE_FILE: &str = "_mcp_bundle.json";
 const MCP_DEFAULT_PORT: u16 = 3311;
 
@@ -49,12 +51,12 @@ pub fn start_mcp_server(
   bundle_json: String,
   config: Option<McpServerConfig>,
   mcp_state: tauri::State<'_, ManagedMcpState>,
-) -> Result<String, String> {
-  let mut state = mcp_state.lock().map_err(|e| e.to_string())?;
+) -> Result<String, AppError> {
+  let mut state = mcp_state.lock()?;
 
   if let Some(ref mut process) = state.process {
     match process.try_wait() {
-      Ok(None) => return Err("MCP server is already running".to_string()),
+      Ok(None) => return Err(AppError::AlreadyRunning("MCP server is already running".into())),
       Ok(Some(_)) => {}
       Err(_) => {}
     }
@@ -63,15 +65,13 @@ pub fn start_mcp_server(
   let bundle_dir = app
     .path()
     .app_data_dir()
-    .map_err(|e| format!("Cannot resolve app data dir: {}", e))?;
-  std::fs::create_dir_all(&bundle_dir).map_err(|e| e.to_string())?;
+    .map_err(|e| AppError::Internal(format!("Cannot resolve app data dir: {}", e)))?;
+  std::fs::create_dir_all(&bundle_dir)?;
   let bundle_path = bundle_dir.join(MCP_BUNDLE_FILE);
 
   {
-    let mut file = std::fs::File::create(&bundle_path).map_err(|e| e.to_string())?;
-    file
-      .write_all(bundle_json.as_bytes())
-      .map_err(|e| e.to_string())?;
+    let mut file = std::fs::File::create(&bundle_path)?;
+    file.write_all(bundle_json.as_bytes())?;
   }
 
   let script_path = resolve_script_path(&app)?;
@@ -86,10 +86,10 @@ pub fn start_mcp_server(
 
   // Ensure node is available before spawning
   if Command::new(node).arg("--version").output().is_err() {
-    return Err(format!(
+    return Err(AppError::NotFound(format!(
       "Node.js runtime not found: {}. Please install Node.js to use the MCP server.",
       node
-    ));
+    )));
   }
 
   let mut cmd = Command::new(node);
@@ -124,7 +124,7 @@ pub fn start_mcp_server(
   }
   cmd.stdout(std::process::Stdio::piped());
 
-  let mut child = cmd.spawn().map_err(|e| format!("Failed to start MCP server: {}", e))?;
+  let mut child = cmd.spawn().map_err(|e| AppError::Internal(format!("Failed to start MCP server: {}", e)))?;
 
   // Drain a small amount of stdout to confirm the process started; then drop the handle.
   if let Some(ref mut stdout) = child.stdout {
@@ -152,8 +152,8 @@ pub fn start_mcp_server(
 pub fn stop_mcp_server(
   app: AppHandle,
   mcp_state: tauri::State<'_, ManagedMcpState>,
-) -> Result<String, String> {
-  let mut state = mcp_state.lock().map_err(|e| e.to_string())?;
+) -> Result<String, AppError> {
+  let mut state = mcp_state.lock()?;
 
   match state.process.take() {
     Some(mut child) => {
@@ -187,15 +187,15 @@ pub fn stop_mcp_server(
 
       Ok("MCP server stopped".to_string())
     }
-    None => Err("MCP server is not running".to_string()),
+    None => Err(AppError::NotRunning("MCP server is not running".into())),
   }
 }
 
 #[tauri::command]
 pub fn get_mcp_server_status(
   mcp_state: tauri::State<'_, ManagedMcpState>,
-) -> Result<McpServerStatus, String> {
-  let mut state = mcp_state.lock().map_err(|e| e.to_string())?;
+) -> Result<McpServerStatus, AppError> {
+  let mut state = mcp_state.lock()?;
 
   let (running, pid) = match state.process.as_mut() {
     Some(process) => match process.try_wait() {
@@ -217,11 +217,11 @@ pub fn get_mcp_server_status(
 }
 
 /// Returns the path to the MCP bundle file.
-fn mcp_bundle_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+fn mcp_bundle_path(app: &AppHandle) -> Result<std::path::PathBuf, AppError> {
   let bundle_dir = app
     .path()
     .app_data_dir()
-    .map_err(|e| format!("Cannot resolve app data dir: {}", e))?;
+    .map_err(|e| AppError::Internal(format!("Cannot resolve app data dir: {}", e)))?;
   Ok(bundle_dir.join(MCP_BUNDLE_FILE))
 }
 
@@ -229,12 +229,12 @@ fn mcp_bundle_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 #[tauri::command]
 pub fn read_mcp_bundle(
   app: AppHandle,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
   let bundle_path = mcp_bundle_path(&app)?;
   if !bundle_path.exists() {
     return Ok(String::new());
   }
-  std::fs::read_to_string(&bundle_path).map_err(|e| e.to_string())
+  Ok(std::fs::read_to_string(&bundle_path)?)
 }
 
 /// Read collections from the MCP bundle and emit them to the frontend.
@@ -242,30 +242,30 @@ pub fn read_mcp_bundle(
 #[tauri::command]
 pub fn sync_mcp_collections(
   app: AppHandle,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
   let bundle_path = mcp_bundle_path(&app)?;
   if !bundle_path.exists() {
     return Ok(());
   }
 
-  let content = std::fs::read_to_string(&bundle_path).map_err(|e| e.to_string())?;
-  let parsed: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+  let content = std::fs::read_to_string(&bundle_path)?;
+  let parsed: serde_json::Value = serde_json::from_str(&content)?;
   let _ = app.emit("mcp-sync-collections", &parsed);
 
   Ok(())
 }
 
 /// Locate the reqy-mcp `dist/index.js` script.
-fn resolve_script_path(app: &AppHandle) -> Result<String, String> {
+fn resolve_script_path(app: &AppHandle) -> Result<String, AppError> {
   let candidates: Vec<std::path::PathBuf> = if cfg!(debug_assertions) {
-    let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+    let cwd = std::env::current_dir().map_err(|e| AppError::Internal(e.to_string()))?;
     vec![
       cwd.join("reqy-mcp").join("dist").join("index.js"),
       cwd.join("..").join("reqy-mcp").join("dist").join("index.js"),
       cwd.join("..\\reqy-mcp\\dist\\index.js").into(),
     ]
   } else {
-    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+    let resource_dir = app.path().resource_dir().map_err(|e| AppError::Internal(e.to_string()))?;
     vec![
       resource_dir.join("reqy-mcp").join("dist").join("index.js"),
     ]
@@ -277,12 +277,12 @@ fn resolve_script_path(app: &AppHandle) -> Result<String, String> {
     }
   }
 
-  Err(format!(
+  Err(AppError::NotFound(format!(
     "reqy-mcp script not found (tried: {})",
     candidates
       .iter()
       .map(|p| p.display().to_string())
       .collect::<Vec<_>>()
       .join(", ")
-  ))
+  )))
 }

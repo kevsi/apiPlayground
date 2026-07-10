@@ -17,6 +17,7 @@ use tauri::{AppHandle, Emitter};
 use tiny_http::{Header, Response, Server};
 use uuid::Uuid;
 
+use crate::error::AppError;
 use crate::fetch::SharedClient;
 
 #[derive(Default)]
@@ -77,14 +78,15 @@ async fn forward_request_async(
   url: &str,
   headers: &[(String, String)],
   body: Option<&str>,
-) -> Result<(u16, Vec<(String, String)>, String), String> {
-  let _parsed_url = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+) -> Result<(u16, Vec<(String, String)>, String), AppError> {
+  let _parsed_url = reqwest::Url::parse(url)
+    .map_err(|e| AppError::InvalidInput(format!("Invalid URL: {}", e)))?;
 
   // No SSRF blocking here — same rationale as fetch_proxy: Reqly is a
   // desktop client, testing local/LAN APIs is a core use case.
 
   let mut request = client
-    .request(method.parse::<reqwest::Method>().map_err(|e| e.to_string())?, url);
+    .request(method.parse::<reqwest::Method>().map_err(|e| AppError::InvalidInput(e.to_string()))?, url);
 
   for (key, value) in headers {
     request = request.header(key, value);
@@ -94,14 +96,14 @@ async fn forward_request_async(
     request = request.body(reqwest::Body::from(b.to_string()));
   }
 
-  let response = request.send().await.map_err(|e| e.to_string())?;
+  let response = request.send().await?;
   let status = response.status().as_u16();
   let resp_headers: Vec<(String, String)> = response
     .headers()
     .iter()
     .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
     .collect();
-  let body_str = response.text().await.map_err(|e| e.to_string())?;
+  let body_str = response.text().await.map_err(|e| AppError::Network(e.to_string()))?;
 
   Ok((status, resp_headers, body_str))
 }
@@ -111,22 +113,28 @@ fn start_proxy_server(
   port: u16,
   state: &ManagedCaptureProxyState,
   client: reqwest::Client,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
   let addr = SocketAddr::from(([127, 0, 0, 1], port));
-  let server = Server::http(addr).map_err(|e| format!("Failed to bind port {}: {}", port, e))?;
+  let server = Server::http(addr).map_err(|e| AppError::Network(format!("Failed to bind port {}: {}", port, e)))?;
 
   let shutdown_flag = Arc::new(AtomicBool::new(false));
   let flag_for_server = shutdown_flag.clone();
 
   {
-    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let mut guard = state.lock()?;
     guard.shutdown_flag = Some(shutdown_flag);
   }
 
   // Spawn the blocking proxy loop in a std thread with a dedicated runtime
   let handle = app_handle.clone();
   let server_handle = std::thread::spawn(move || {
-    let rt = tokio::runtime::Runtime::new().expect("failed to create proxy runtime");
+    let rt = match tokio::runtime::Runtime::new() {
+      Ok(r) => r,
+      Err(e) => {
+        eprintln!("[capture-proxy] failed to create tokio runtime: {}", e);
+        return;
+      }
+    };
     for mut request in server.incoming_requests() {
       if flag_for_server.load(Ordering::SeqCst) {
         break;
@@ -160,8 +168,29 @@ fn start_proxy_server(
 
       let mut body_bytes: Option<Vec<u8>> = None;
       if method != "GET" && method != "HEAD" {
-        let mut buf = Vec::new();
-        let _ = request.as_reader().read_to_end(&mut buf);
+        let max_body: u64 = 10_485_760; // 10 MB cap
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        let mut buf: Vec<u8> = Vec::new();
+        let reader = request.as_reader();
+        let mut chunk = [0u8; 8192];
+        loop {
+          if buf.len() >= max_body as usize {
+            eprintln!("[capture-proxy] request body exceeds 10 MB, truncating");
+            break;
+          }
+          if std::time::Instant::now() > deadline {
+            eprintln!("[capture-proxy] request body read timed out after 30s");
+            break;
+          }
+          match reader.read(&mut chunk) {
+            Ok(0) => break, // EOF
+            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            Err(e) => {
+              eprintln!("[capture-proxy] error reading request body: {}", e);
+              break;
+            }
+          }
+        }
         if !buf.is_empty() {
           body_bytes = Some(buf);
         }
@@ -191,7 +220,7 @@ fn start_proxy_server(
       let (status, resp_headers, resp_body) = match forward_result {
         Ok((s, h, b)) => (s, Some(h), Some(b)),
         Err(e) => {
-          captured.error = Some(e.clone());
+          captured.error = Some(e.to_string());
           captured.duration_ms = Some(start.elapsed().as_millis() as u64);
           let _ = handle.emit("captured-request-updated", &captured);
           let _ = request.respond(
@@ -216,16 +245,15 @@ fn start_proxy_server(
 
       let _ = handle.emit("captured-request-updated", &captured);
 
-      // Build tiny_http response headers
+      // Build tiny_http response headers — filter out invalid header entries
+      // instead of unwrapping (which would panic the proxy thread).
       let http_resp_headers: Vec<Header> = resp_headers
         .unwrap_or_default()
         .iter()
         .filter(|(k, _)| !k.eq_ignore_ascii_case("transfer-encoding"))
         .filter(|(k, _)| !k.eq_ignore_ascii_case("content-encoding"))
-        .map(|(k, v)| {
-          Header::from_bytes(k.as_bytes(), v.as_bytes()).unwrap_or_else(|_| {
-            Header::from_bytes(k.as_bytes(), b"").unwrap()
-          })
+        .filter_map(|(k, v)| {
+          Header::from_bytes(k.as_bytes(), v.as_bytes()).ok()
         })
         .collect();
 
@@ -239,7 +267,7 @@ fn start_proxy_server(
     }
   });
 
-  let mut guard = state.lock().map_err(|e| e.to_string())?;
+  let mut guard = state.lock()?;
   guard.server_thread = Some(server_handle);
 
   Ok(())
@@ -251,15 +279,15 @@ pub fn start_capture_proxy(
   port: u16,
   state: tauri::State<'_, ManagedCaptureProxyState>,
   client: tauri::State<'_, SharedClient>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
   if port < 1024 {
-    return Err("Port must be between 1024 and 65535".to_string());
+    return Err(AppError::InvalidInput("Port must be between 1024 and 65535".into()));
   }
 
   {
-    let guard = state.lock().map_err(|e| e.to_string())?;
+    let guard = state.lock()?;
     if guard.shutdown_flag.is_some() {
-      return Err("Capture proxy is already running".to_string());
+      return Err(AppError::AlreadyRunning("Capture proxy is already running".into()));
     }
   }
 
@@ -267,8 +295,8 @@ pub fn start_capture_proxy(
 }
 
 #[tauri::command]
-pub fn stop_capture_proxy(state: tauri::State<'_, ManagedCaptureProxyState>) -> Result<(), String> {
-  let mut guard = state.lock().map_err(|e| e.to_string())?;
+pub fn stop_capture_proxy(state: tauri::State<'_, ManagedCaptureProxyState>) -> Result<(), AppError> {
+  let mut guard = state.lock()?;
   if let Some(flag) = guard.shutdown_flag.take() {
     flag.store(true, Ordering::SeqCst);
     if let Some(handle) = guard.server_thread.take() {
@@ -281,8 +309,13 @@ pub fn stop_capture_proxy(state: tauri::State<'_, ManagedCaptureProxyState>) -> 
       let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
       loop {
         if handle.is_finished() {
-          let _ = handle.join();
-          break Ok(());
+          match handle.join() {
+            Ok(_) => break Ok(()),
+            Err(_) => {
+              eprintln!("[capture-proxy] proxy thread panicked");
+              break Ok(());
+            }
+          }
         }
         if std::time::Instant::now() >= deadline {
           // Detach — the thread will exit on its next flag check.
@@ -294,7 +327,7 @@ pub fn stop_capture_proxy(state: tauri::State<'_, ManagedCaptureProxyState>) -> 
       Ok(())
     }
   } else {
-    Err("Capture proxy is not running".to_string())
+    Err(AppError::NotRunning("Capture proxy is not running".into()))
   }
 }
 
