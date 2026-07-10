@@ -92,7 +92,7 @@ export function ConnectionBar({
       <div className="flex items-center gap-2 rounded-lg border border-input/50 px-3 py-1.5 transition-all duration-200">
         <Badge
           variant="outline"
-          className={cn("shrink-0 gap-1.5 py-0.5 px-2 text-xs font-semibold", cfg.className)}
+          className={cn("shrink-0 gap-1.5 py-0.5 px-2 text-sm font-semibold", cfg.className)}
         >
           {status === "connecting" || status === "disconnecting" ? (
             <Loader2 className="size-3 animate-spin" />
@@ -124,7 +124,7 @@ export function ConnectionBar({
             size="sm"
             disabled={isBusy}
             onClick={onDisconnect}
-            className="h-7 gap-1.5 px-3 text-xs font-semibold shrink-0 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
+            className="h-7 gap-1.5 px-3 text-sm font-semibold shrink-0 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
           >
             <WifiOff className="size-3.5" />
             Disconnect
@@ -135,7 +135,7 @@ export function ConnectionBar({
             size="sm"
             onClick={handleConnect}
             disabled={!url.trim()}
-            className="h-7 gap-1.5 px-3 text-xs font-semibold shrink-0 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/50"
+            className="h-7 gap-1.5 px-3 text-sm font-semibold shrink-0 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/50"
           >
             <Wifi className="size-3.5" />
             Connect
@@ -149,17 +149,17 @@ export function ConnectionBar({
               size="sm"
               onClick={onSave}
               aria-label="Save connection"
-              className="h-7 gap-1.5 px-2 text-xs font-medium text-muted-foreground/40 hover:text-foreground"
+              className="h-7 gap-1.5 px-2 text-sm font-medium text-muted-foreground/40 hover:text-foreground"
             >
               <Save className="size-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p className="text-xs">Save URL, headers and auth config for next session</p>
+            <p className="text-sm">Save URL, headers and auth config for next session</p>
           </TooltipContent>
         </Tooltip>
       </div>
-      {urlError && <p className="mt-1.5 text-xs font-medium text-red-500 px-1">{urlError}</p>}
+      {urlError && <p className="mt-1.5 text-sm font-medium text-red-500 px-1">{urlError}</p>}
     </div>
   );
 }

@@ -134,14 +134,14 @@ export function WebSocketTab() {
       {status === "error" && connection?.errorReason && !dismissedError && (
         <div className="mx-3 mt-1 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 shrink-0">
           <AlertCircle className="size-3.5 text-red-500 shrink-0" />
-          <span className="flex-1 text-xs text-red-600">
+          <span className="flex-1 text-sm text-red-600">
             Connection lost — {connection.errorReason}
           </span>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleReconnect}
-            className="min-h-9 gap-1 px-2 text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10"
+            className="min-h-9 gap-1 px-2 text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10"
           >
             <RefreshCw className="size-3" />
             Reconnect
@@ -149,7 +149,7 @@ export function WebSocketTab() {
           <button
             onClick={() => setDismissedError(true)}
             aria-label="Dismiss error"
-            className="text-xs text-muted-foreground/40 hover:text-foreground ml-1"
+            className="text-sm text-muted-foreground/40 hover:text-foreground ml-1"
           >
             ×
           </button>
@@ -160,13 +160,13 @@ export function WebSocketTab() {
         <TabsList className="mx-4 h-7 w-auto self-start rounded-lg border border-border/40 bg-muted/30 p-0.5">
           <TabsTrigger
             value="headers"
-            className="h-6 px-3 text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
+            className="h-6 px-3 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
           >
             Headers
           </TabsTrigger>
           <TabsTrigger
             value="auth"
-            className="h-6 px-3 text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
+            className="h-6 px-3 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
           >
             Auth
           </TabsTrigger>

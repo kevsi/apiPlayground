@@ -29,14 +29,14 @@ export function WsAuthPanel({ authConfig, onChange, disabled }: WsAuthPanelProps
             onClick={() => !disabled && onChange({ ...authConfig, type: mode.value })}
             disabled={disabled}
             className={cn(
-              "flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all duration-150",
+              "flex-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition-all duration-150",
               authConfig.type === mode.value
                 ? "bg-primary/10 text-primary shadow-xs border border-primary/20"
                 : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 border border-transparent",
               disabled && "opacity-50 cursor-not-allowed",
             )}
           >
-            <div className="text-xs font-semibold">{mode.label}</div>
+            <div className="text-sm font-semibold">{mode.label}</div>
             <div className="text-[10px] opacity-60 mt-0.5">{mode.description}</div>
           </button>
         ))}
@@ -73,7 +73,7 @@ export function WsAuthPanel({ authConfig, onChange, disabled }: WsAuthPanelProps
               onChange={(e) => onChange({ ...authConfig, token: e.target.value })}
               placeholder={authConfig.type === "bearer" ? "Bearer token..." : "Token value..."}
               disabled={disabled}
-              className="h-8 pl-8 text-xs font-mono"
+              className="h-8 pl-8 text-sm font-mono"
             />
           </div>
 
@@ -86,7 +86,7 @@ export function WsAuthPanel({ authConfig, onChange, disabled }: WsAuthPanelProps
                 onChange={(e) => onChange({ ...authConfig, queryName: e.target.value })}
                 placeholder="Query parameter name (default: token)"
                 disabled={disabled}
-                className="h-8 pl-8 text-xs font-mono"
+                className="h-8 pl-8 text-sm font-mono"
               />
             </div>
           )}
@@ -95,7 +95,7 @@ export function WsAuthPanel({ authConfig, onChange, disabled }: WsAuthPanelProps
 
       {/* None: show info */}
       {authConfig.type === "none" && (
-        <p className="text-xs text-muted-foreground/40 italic text-center py-2">
+        <p className="text-sm text-muted-foreground/40 italic text-center py-2">
           No authentication will be sent with the WebSocket connection.
         </p>
       )}

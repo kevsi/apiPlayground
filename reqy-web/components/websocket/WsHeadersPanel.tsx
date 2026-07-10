@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Plus, Trash2, Info } from "lucide-react"
-import { isTauriAvailable } from "@/lib/tauri"
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Plus, Trash2, Info } from "lucide-react";
+import { isTauriAvailable } from "@/lib/tauri";
 
 interface HeaderRow {
-  id: string
-  key: string
-  value: string
+  id: string;
+  key: string;
+  value: string;
 }
 
 interface WsHeadersPanelProps {
-  headers: Record<string, string>
-  onChange: (headers: Record<string, string>) => void
-  disabled: boolean
+  headers: Record<string, string>;
+  onChange: (headers: Record<string, string>) => void;
+  disabled: boolean;
 }
 
 export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelProps) {
@@ -24,8 +24,8 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
       id: crypto.randomUUID(),
       key,
       value,
-    }))
-  )
+    })),
+  );
 
   useEffect(() => {
     setRows(
@@ -33,44 +33,44 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
         id: crypto.randomUUID(),
         key,
         value,
-      }))
-    )
-  }, [headers])
+      })),
+    );
+  }, [headers]);
 
   const emitChange = useCallback(
     (newRows: HeaderRow[]) => {
-      const obj: Record<string, string> = {}
+      const obj: Record<string, string> = {};
       for (const row of newRows) {
-        if (row.key.trim()) obj[row.key.trim()] = row.value
+        if (row.key.trim()) obj[row.key.trim()] = row.value;
       }
-      onChange(obj)
+      onChange(obj);
     },
-    [onChange]
-  )
+    [onChange],
+  );
 
   const addRow = useCallback(() => {
-    const newRows = [...rows, { id: crypto.randomUUID(), key: "", value: "" }]
-    setRows(newRows)
-    emitChange(newRows)
-  }, [rows, emitChange])
+    const newRows = [...rows, { id: crypto.randomUUID(), key: "", value: "" }];
+    setRows(newRows);
+    emitChange(newRows);
+  }, [rows, emitChange]);
 
   const removeRow = useCallback(
     (id: string) => {
-      const newRows = rows.filter((r) => r.id !== id)
-      setRows(newRows)
-      emitChange(newRows)
+      const newRows = rows.filter((r) => r.id !== id);
+      setRows(newRows);
+      emitChange(newRows);
     },
-    [rows, emitChange]
-  )
+    [rows, emitChange],
+  );
 
   const updateRow = useCallback(
     (id: string, field: "key" | "value", val: string) => {
-      const newRows = rows.map((r) => (r.id === id ? { ...r, [field]: val } : r))
-      setRows(newRows)
-      emitChange(newRows)
+      const newRows = rows.map((r) => (r.id === id ? { ...r, [field]: val } : r));
+      setRows(newRows);
+      emitChange(newRows);
     },
-    [rows, emitChange]
-  )
+    [rows, emitChange],
+  );
 
   return (
     <div className="border-b border-border/60 px-4 py-3">
@@ -78,12 +78,13 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
         <div className="flex items-start gap-2 mb-2 rounded-md bg-amber-500/5 border border-amber-500/10 px-2 py-1.5">
           <Info className="size-3.5 text-amber-600 shrink-0 mt-0.5" />
           <p className="text-[10px] text-amber-700 leading-tight">
-            Custom headers are only supported in desktop mode (Tauri). In web mode, WebSocket connections use browser defaults.
+            Custom headers are only supported in desktop mode (Tauri). In web mode, WebSocket
+            connections use browser defaults.
           </p>
         </div>
       )}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground/40">
+        <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground/40">
           Upgrade Headers
         </span>
         <Button
@@ -91,7 +92,7 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
           size="sm"
           onClick={addRow}
           disabled={disabled || !isTauriAvailable()}
-          className="min-h-9 gap-1 text-xs font-medium text-muted-foreground/50 hover:text-foreground"
+          className="min-h-9 gap-1 text-sm font-medium text-muted-foreground/50 hover:text-foreground"
         >
           <Plus className="size-3" />
           Add header
@@ -99,7 +100,7 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
       </div>
       <div className="flex flex-col gap-1.5">
         {rows.length === 0 && (
-          <p className="text-xs text-muted-foreground/30 italic">
+          <p className="text-sm text-muted-foreground/30 italic">
             No custom headers. The connection will use defaults.
           </p>
         )}
@@ -110,14 +111,14 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
               onChange={(e) => updateRow(row.id, "key", e.target.value)}
               placeholder="Header name"
               disabled={disabled}
-              className="h-7 flex-1 text-xs font-mono"
+              className="h-7 flex-1 text-sm font-mono"
             />
             <Input
               value={row.value}
               onChange={(e) => updateRow(row.id, "value", e.target.value)}
               placeholder="Value"
               disabled={disabled}
-              className="h-7 flex-[2] text-xs font-mono"
+              className="h-7 flex-[2] text-sm font-mono"
             />
             <button
               onClick={() => removeRow(row.id)}
@@ -131,5 +132,5 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
         ))}
       </div>
     </div>
-  )
+  );
 }
