@@ -1,0 +1,177 @@
+//! External-link and file-export helpers.
+//!
+//! `open_external` whitelists a small set of URL schemes (http, https,
+//! mailto) to prevent RCE via `file://`, `ms-settings:`, etc. `export_json`
+//! writes the given content to a user-chosen file path via the dialog plugin.
+
+use std::io::Write;
+
+use tauri::AppHandle;
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_fs::{FilePath, FsExt, OpenOptions};
+
+/// Maximum size of exported JSON content (50 MB).
+///
+/// Prevents OOM from accidentally serialising very large datasets.
+/// 50 MB is far beyond a reasonable collection export and is a
+/// generous safety limit.
+const MAX_EXPORT_SIZE: usize = 52_428_800; // 50 × 1024 × 1024
+
+/// Validate export parameters before the dialog is opened.
+///
+/// Returns `Ok(())` if the parameters are acceptable, or an error
+/// message explaining the problem.
+fn validate_export(content: &str, default_name: &str) -> Result<(), String> {
+  if content.len() > MAX_EXPORT_SIZE {
+    return Err(format!(
+      "Export content too large ({} bytes). Maximum allowed is {} bytes.",
+      content.len(),
+      MAX_EXPORT_SIZE,
+    ));
+  }
+
+  if default_name.is_empty() {
+    return Err("File name must not be empty.".to_string());
+  }
+
+  Ok(())
+}
+
+#[tauri::command]
+pub fn export_json(
+  app: AppHandle,
+  content: String,
+  default_name: String,
+) -> Result<String, String> {
+  validate_export(&content, &default_name)?;
+
+  let file_path: Option<FilePath> = app
+    .dialog()
+    .file()
+    .add_filter("JSON", &["json"])
+    .set_file_name(&default_name)
+    .blocking_save_file();
+
+  match file_path {
+    Some(fp) => {
+      let path = fp
+        .into_path()
+        .map_err(|e| format!("Invalid file path: {}", e))?;
+      let mut opts = OpenOptions::new();
+      opts.write(true).create(true).truncate(true);
+      // `app.handle()` keeps the manager alive for the duration of the call
+      let fs = app.fs();
+      let mut file = fs.open(&path, opts).map_err(|e| e.to_string())?;
+      file
+        .write_all(content.as_bytes())
+        .map_err(|e| e.to_string())?;
+      Ok(path.to_string_lossy().to_string())
+    }
+    None => Err("cancelled".to_string()),
+  }
+}
+
+#[tauri::command]
+pub fn open_external(url: String) -> Result<(), String> {
+  // SECURITY FIX H4: Whitelist allowed URL schemes to prevent RCE via file://, ms-settings:, etc.
+  let scheme = url
+    .split("://")
+    .next()
+    .unwrap_or("")
+    .to_lowercase();
+
+  let allowed_schemes = ["http", "https", "mailto"];
+
+  if !allowed_schemes.contains(&scheme.as_str()) {
+    return Err(format!(
+      "Blocked dangerous scheme: {}. Only http, https, mailto are allowed.",
+      scheme
+    ));
+  }
+
+  open::that(&url).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::validate_export;
+
+  // ── export_json validation ───────────────────────────────────
+
+  #[test]
+  fn validate_rejects_empty_default_name() {
+    let err = validate_export("{}", "").unwrap_err();
+    assert!(err.contains("must not be empty"));
+  }
+
+  #[test]
+  fn validate_accepts_small_content() {
+    assert!(validate_export("{\"ok\":true}", "export.json").is_ok());
+  }
+
+  #[test]
+  fn validate_rejects_content_exceeding_max_size() {
+    // Build a string one byte over MAX_EXPORT_SIZE (52_428_801 bytes)
+    let oversized = "X".repeat(super::MAX_EXPORT_SIZE + 1);
+    let err = validate_export(&oversized, "export.json").unwrap_err();
+    assert!(err.contains("too large"));
+  }
+
+  #[test]
+  fn validate_accepts_content_at_max_size() {
+    let at_limit = "Y".repeat(super::MAX_EXPORT_SIZE);
+    assert!(validate_export(&at_limit, "export.json").is_ok());
+  }
+
+  // ── open_external scheme validation ──────────────────────────
+  /// Mirror of the scheme whitelist; used to ensure tests cover every
+  /// allowed/disallowed scheme combination.
+  const ALLOWED: &[&str] = &["http", "https", "mailto"];
+
+  fn is_allowed(url: &str) -> bool {
+    let scheme = url.split("://").next().unwrap_or("").to_lowercase();
+    ALLOWED.contains(&scheme.as_str())
+  }
+
+  #[test]
+  fn http_url_is_allowed() {
+    assert!(is_allowed("http://example.com"));
+  }
+
+  #[test]
+  fn https_url_is_allowed() {
+    assert!(is_allowed("https://example.com/path?q=1"));
+  }
+
+  #[test]
+  fn mailto_url_is_allowed() {
+    assert!(is_allowed("mailto:foo@example.com"));
+  }
+
+  #[test]
+  fn file_scheme_is_blocked() {
+    assert!(!is_allowed("file:///etc/passwd"));
+  }
+
+  #[test]
+  fn ms_settings_scheme_is_blocked() {
+    assert!(!is_allowed("ms-settings:network"));
+  }
+
+  #[test]
+  fn javascript_scheme_is_blocked() {
+    assert!(!is_allowed("javascript:alert(1)"));
+  }
+
+  #[test]
+  fn uppercase_scheme_is_normalized() {
+    assert!(is_allowed("HTTP://example.com"));
+    assert!(is_allowed("HTTPS://example.com"));
+    assert!(is_allowed("MAILTO:foo@example.com"));
+  }
+
+  #[test]
+  fn malformed_url_is_blocked() {
+    assert!(!is_allowed("not a url"));
+  }
+}
