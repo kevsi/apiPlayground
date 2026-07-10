@@ -21,6 +21,9 @@ const securityHeaders = [
     // `'unsafe-inline'` for script-src is needed because Next.js dev mode and
     // several components (CM6 editor, GraphiQL) inject inline scripts. In
     // production this should be replaced by a nonce-based CSP.
+    //
+    // `report-uri /api/csp-reports` collects violations so we can monitor what
+    // needs a hash/nonce before removing `'unsafe-inline'`.
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
@@ -32,6 +35,8 @@ const securityHeaders = [
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "upgrade-insecure-requests",
+      "report-uri /api/csp-reports",
     ].join("; "),
   },
   // HSTS only in production — breaks dev over plain HTTP otherwise.
