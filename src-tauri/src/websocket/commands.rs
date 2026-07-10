@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use http::{HeaderName, HeaderValue};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
 use tokio::net::TcpStream;
 use futures_util::{SinkExt, StreamExt};
@@ -21,15 +22,17 @@ pub async fn ws_connect(
 ) -> Result<String, AppError> {
     let connection_id = Uuid::new_v4().to_string();
 
-    // Validate URL format, then build a tungstenite::Request (= http::Request<()>)
-    // so we can attach custom headers before connecting.
-    let _validated = reqwest::Url::parse(&url).map_err(|e| AppError::InvalidInput(format!("Invalid URL: {}", e)))?;
+    // Build a proper tungstenite request via IntoClientRequest, which
+    // automatically sets the required WebSocket handshake headers
+    // (Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Host).
+    // Using http::Request::builder() would produce a bare request WITHOUT
+    // these mandatory headers, causing the server to reject the handshake
+    // with "Missing, duplicated or incorrect header sec-websocket-key".
+    let mut request = url
+        .into_client_request()
+        .map_err(|e| AppError::InvalidInput(format!("Invalid WebSocket URL: {}", e)))?;
 
-    let mut request = http::Request::builder()
-        .uri(&url)
-        .body(())
-        .map_err(|e| AppError::InvalidInput(format!("Failed to build request: {}", e)))?;
-
+    // Merge custom headers on top of the properly-built request.
     for (k, v) in &headers {
         let name = HeaderName::from_str(k).map_err(|e| AppError::InvalidInput(format!("Invalid header name '{}': {}", k, e)))?;
         let value = HeaderValue::from_str(v).map_err(|e| AppError::InvalidInput(format!("Invalid header value for '{}': {}", k, e)))?;
