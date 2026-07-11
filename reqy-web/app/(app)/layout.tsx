@@ -1,56 +1,76 @@
-"use client"
+"use client";
 
-import { ApiSidebar } from "@/components/api-sidebar"
-import { ApiHeader } from "@/components/api-header"
-import { useSidebar } from "@/contexts/sidebar-context"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { ShortcutsRegistrar } from "@/hooks/use-shortcuts"
+import { useState, useEffect } from "react";
+import { ApiSidebar } from "@/components/api-sidebar";
+import { ApiHeader } from "@/components/api-header";
+import { AiSidebar } from "@/components/ai-sidebar";
+import { useSidebar } from "@/contexts/sidebar-context";
+import { AiSidebarContext } from "@/contexts/ai-sidebar-context";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { ShortcutsRegistrar } from "@/hooks/use-shortcuts";
 
 // Maps URL segment → ApiSidebar `activePage` value.
 // Centralised here so adding a new page only requires updating one mapping.
 const ACTIVE_PAGE_MAP: Record<string, string> = {
   "": "api-endpoints",
-  "dashboard": "dashboard",
-  "collections": "collections",
-  "settings": "settings",
-  "runner": "runner",
+  dashboard: "dashboard",
+  collections: "collections",
+  settings: "settings",
+  runner: "runner",
   "ai-insights": "ai-insights",
-  "documentation": "documentation",
-  "workspaces": "workspaces",
-  "graphql": "graphql",
+  documentation: "documentation",
+  workspaces: "workspaces",
+  graphql: "graphql",
   "my-projects": "projects", // URL /my-projects but sidebar expects "projects"
-  "sdks": "sdks",
-  "websocket": "websocket",
-  "git": "git",
-  "sse": "sse",
-}
+  sdks: "sdks",
+  websocket: "websocket",
+  git: "git",
+  sse: "sse",
+};
 
 function getActivePage(pathname: string): string {
-  const segment = pathname.split("/")[1] ?? ""
-  return ACTIVE_PAGE_MAP[segment] ?? "api-endpoints"
+  const segment = pathname.split("/")[1] ?? "";
+  return ACTIVE_PAGE_MAP[segment] ?? "api-endpoints";
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isCollapsed, toggleSidebar } = useSidebar()
-  const pathname = usePathname()
-  const activePage = getActivePage(pathname)
+  const { isCollapsed, toggleSidebar } = useSidebar();
+  const pathname = usePathname();
+  const activePage = getActivePage(pathname);
+  const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+
+  // Cmd+I / Ctrl+I toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "i") {
+        e.preventDefault();
+        setAiSidebarOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
-    <div className="flex h-screen bg-background bg-dot-pattern">
-      <ApiSidebar activePage={activePage} collapsed={isCollapsed} onCollapse={toggleSidebar} />
+    <AiSidebarContext.Provider value={{ aiSidebarOpen, setAiSidebarOpen }}>
+      <div className="flex h-screen bg-background bg-dot-pattern">
+        <ApiSidebar activePage={activePage} collapsed={isCollapsed} onCollapse={toggleSidebar} />
 
-      <div
-        className={cn(
-          "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out main-content relative",
-          isCollapsed ? "ml-[60px]" : "ml-64",
-          "max-[916px]:ml-[60px]"
-        )}
-      >
-        <ShortcutsRegistrar />
-        <ApiHeader />
-        {children}
+        <div
+          className={cn(
+            "flex flex-1 flex-col overflow-hidden transition-[margin] duration-200 ease-out main-content relative",
+            isCollapsed ? "ml-[60px]" : "ml-64",
+            "max-[916px]:ml-[60px]",
+          )}
+        >
+          <ShortcutsRegistrar />
+          <ApiHeader />
+          {children}
+        </div>
+
+        <AiSidebar open={aiSidebarOpen} onClose={() => setAiSidebarOpen(false)} />
       </div>
-    </div>
-  )
+    </AiSidebarContext.Provider>
+  );
 }

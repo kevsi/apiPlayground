@@ -27,7 +27,6 @@ export const metadata: Metadata = {
 
 import { SidebarProvider } from "@/contexts/sidebar-context";
 import { Toaster } from "@/components/ui/toaster";
-import { FloatingAiChat } from "@/app/floating-ai-chat-client";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ClientLayoutShell } from "@/components/client-layout-shell";
 import { AiShortcutBridge } from "@/components/ai-shortcut-bridge";
@@ -59,7 +58,6 @@ export default function RootLayout({
                 {children}
               </ClientLayoutShell>
             </SidebarProvider>
-            <FloatingAiChat />
             <AiShortcutBridge />
             <Toaster />
           </ErrorBoundary>
