@@ -1,17 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import {
-  Plus,
-  Trash2,
-  Copy,
-  Users,
-  UserPlus,
-  Check,
-  AlertCircle,
-  Shield,
-  Building2,
-} from "lucide-react";
+import { Plus, Trash2, Copy, Users, UserPlus, AlertCircle, Shield, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,15 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
-interface WorkspaceData {
-  id: string;
-  name: string;
-  ownerId: string;
-  role: string;
-  createdAt: number;
-  updatedAt: number;
-}
+import { useRequestStore, type Workspace } from "@/hooks/use-request-store";
 
 interface MemberData {
   id: string;
@@ -63,13 +45,15 @@ function formatDate(ts: number): string {
 }
 
 export default function WorkspacesPage() {
-  const [workspaces, setWorkspaces] = useState<WorkspaceData[]>([]);
+  const workspaces = useRequestStore((s) => s.workspaces);
+  const fetchWorkspacesFromApi = useRequestStore((s) => s.fetchWorkspacesFromApi);
+
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selected, setSelected] = useState<WorkspaceData | null>(null);
+  const [selected, setSelected] = useState<Workspace | null>(null);
   const [members, setMembers] = useState<MemberData[]>([]);
   const [invitation, setInvitation] = useState<{ token: string; expiresAt: number } | null>(null);
   const [workspaceName, setWorkspaceName] = useState("");
@@ -77,22 +61,10 @@ export default function WorkspacesPage() {
   const [deleting, setDeleting] = useState(false);
   const [inviting, setInviting] = useState(false);
 
-  const fetchWorkspaces = useCallback(async () => {
-    try {
-      const res = await fetch("/api/workspaces");
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setWorkspaces(data.workspaces ?? []);
-    } catch {
-      toast({ title: "Unable to load workspaces", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Load workspaces from the sync server and populate the shared store
   useEffect(() => {
-    void fetchWorkspaces();
-  }, [fetchWorkspaces]);
+    fetchWorkspacesFromApi().finally(() => setLoading(false));
+  }, [fetchWorkspacesFromApi]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,8 +77,8 @@ export default function WorkspacesPage() {
         body: JSON.stringify({ name: workspaceName.trim() }),
       });
       if (!res.ok) throw new Error("create failed");
-      const data = await res.json();
-      setWorkspaces((prev) => [data.workspace, ...prev]);
+      // Refresh the store so header & page are in sync
+      await fetchWorkspacesFromApi();
       setWorkspaceName("");
       setCreateOpen(false);
       toast({ title: "Workspace created" });
@@ -125,7 +97,7 @@ export default function WorkspacesPage() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("delete failed");
-      setWorkspaces((prev) => prev.filter((w) => w.id !== selected.id));
+      await fetchWorkspacesFromApi();
       setDeleteOpen(false);
       setSelected(null);
       toast({ title: "Workspace deleted" });
@@ -136,7 +108,7 @@ export default function WorkspacesPage() {
     }
   };
 
-  const openMembers = async (ws: WorkspaceData) => {
+  const openMembers = async (ws: Workspace) => {
     setSelected(ws);
     setMembersOpen(true);
     try {
@@ -149,7 +121,7 @@ export default function WorkspacesPage() {
     }
   };
 
-  const openInvite = (ws: WorkspaceData) => {
+  const openInvite = (ws: Workspace) => {
     setSelected(ws);
     setInvitation(null);
     setInviteOpen(true);
@@ -233,15 +205,19 @@ export default function WorkspacesPage() {
                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
                             ws.role === "owner"
                               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
+                              : ws.role
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                : "bg-muted text-muted-foreground",
                           )}
                         >
                           {ws.role === "owner" ? (
                             <>
                               <Shield className="size-3" /> Owner
                             </>
-                          ) : (
+                          ) : ws.role ? (
                             ws.role
+                          ) : (
+                            "Local"
                           )}
                         </span>
                       </div>
@@ -263,7 +239,7 @@ export default function WorkspacesPage() {
                       <Users className="mr-1.5 size-3.5" />
                       Members
                     </Button>
-                    {ws.role === "owner" && (
+                    {(ws.role === "owner" || (!ws.role && ws.id === "ws-personal")) && (
                       <>
                         <Button
                           variant="secondary"

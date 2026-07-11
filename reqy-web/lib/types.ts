@@ -1,28 +1,29 @@
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "GRAPHQL"
+export type HttpMethod =
+  "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "GRAPHQL";
 
 export interface CollectionFolder {
-  id: string
-  name: string
-  parentId: string | null
-  collectionId: string
-  order: number
-  createdAt: number
-  updatedAt: number
+  id: string;
+  name: string;
+  parentId: string | null;
+  collectionId: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface RequestItem {
-  id: string
-  name: string
-  method: HttpMethod
-  url: string
-  endpoint: string
-  headers?: Record<string, string>
-  body?: string
-  bodyType?: "json" | "form-data" | "x-www-form" | "raw" | "binary"
-  authType?: "none" | "bearer" | "basic" | "api-key" | "oauth2"
-  authToken?: string
-  queryParams?: Array<{ key: string; value: string }>
-  folderId?: string | null
+  id: string;
+  name: string;
+  method: HttpMethod;
+  url: string;
+  endpoint: string;
+  headers?: Record<string, string>;
+  body?: string;
+  bodyType?: "json" | "form-data" | "x-www-form" | "raw" | "binary";
+  authType?: "none" | "bearer" | "basic" | "api-key" | "oauth2";
+  authToken?: string;
+  queryParams?: Array<{ key: string; value: string }>;
+  folderId?: string | null;
   /**
    * Legacy assertion format used by the original inline test editor.
    * New code should use {@link runnerAssertions} (lib/test-runner/types.Assertion)
@@ -31,225 +32,238 @@ export interface RequestItem {
    * without a migration path. Prefer runnerAssertions for new code.
    * @deprecated since 2024-Q4 — use runnerAssertions instead.
    */
-  assertions?: RequestTestAssertion[]
-  runnerAssertions?: import("@/lib/test-runner/types").Assertion[]
-  preRequestScript?: string
-  postResponseScript?: string
-  datasetKey?: string
-  protocol?: "rest" | "graphql"
+  assertions?: RequestTestAssertion[];
+  runnerAssertions?: import("@/lib/test-runner/types").Assertion[];
+  preRequestScript?: string;
+  postResponseScript?: string;
+  datasetKey?: string;
+  protocol?: "rest" | "graphql";
   graphql?: {
-    query: string
-    variables: string
-    operationName?: string
-  }
-  createdAt: number
-  updatedAt: number
+    query: string;
+    variables: string;
+    operationName?: string;
+  };
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface HistoryItem extends RequestItem {
-  workspaceId?: string
-  responseStatus?: number
-  responseTime?: number
-  responseSize?: string
-  responseBody?: string | Blob
-  executedAt: number
+  workspaceId?: string;
+  responseStatus?: number;
+  responseTime?: number;
+  responseSize?: string;
+  responseBody?: string | Blob;
+  executedAt: number;
 }
 
 export interface Workspace {
-  id: string
-  name: string
-  description?: string
-  color: string
-  icon: string
-  createdAt: number
-  updatedAt: number
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  icon: string;
+  /** Present when workspace comes from the sync server */
+  ownerId?: string;
+  /** "owner" | "editor" — present when workspace comes from the sync server */
+  role?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Collection {
-  id: string
-  name: string
-  description?: string
-  color: string
-  icon: string
-  workspaceId?: string
-  requests: RequestItem[]
-  folders?: CollectionFolder[]
-  createdAt: number
-  updatedAt: number
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  icon: string;
+  workspaceId?: string;
+  requests: RequestItem[];
+  folders?: CollectionFolder[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface EnvironmentVariable {
-  key: string
-  value: string
-  enabled: boolean
+  key: string;
+  value: string;
+  enabled: boolean;
 }
 
 export interface Environment {
-  id: string
-  name: string
-  color: string
-  workspaceId?: string
-  variables: EnvironmentVariable[]
-  createdAt: number
-  updatedAt: number
+  id: string;
+  name: string;
+  color: string;
+  workspaceId?: string;
+  variables: EnvironmentVariable[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface VariableMapping {
-  id: string
-  name: string
-  sourceRequestId: string
-  sourcePath: string
-  workspaceId?: string
-  enabled: boolean
-  createdAt: number
-  updatedAt: number
+  id: string;
+  name: string;
+  sourceRequestId: string;
+  sourcePath: string;
+  workspaceId?: string;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Notification {
-  id: string
-  title: string
-  body?: string
-  type?: "info" | "success" | "warning" | "error"
-  event?: string
-  read: boolean
-  createdAt: number
+  id: string;
+  title: string;
+  body?: string;
+  type?: "info" | "success" | "warning" | "error";
+  event?: string;
+  read: boolean;
+  createdAt: number;
 }
 
-export type AssertionType = "status" | "bodyContains" | "headerExists" | "jsonPath"
+export type AssertionType = "status" | "bodyContains" | "headerExists" | "jsonPath";
 
 export interface RequestTestAssertion {
-  id: string
-  type: AssertionType
-  target: string
-  expected?: string
-  enabled: boolean
+  id: string;
+  type: AssertionType;
+  target: string;
+  expected?: string;
+  enabled: boolean;
 }
 
 export interface TestResult {
-  assertionId: string
-  type: AssertionType
-  target: string
-  expected?: string
-  passed: boolean
-  message: string
+  assertionId: string;
+  type: AssertionType;
+  target: string;
+  expected?: string;
+  passed: boolean;
+  message: string;
 }
 
-export type AIProvider = "anthropic" | "openai" | "openrouter" | "gemini" | "deepseek" | "ollama" | "opencode-zen" | "custom" | "grok"
-export type AnalysisMode = "static" | "ai"
+export type AIProvider =
+  | "anthropic"
+  | "openai"
+  | "openrouter"
+  | "gemini"
+  | "deepseek"
+  | "ollama"
+  | "opencode-zen"
+  | "custom"
+  | "grok";
+export type AnalysisMode = "static" | "ai";
 
 export interface SavedProject {
-  id: string
-  name: string
-  framework: string
-  language?: string
-  folderPath: string
-  port?: number
-  routes: import("@/lib/detect-shared").DetectedRoute[]
-  analyzedAt: string
-  mode: AnalysisMode
-  workspaceId?: string
+  id: string;
+  name: string;
+  framework: string;
+  language?: string;
+  folderPath: string;
+  port?: number;
+  routes: import("@/lib/detect-shared").DetectedRoute[];
+  analyzedAt: string;
+  mode: AnalysisMode;
+  workspaceId?: string;
 }
 
 export interface GithubConfig {
-  token?: string
+  token?: string;
 }
 
 export interface OllamaConfig {
-  host?: string
-  port?: number
-  model?: string
+  host?: string;
+  port?: number;
+  model?: string;
 }
 
 // --- GraphQL additions ---
 
 export interface GraphQLError {
-  message: string
-  path?: (string | number)[]
-  extensions?: Record<string, unknown>
+  message: string;
+  path?: (string | number)[];
+  extensions?: Record<string, unknown>;
 }
 
 export interface GraphQLExecuteResult {
-  statusCode: number
-  responseTimeMs: number
-  headers: Record<string, string>
-  data?: unknown
-  errors?: GraphQLError[]
-  graphqlBody: { data?: unknown; errors?: GraphQLError[] } | unknown
+  statusCode: number;
+  responseTimeMs: number;
+  headers: Record<string, string>;
+  data?: unknown;
+  errors?: GraphQLError[];
+  graphqlBody: { data?: unknown; errors?: GraphQLError[] } | unknown;
 }
 
 export interface GraphQLRequest {
-  endpoint: string
-  query: string
-  variables?: Record<string, unknown>
-  operationName?: string
-  headers?: Record<string, string>
+  endpoint: string;
+  query: string;
+  variables?: Record<string, unknown>;
+  operationName?: string;
+  headers?: Record<string, string>;
 }
 
-export type GraphqlMessageType = "data" | "error" | "complete" | "info"
+export type GraphqlMessageType = "data" | "error" | "complete" | "info";
 
 export interface GraphqlSubscriptionMessage {
-  id: number
-  type: GraphqlMessageType
-  payload: unknown
-  timestamp: number
+  id: number;
+  type: GraphqlMessageType;
+  payload: unknown;
+  timestamp: number;
 }
 
 export interface GraphqlTab {
-  id: string
-  name: string
-  endpoint: string
-  query: string
-  variables: string
-  headers: string
-  operationName?: string
-  schema?: unknown
-  schemaLoading?: boolean
-  response?: GraphQLExecuteResult
-  subscriptionMessages?: GraphqlSubscriptionMessage[]
-  saved?: boolean
-  dirty?: boolean
+  id: string;
+  name: string;
+  endpoint: string;
+  query: string;
+  variables: string;
+  headers: string;
+  operationName?: string;
+  schema?: unknown;
+  schemaLoading?: boolean;
+  response?: GraphQLExecuteResult;
+  subscriptionMessages?: GraphqlSubscriptionMessage[];
+  saved?: boolean;
+  dirty?: boolean;
 }
 
 export interface GraphQLError {
-  message: string
-  path?: (string | number)[]
-  extensions?: Record<string, unknown>
+  message: string;
+  path?: (string | number)[];
+  extensions?: Record<string, unknown>;
 }
 
 export interface GraphQLExecuteResult {
-  statusCode: number
-  responseTimeMs: number
-  headers: Record<string, string>
-  data?: unknown
-  errors?: GraphQLError[]
-  graphqlBody: { data?: unknown; errors?: GraphQLError[] } | unknown
+  statusCode: number;
+  responseTimeMs: number;
+  headers: Record<string, string>;
+  data?: unknown;
+  errors?: GraphQLError[];
+  graphqlBody: { data?: unknown; errors?: GraphQLError[] } | unknown;
 }
 
 export interface GraphQLRequest {
-  endpoint: string
-  query: string
-  variables?: Record<string, unknown>
-  operationName?: string
-  headers?: Record<string, string>
+  endpoint: string;
+  query: string;
+  variables?: Record<string, unknown>;
+  operationName?: string;
+  headers?: Record<string, string>;
 }
 
 export interface GraphqlTab {
-  id: string
-  name: string
-  endpoint: string
-  query: string
-  variables: string
-  headers: string
-  operationName?: string
-  schema?: unknown
-  schemaLoading?: boolean
-  response?: GraphQLExecuteResult
+  id: string;
+  name: string;
+  endpoint: string;
+  query: string;
+  variables: string;
+  headers: string;
+  operationName?: string;
+  schema?: unknown;
+  schemaLoading?: boolean;
+  response?: GraphQLExecuteResult;
   subscriptionMessages?: Array<{
-    id: number
-    type: "data" | "error" | "complete" | "info"
-    payload: unknown
-    timestamp: number
-  }>
-  saved?: boolean
-  dirty?: boolean
+    id: number;
+    type: "data" | "error" | "complete" | "info";
+    payload: unknown;
+    timestamp: number;
+  }>;
+  saved?: boolean;
+  dirty?: boolean;
 }

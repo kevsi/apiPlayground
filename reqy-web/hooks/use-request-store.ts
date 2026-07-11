@@ -383,11 +383,20 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
       const res = await fetch("/api/workspaces");
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = (await res.json()) as {
-        workspaces: Array<{ id: string; name: string; createdAt: number; updatedAt: number }>;
+        workspaces: Array<{
+          id: string;
+          name: string;
+          ownerId: string;
+          role: string;
+          createdAt: number;
+          updatedAt: number;
+        }>;
       };
       const serverWorkspaces: Workspace[] = (data.workspaces ?? []).map((w) => ({
         id: w.id,
         name: w.name,
+        ownerId: w.ownerId,
+        role: w.role,
         color: "slate",
         icon: "folder",
         description: "",

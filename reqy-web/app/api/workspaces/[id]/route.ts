@@ -39,6 +39,10 @@ async function proxyJson(req: NextRequest): Promise<NextResponse> {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  return proxyJson(request);
+}
+
 export async function DELETE(request: NextRequest) {
   return proxyJson(request);
 }

@@ -56,6 +56,31 @@ workspaces.get("/", (c) => {
   return c.json({ workspaces: rows });
 });
 
+const UpdateSchema = z.object({ name: z.string().min(1).max(100) });
+
+workspaces.put("/:id", async (c) => {
+  const auth = c.get("auth") as AuthContext;
+  const id = c.req.param("id");
+
+  const workspace = db.prepare(`SELECT owner_id FROM workspaces WHERE id = ?`).get(id) as
+    { owner_id: string } | undefined;
+  if (!workspace) return c.json({ error: "Workspace not found" }, 404);
+  if (workspace.owner_id !== auth.userId)
+    return c.json({ error: "Only the owner can rename this workspace" }, 403);
+
+  const parsed = await safeParseJson(c, UpdateSchema);
+  if (!parsed.success) return parsed.response;
+
+  const now = Date.now();
+  db.prepare(`UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?`).run(
+    parsed.data.name,
+    now,
+    id,
+  );
+
+  return c.json({ success: true, updatedAt: now });
+});
+
 workspaces.post("/:id/invitations", (c) => {
   const auth = c.get("auth") as AuthContext;
   const id = c.req.param("id");

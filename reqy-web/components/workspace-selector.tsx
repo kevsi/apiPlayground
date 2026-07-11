@@ -1,7 +1,18 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Plus, Check, Folder, Globe, Lock, Zap, Cloud, Terminal, Pencil } from "lucide-react";
+import {
+  Plus,
+  Check,
+  Folder,
+  Globe,
+  Lock,
+  Zap,
+  Cloud,
+  Terminal,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -112,13 +123,59 @@ export function WorkspaceSelector() {
     setCreateOpen(false);
   }, [newName, addWorkspace, addServerWorkspace, setActiveWorkspace]);
 
-  const handleRename = useCallback(() => {
+  const handleRename = useCallback(async () => {
     if (!renamingWorkspace || !newName.trim()) return;
-    updateWorkspace(renamingWorkspace.id, { name: newName.trim() });
+    const id = renamingWorkspace.id;
+    const name = newName.trim();
+    // If this is a server workspace with ownerId, try the API first
+    if (renamingWorkspace.ownerId) {
+      try {
+        const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (res.ok) {
+          await fetchWorkspacesFromApi();
+          setRenamingWorkspace(null);
+          setNewName("");
+          setRenameOpen(false);
+          return;
+        }
+      } catch {
+        // API unavailable, fall through to local update
+      }
+    }
+    // Local fallback
+    updateWorkspace(id, { name });
     setRenamingWorkspace(null);
     setNewName("");
     setRenameOpen(false);
-  }, [renamingWorkspace, newName, updateWorkspace]);
+  }, [renamingWorkspace, newName, updateWorkspace, fetchWorkspacesFromApi]);
+
+  const handleDeleteWorkspace = useCallback(
+    async (w: Workspace, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!window.confirm(`Delete "${w.name}"? This cannot be undone.`)) return;
+
+      if (w.ownerId) {
+        // Server workspace — try API first
+        try {
+          const res = await fetch(`/api/workspaces/${encodeURIComponent(w.id)}`, {
+            method: "DELETE",
+          });
+          if (res.ok) {
+            await fetchWorkspacesFromApi();
+            return;
+          }
+        } catch {
+          // API unavailable, fall through to local delete
+        }
+      }
+      deleteWorkspace(w.id);
+    },
+    [deleteWorkspace, fetchWorkspacesFromApi],
+  );
 
   const openRename = useCallback((w: Workspace) => {
     setRenamingWorkspace(w);
@@ -190,6 +247,19 @@ export function WorkspaceSelector() {
                   title="Renommer"
                 >
                   <Pencil className="size-3.5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteWorkspace(w, e);
+                  }}
+                  className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-all hover:bg-destructive/10 hover:text-destructive",
+                    hoveredWsId === w.id ? "opacity-100" : "opacity-0",
+                  )}
+                  title="Supprimer"
+                >
+                  <Trash2 className="size-3.5" />
                 </button>
               </DropdownMenuItem>
             );
