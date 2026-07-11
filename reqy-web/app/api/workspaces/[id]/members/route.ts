@@ -19,21 +19,26 @@ async function proxyJson(req: NextRequest): Promise<NextResponse> {
   }
 
   const syncPath = getSyncPath(req);
-  const target = `${SYNC_URL}/api/sync${syncPath}${req.nextUrl.search}`;
+  const target = `${SYNC_URL}/api${syncPath}${req.nextUrl.search}`;
   const body = req.method !== "GET" && req.method !== "HEAD" ? await req.text() : undefined;
 
-  const res = await fetch(target, {
-    method: req.method,
-    headers: {
-      "Content-Type": "application/json",
-      ...proxyAuthHeaders(),
-    },
-    body,
-    cache: "no-store",
-  });
+  try {
+    const res = await fetch(target, {
+      method: req.method,
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: req.headers.get("cookie") || "",
+        ...proxyAuthHeaders(),
+      },
+      body,
+      cache: "no-store",
+    });
 
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch {
+    return NextResponse.json({ error: `Sync server unreachable at ${SYNC_URL}` }, { status: 502 });
+  }
 }
 
 export async function GET(request: NextRequest) {

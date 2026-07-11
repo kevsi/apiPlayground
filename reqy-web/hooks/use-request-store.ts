@@ -195,6 +195,7 @@ type RequestStoreState = RequestStore & {
   commit: (updater: (prev: RequestStore) => RequestStore) => void;
   reset: () => void;
   initStore: () => Promise<void>;
+  fetchWorkspacesFromApi: () => Promise<void>;
   notify?: (message: string) => void;
 } & MutationMethods;
 
@@ -376,6 +377,56 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     }
   });
 
+  /** Fetch workspaces from the sync server API and merge with local metadata */
+  const fetchWorkspacesFromApi = async () => {
+    try {
+      const res = await fetch("/api/workspaces");
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      const data = (await res.json()) as {
+        workspaces: Array<{ id: string; name: string; createdAt: number; updatedAt: number }>;
+      };
+      const serverWorkspaces: Workspace[] = (data.workspaces ?? []).map((w) => ({
+        id: w.id,
+        name: w.name,
+        color: "slate",
+        icon: "folder",
+        description: "",
+        createdAt: w.createdAt,
+        updatedAt: w.updatedAt,
+      }));
+
+      const current = get();
+      // Preserve local UI metadata (color, icon) for workspaces that already exist
+      const localMeta = new Map(
+        current.workspaces.map((w) => [
+          w.id,
+          { color: w.color, icon: w.icon, description: w.description },
+        ]),
+      );
+      const merged = serverWorkspaces.map((ws) => {
+        const meta = localMeta.get(ws.id);
+        return meta ? { ...ws, ...meta } : ws;
+      });
+
+      // Keep the Personal workspace (local-only concept)
+      const personalWs = current.workspaces.find((w) => w.id === WORKSPACE_PERSONAL_ID);
+      const allWorkspaces = personalWs ? [personalWs, ...merged] : merged;
+
+      const activeId = current.activeWorkspaceId;
+      const stillExists = allWorkspaces.some((w) => w.id === activeId);
+
+      commit((prev) => ({
+        ...prev,
+        workspaces: allWorkspaces,
+        activeWorkspaceId: stillExists
+          ? activeId!
+          : (allWorkspaces[0]?.id ?? WORKSPACE_PERSONAL_ID),
+      }));
+    } catch (e) {
+      console.warn("[workspaces] API fetch failed, using local workspaces:", e);
+    }
+  };
+
   const mutations = {
     ...createNotificationsMutations(commit),
     ...createHistoryMutations(commit),
@@ -421,6 +472,7 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
       const loaded = await loadFromStorageAsync();
       set(loaded);
     },
+    fetchWorkspacesFromApi,
     ...mutations,
     getFoldersForCollection,
     notify: (message: string) =>

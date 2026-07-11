@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
-import { Plus, Check, Folder, Globe, Lock, Zap, Cloud, Terminal, Pencil } from "lucide-react"
+import { useState, useCallback, useEffect } from "react";
+import { Plus, Check, Folder, Globe, Lock, Zap, Cloud, Terminal, Pencil } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -9,20 +9,20 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
-import { useRequestStore, type Workspace } from "@/hooks/use-request-store"
-import { useShallow } from "zustand/react/shallow"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { useRequestStore, type Workspace } from "@/hooks/use-request-store";
+import { useShallow } from "zustand/react/shallow";
 
 const workspaceIcons: Record<string, typeof Folder> = {
   folder: Folder,
@@ -31,7 +31,7 @@ const workspaceIcons: Record<string, typeof Folder> = {
   zap: Zap,
   cloud: Cloud,
   terminal: Terminal,
-}
+};
 
 const workspaceColors: Record<string, string> = {
   slate: "bg-slate-500",
@@ -40,61 +40,93 @@ const workspaceColors: Record<string, string> = {
   amber: "bg-amber-500",
   purple: "bg-purple-500",
   red: "bg-red-500",
-}
+};
 
 export function WorkspaceSelector() {
   // Atomic selectors — re-render only when the workspaces list or the active
   // workspace id actually changes, not on unrelated mutations.
-  const workspaces = useRequestStore((s) => s.workspaces)
-  const activeWorkspaceId = useRequestStore((s) => s.activeWorkspaceId)
+  const workspaces = useRequestStore((s) => s.workspaces);
+  const activeWorkspaceId = useRequestStore((s) => s.activeWorkspaceId);
   // Action refs are stable; group them under one useShallow subscription.
-  const { addWorkspace, updateWorkspace, deleteWorkspace, setActiveWorkspace } =
-    useRequestStore(
-      useShallow((s) => ({
-        addWorkspace: s.addWorkspace,
-        updateWorkspace: s.updateWorkspace,
-        deleteWorkspace: s.deleteWorkspace,
-        setActiveWorkspace: s.setActiveWorkspace,
-      })),
-    )
+  const {
+    addWorkspace,
+    addServerWorkspace,
+    updateWorkspace,
+    deleteWorkspace,
+    setActiveWorkspace,
+    fetchWorkspacesFromApi,
+  } = useRequestStore(
+    useShallow((s) => ({
+      addWorkspace: s.addWorkspace,
+      addServerWorkspace: s.addServerWorkspace,
+      updateWorkspace: s.updateWorkspace,
+      deleteWorkspace: s.deleteWorkspace,
+      setActiveWorkspace: s.setActiveWorkspace,
+      fetchWorkspacesFromApi: s.fetchWorkspacesFromApi,
+    })),
+  );
 
-  const [createOpen, setCreateOpen] = useState(false)
-  const [renameOpen, setRenameOpen] = useState(false)
-  const [renamingWorkspace, setRenamingWorkspace] = useState<Workspace | null>(null)
-  const [newName, setNewName] = useState("")
-  const [hoveredWsId, setHoveredWsId] = useState<string | null>(null)
+  // Load workspaces from the sync server on mount and merge into the store
+  useEffect(() => {
+    fetchWorkspacesFromApi();
+  }, [fetchWorkspacesFromApi]);
 
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renamingWorkspace, setRenamingWorkspace] = useState<Workspace | null>(null);
+  const [newName, setNewName] = useState("");
+  const [hoveredWsId, setHoveredWsId] = useState<string | null>(null);
 
-  const handleCreate = useCallback(() => {
-    if (!newName.trim()) return
-    addWorkspace({
-      name: newName.trim(),
-      description: "",
-      color: "slate",
-      icon: "folder",
-    })
-    setNewName("")
-    setCreateOpen(false)
-  }, [newName, addWorkspace])
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+
+  const handleCreate = useCallback(async () => {
+    if (!newName.trim()) return;
+    try {
+      const res = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const serverWs = data.workspace;
+        addServerWorkspace({
+          id: serverWs.id,
+          name: serverWs.name,
+          color: "slate",
+          icon: "folder",
+          description: "",
+          createdAt: serverWs.createdAt,
+          updatedAt: serverWs.updatedAt,
+        });
+        setActiveWorkspace(serverWs.id);
+      } else {
+        // API error, fall back to local-only creation
+        addWorkspace({ name: newName.trim(), description: "", color: "slate", icon: "folder" });
+      }
+    } catch {
+      // Network error, fall back to local-only creation
+      addWorkspace({ name: newName.trim(), description: "", color: "slate", icon: "folder" });
+    }
+    setNewName("");
+    setCreateOpen(false);
+  }, [newName, addWorkspace, addServerWorkspace, setActiveWorkspace]);
 
   const handleRename = useCallback(() => {
-    if (!renamingWorkspace || !newName.trim()) return
-    updateWorkspace(renamingWorkspace.id, { name: newName.trim() })
-    setRenamingWorkspace(null)
-    setNewName("")
-    setRenameOpen(false)
-  }, [renamingWorkspace, newName, updateWorkspace])
+    if (!renamingWorkspace || !newName.trim()) return;
+    updateWorkspace(renamingWorkspace.id, { name: newName.trim() });
+    setRenamingWorkspace(null);
+    setNewName("");
+    setRenameOpen(false);
+  }, [renamingWorkspace, newName, updateWorkspace]);
 
   const openRename = useCallback((w: Workspace) => {
-    setRenamingWorkspace(w)
-    setNewName(w.name)
-    setRenameOpen(true)
-  }, [])
+    setRenamingWorkspace(w);
+    setNewName(w.name);
+    setRenameOpen(true);
+  }, []);
 
-  const IconComponent = activeWorkspace
-    ? workspaceIcons[activeWorkspace.icon] || Folder
-    : Folder
+  const IconComponent = activeWorkspace ? workspaceIcons[activeWorkspace.icon] || Folder : Folder;
 
   return (
     <>
@@ -104,10 +136,14 @@ export function WorkspaceSelector() {
             aria-label="Switch workspace"
             className="group/ws flex items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-foreground transition-all duration-200 hover:border-border hover:bg-accent/50"
           >
-            <div className={cn(
-              "flex size-6 shrink-0 items-center justify-center rounded-md",
-              activeWorkspace ? workspaceColors[activeWorkspace.color] || "bg-slate-500" : "bg-slate-500"
-            )}>
+            <div
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-md",
+                activeWorkspace
+                  ? workspaceColors[activeWorkspace.color] || "bg-slate-500"
+                  : "bg-slate-500",
+              )}
+            >
               <IconComponent className="size-3.5 text-white" />
             </div>
             <span className="max-w-[140px] truncate">{activeWorkspace?.name ?? "Workspace"}</span>
@@ -119,45 +155,50 @@ export function WorkspaceSelector() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {workspaces.map((w) => {
-            const Icon = workspaceIcons[w.icon] || Folder
-            const isActive = w.id === activeWorkspaceId
+            const Icon = workspaceIcons[w.icon] || Folder;
+            const isActive = w.id === activeWorkspaceId;
             return (
-                <DropdownMenuItem
-                  key={w.id}
-                  onClick={() => setActiveWorkspace(w.id)}
-                  onMouseEnter={() => setHoveredWsId(w.id)}
-                  onMouseLeave={() => setHoveredWsId(null)}
+              <DropdownMenuItem
+                key={w.id}
+                onClick={() => setActiveWorkspace(w.id)}
+                onMouseEnter={() => setHoveredWsId(w.id)}
+                onMouseLeave={() => setHoveredWsId(null)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2",
+                  isActive && "bg-primary/10 text-primary",
+                )}
+              >
+                <div
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2",
-                    isActive && "bg-primary/10 text-primary"
+                    "flex size-6 shrink-0 items-center justify-center rounded-md",
+                    workspaceColors[w.color] || "bg-slate-500",
                   )}
                 >
-                  <div className={cn(
-                    "flex size-6 shrink-0 items-center justify-center rounded-md",
-                    workspaceColors[w.color] || "bg-slate-500"
-                  )}>
-                    <Icon className="size-3.5 text-white" />
-                  </div>
-                  <span className="flex-1 truncate text-sm">{w.name}</span>
-                  {isActive && <Check className="size-4 shrink-0 text-primary" />}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openRename(w)
-                    }}
-                    className={cn(
-                      "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-all hover:bg-accent hover:text-foreground",
-                      hoveredWsId === w.id ? "opacity-100" : "opacity-0"
-                    )}
-                    title="Renommer"
-                  >
-                    <Pencil className="size-3.5" />
-                  </button>
-                </DropdownMenuItem>
-            )
+                  <Icon className="size-3.5 text-white" />
+                </div>
+                <span className="flex-1 truncate text-sm">{w.name}</span>
+                {isActive && <Check className="size-4 shrink-0 text-primary" />}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openRename(w);
+                  }}
+                  className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-all hover:bg-accent hover:text-foreground",
+                    hoveredWsId === w.id ? "opacity-100" : "opacity-0",
+                  )}
+                  title="Renommer"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+              </DropdownMenuItem>
+            );
           })}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreateOpen(true)} className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground">
+          <DropdownMenuItem
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground"
+          >
             <div className="flex size-6 shrink-0 items-center justify-center rounded-md border border-dashed border-border">
               <Plus className="size-3.5" />
             </div>
@@ -195,7 +236,13 @@ export function WorkspaceSelector() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={renameOpen} onOpenChange={(v) => { setRenameOpen(v); if (!v) setRenamingWorkspace(null) }}>
+      <Dialog
+        open={renameOpen}
+        onOpenChange={(v) => {
+          setRenameOpen(v);
+          if (!v) setRenamingWorkspace(null);
+        }}
+      >
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Renommer le workspace</DialogTitle>
@@ -213,7 +260,13 @@ export function WorkspaceSelector() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRenameOpen(false); setRenamingWorkspace(null) }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRenameOpen(false);
+                setRenamingWorkspace(null);
+              }}
+            >
               Annuler
             </Button>
             <Button onClick={handleRename} disabled={!newName.trim()}>
@@ -223,5 +276,5 @@ export function WorkspaceSelector() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

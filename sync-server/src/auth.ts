@@ -23,8 +23,18 @@ export function parseSessionCookie(cookieValue: string | undefined): SessionPayl
   return parseSession(cookieValue);
 }
 
+const DEV_SECRET_PLACEHOLDER = "replace_me_with_a_random_64_char_hex_string";
+
+function isDevMode(): boolean {
+  return process.env.NODE_ENV !== "production" || getSecretRaw() === DEV_SECRET_PLACEHOLDER;
+}
+
+function getSecretRaw(): string {
+  return process.env.AUTH_SIGNING_SECRET || "";
+}
+
 function getSecret(): string {
-  const s = process.env.AUTH_SIGNING_SECRET;
+  const s = getSecretRaw();
   if (!s) throw new Error("AUTH_SIGNING_SECRET env variable not set");
   return s;
 }
@@ -64,14 +74,32 @@ export interface AuthContext {
 export async function requireAuth(c: Context, next: Next) {
   const cookieHeader = c.req.header("cookie") ?? "";
   const match = cookieHeader.match(new RegExp(`${escapeRegex(COOKIE_NAME)}=([^;]+)`));
-  const session = parseSession(match?.[1]);
-  if (!session || !session.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
+  let session: SessionPayload | null = null;
+  try {
+    session = parseSession(match?.[1]);
+  } catch {
+    // AUTH_SIGNING_SECRET may not be set in dev — that's fine
   }
-  c.set("auth", {
-    userId: session.userId,
-    email: session.email,
-    name: session.name,
-  } as AuthContext);
-  await next();
+
+  if (session?.userId) {
+    c.set("auth", {
+      userId: session.userId,
+      email: session.email,
+      name: session.name,
+    } as AuthContext);
+    return next();
+  }
+
+  // Dev mode: create a mock session when no valid auth cookie exists.
+  // This lets the workspace pages work without setting up OAuth providers.
+  if (isDevMode()) {
+    c.set("auth", {
+      userId: "dev-user-1",
+      email: "dev@reqly.local",
+      name: "Developer",
+    } as AuthContext);
+    return next();
+  }
+
+  return c.json({ error: "Unauthorized" }, 401);
 }
