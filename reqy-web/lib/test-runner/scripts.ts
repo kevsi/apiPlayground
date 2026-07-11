@@ -1,15 +1,15 @@
-import type { RunnerContext, RequestResponse } from "./types"
+import type { RunnerContext, RequestResponse } from "./types";
 
 export interface ScriptOptions {
-  phase: "pre" | "post"
-  response?: RequestResponse
-  timeoutMs?: number
+  phase: "pre" | "post";
+  response?: RequestResponse;
+  timeoutMs?: number;
 }
 
 export interface ScriptOutput {
-  result?: unknown
-  error?: string
-  consoleLines: string[]
+  result?: unknown;
+  error?: string;
+  consoleLines: string[];
 }
 
 const FORBIDDEN_GLOBALS = [
@@ -24,23 +24,31 @@ const FORBIDDEN_GLOBALS = [
   "Buffer",
   "setImmediate",
   "setInterval",
-]
+];
 
 function createPmApi(ctx: RunnerContext, response?: RequestResponse) {
   const environment = {
     get: (k: string) => ctx.environment[k],
-    set: (k: string, v: string) => { ctx.environment[k] = v },
+    set: (k: string, v: string) => {
+      ctx.environment[k] = v;
+    },
     has: (k: string) => k in ctx.environment,
-    unset: (k: string) => { delete ctx.environment[k] },
-  }
+    unset: (k: string) => {
+      delete ctx.environment[k];
+    },
+  };
   const variables = {
     get: (k: string) => ctx.iterationData[k] ?? ctx.environment[k],
-    set: (k: string, v: string) => { ctx.iterationData[k] = v },
-  }
+    set: (k: string, v: string) => {
+      ctx.iterationData[k] = v;
+    },
+  };
   const iterationData = {
     get: (k: string) => ctx.iterationData[k],
-    set: (k: string, v: string) => { ctx.iterationData[k] = v },
-  }
+    set: (k: string, v: string) => {
+      ctx.iterationData[k] = v;
+    },
+  };
   return {
     environment,
     variables,
@@ -48,20 +56,27 @@ function createPmApi(ctx: RunnerContext, response?: RequestResponse) {
     expect: (actual: unknown) => ({
       to: {
         equal: (expected: unknown) => {
-          if (actual !== expected) throw new Error(`Expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`)
+          if (actual !== expected)
+            throw new Error(
+              `Expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`,
+            );
         },
         exist: () => {
-          if (actual === undefined || actual === null) throw new Error(`Expected value to exist`)
+          if (actual === undefined || actual === null) throw new Error(`Expected value to exist`);
         },
       },
     }),
     response,
-  }
+  };
 }
 
 function stringify(v: unknown): string {
-  if (typeof v === "string") return v
-  try { return JSON.stringify(v) } catch { return String(v) }
+  if (typeof v === "string") return v;
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
 }
 
 /**
@@ -69,58 +84,83 @@ function stringify(v: unknown): string {
  * During browser bundling, Function() prevents webpack from bundling this.
  * We return `null` if the module is unavailable.
  */
-let _vm: typeof import("node:vm") | null
+let _vm: typeof import("node:vm") | undefined;
 async function getVm(): Promise<typeof import("node:vm") | null> {
-  if (_vm !== null) return _vm
+  if (_vm !== undefined) return _vm ?? null;
   try {
-    // Use Function() to prevent webpack from bundling this import
-    const importer = new Function('return import("node:vm")')
-    _vm = await importer()
+    // `eval` keeps the module specifier out of webpack's static analysis
+    // (fixes client bundle) while still going through Node.js / vitest's
+    // `require` interceptor, so `vi.mock("node:vm")` stays active in tests.
+    _vm = eval('require("node:vm")') as typeof import("node:vm");
   } catch {
-    _vm = null
+    try {
+      const importer = new Function('return import("node:vm")');
+      _vm = await importer();
+    } catch {
+      _vm = undefined;
+    }
   }
-  return _vm
+  return _vm ?? null;
 }
 
 export async function runScript(
   code: string,
   ctx: RunnerContext,
-  options: ScriptOptions
+  options: ScriptOptions,
 ): Promise<ScriptOutput> {
-  const consoleLines: string[] = []
-  const log = (msg: string) => { consoleLines.push(msg); ctx.log(msg) }
+  const consoleLines: string[] = [];
+  const log = (msg: string) => {
+    consoleLines.push(msg);
+    ctx.log(msg);
+  };
   const consoleShim = {
     log: (...args: unknown[]) => log(args.map(stringify).join(" ")),
     warn: (...args: unknown[]) => log("[WARN] " + args.map(stringify).join(" ")),
     error: (...args: unknown[]) => log("[ERROR] " + args.map(stringify).join(" ")),
-  }
+  };
 
   const sandbox: Record<string, unknown> = {
     pm: createPmApi(ctx, options.response),
     console: consoleShim,
-    Math, Date, JSON, Array, Object, String, Number, Boolean, RegExp, Map, Set,
-    URL, parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
-  }
-  for (const key of FORBIDDEN_GLOBALS) sandbox[key] = undefined
+    Math,
+    Date,
+    JSON,
+    Array,
+    Object,
+    String,
+    Number,
+    Boolean,
+    RegExp,
+    Map,
+    Set,
+    URL,
+    parseInt,
+    parseFloat,
+    isNaN,
+    isFinite,
+    encodeURIComponent,
+    decodeURIComponent,
+  };
+  for (const key of FORBIDDEN_GLOBALS) sandbox[key] = undefined;
 
-  const vm = await getVm()
+  const vm = await getVm();
   if (!vm) {
     return {
       error: "Script execution requires Node.js `vm` module — not available in this environment.",
       consoleLines,
-    }
+    };
   }
 
   try {
-    const wrapped = `(function() { return (${code}); })()`
-    const script = new vm.Script(wrapped)
+    const wrapped = `(function() { return (${code}); })()`;
+    const script = new vm.Script(wrapped);
     const vmContext = vm.createContext(sandbox, {
       codeGeneration: { strings: false, wasm: false },
       microtaskMode: "afterEvaluate",
-    })
-    const result = script.runInContext(vmContext, { timeout: options.timeoutMs ?? 5000 })
-    return { result, consoleLines }
+    });
+    const result = script.runInContext(vmContext, { timeout: options.timeoutMs ?? 5000 });
+    return { result, consoleLines };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err), consoleLines }
+    return { error: err instanceof Error ? err.message : String(err), consoleLines };
   }
 }

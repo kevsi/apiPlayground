@@ -194,6 +194,7 @@ type RequestStoreState = RequestStore & {
   get: () => RequestStore;
   commit: (updater: (prev: RequestStore) => RequestStore) => void;
   reset: () => void;
+  initStore: () => Promise<void>;
   notify?: (message: string) => void;
 } & MutationMethods;
 
@@ -415,6 +416,10 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
           systemNotificationPermission: getBrowserNotificationPermission(),
         }),
       );
+    },
+    initStore: async () => {
+      const loaded = await loadFromStorageAsync();
+      set(loaded);
     },
     ...mutations,
     getFoldersForCollection,

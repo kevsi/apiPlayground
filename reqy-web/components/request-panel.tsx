@@ -1,80 +1,84 @@
-"use client"
+"use client";
 
-import { useState, useMemo, useRef } from "react"
-import { Plus, Trash2, Play, Code, Braces, Check, Copy, Loader2, FlaskConical } from "lucide-react"
-import { cn } from "@/lib/utils"
-import type { HttpMethod } from "@/lib/types"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState, useMemo, useRef } from "react";
+import { Plus, Trash2, Play, Code, Braces, Check, Copy, Loader2, FlaskConical } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { HttpMethod } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from "@/components/ui/accordion"
+} from "@/components/ui/accordion";
 
-import type { BodyType, AuthType, QueryParam, Header } from "@/lib/request-executor"
-import type { RequestTestAssertion, AssertionType } from "@/lib/types"
-import type { Assertion } from "@/lib/test-runner/types"
-import { Switch } from "@/components/ui/switch"
-import { AssertionEditor } from "@/components/assertion-editor"
-import { ScriptEditor } from "@/components/script-editor"
-import { createJsonKeyDownHandler } from "@/lib/json-textarea-utils"
+import type { BodyType, AuthType, QueryParam, Header } from "@/lib/request-executor";
+import { normalizeUrl as canonicalNormalizeUrl } from "@/lib/request-executor";
+import type { RequestTestAssertion, AssertionType } from "@/lib/types";
+import type { Assertion } from "@/lib/test-runner/types";
+import { Switch } from "@/components/ui/switch";
+import { AssertionEditor } from "@/components/assertion-editor";
+import { ScriptEditor } from "@/components/script-editor";
+import { createJsonKeyDownHandler } from "@/lib/json-textarea-utils";
 
 function parseFormBody(body: string): Array<{ key: string; value: string }> {
-  if (!body) return []
-  return body.split("&").filter(Boolean).map((pair) => {
-    const eq = pair.indexOf("=")
-    if (eq === -1) return { key: decodeURIComponent(pair), value: "" }
-    return {
-      key: decodeURIComponent(pair.slice(0, eq)),
-      value: decodeURIComponent(pair.slice(eq + 1)),
-    }
-  })
+  if (!body) return [];
+  return body
+    .split("&")
+    .filter(Boolean)
+    .map((pair) => {
+      const eq = pair.indexOf("=");
+      if (eq === -1) return { key: decodeURIComponent(pair), value: "" };
+      return {
+        key: decodeURIComponent(pair.slice(0, eq)),
+        value: decodeURIComponent(pair.slice(eq + 1)),
+      };
+    });
 }
 
 function serializeFormBody(pairs: Array<{ key: string; value: string }>): string {
   return pairs
     .filter((p) => p.key.trim())
     .map((p) => `${encodeURIComponent(p.key.trim())}=${encodeURIComponent(p.value)}`)
-    .join("&")
+    .join("&");
 }
 
 interface RequestPanelProps {
-  method: HttpMethod
-  url: string
-  queryParams: QueryParam[]
-  headers: Header[]
-  body: string
-  bodyType: BodyType
-  authType: AuthType
-  authToken: string
-  assertions?: RequestTestAssertion[]
-  runnerAssertions?: Assertion[]
-  preRequestScript?: string
-  postResponseScript?: string
-  onMethodChange: (method: HttpMethod) => void
-  onUrlChange: (url: string) => void
-  onQueryParamsChange: (queryParams: QueryParam[]) => void
-  onHeadersChange: (headers: Header[]) => void
-  onBodyChange: (body: string) => void
-  onBodyTypeChange: (bodyType: BodyType) => void
-  onAuthChange: (type: AuthType, token: string) => void
-  onAssertionsChange?: (assertions: RequestTestAssertion[]) => void
-  onRunnerAssertionsChange?: (assertions: Assertion[]) => void
-  onPreRequestScriptChange?: (script: string) => void
-  onPostResponseScriptChange?: (script: string) => void
-  onRunTests?: () => void
-  onSend: () => Promise<void>
-  isLoading?: boolean
-  variableNames?: string[]
+  method: HttpMethod;
+  url: string;
+  queryParams: QueryParam[];
+  headers: Header[];
+  body: string;
+  bodyType: BodyType;
+  authType: AuthType;
+  authToken: string;
+  assertions?: RequestTestAssertion[];
+  runnerAssertions?: Assertion[];
+  preRequestScript?: string;
+  postResponseScript?: string;
+  onMethodChange: (method: HttpMethod) => void;
+  onUrlChange: (url: string) => void;
+  onQueryParamsChange: (queryParams: QueryParam[]) => void;
+  onHeadersChange: (headers: Header[]) => void;
+  onBodyChange: (body: string) => void;
+  onBodyTypeChange: (bodyType: BodyType) => void;
+  onAuthChange: (type: AuthType, token: string) => void;
+  onAssertionsChange?: (assertions: RequestTestAssertion[]) => void;
+  onRunnerAssertionsChange?: (assertions: Assertion[]) => void;
+  onPreRequestScriptChange?: (script: string) => void;
+  onPostResponseScriptChange?: (script: string) => void;
+  onRunTests?: () => void;
+  onSend: () => Promise<void>;
+  isLoading?: boolean;
+  variableNames?: string[];
 }
 
 export function RequestPanel({
@@ -107,185 +111,167 @@ export function RequestPanel({
   variableNames,
 }: RequestPanelProps) {
   const addQueryParam = () => {
-    onQueryParamsChange([...queryParams, { key: "", value: "" }])
-  }
+    onQueryParamsChange([...queryParams, { key: "", value: "" }]);
+  };
 
   const removeQueryParam = (index: number) => {
-    onQueryParamsChange(queryParams.filter((_, i) => i !== index))
-  }
+    onQueryParamsChange(queryParams.filter((_, i) => i !== index));
+  };
 
   const updateQueryParam = (index: number, field: "key" | "value", value: string) => {
     onQueryParamsChange(
       queryParams.map((param, i) => (i === index ? { ...param, [field]: value } : param)),
-    )
-  }
+    );
+  };
 
   const addHeader = () => {
-    onHeadersChange([...headers, { key: "", value: "" }])
-  }
+    onHeadersChange([...headers, { key: "", value: "" }]);
+  };
 
   const removeHeader = (index: number) => {
-    onHeadersChange(headers.filter((_, i) => i !== index))
-  }
+    onHeadersChange(headers.filter((_, i) => i !== index));
+  };
 
   const updateHeader = (index: number, field: "key" | "value", value: string) => {
     onHeadersChange(
       headers.map((header, i) => (i === index ? { ...header, [field]: value } : header)),
-    )
-  }
+    );
+  };
 
-  const [exportFormat, setExportFormat] = useState<"curl" | "fetch">("curl")
-  const [showRawBody, setShowRawBody] = useState(false)
+  const [exportFormat, setExportFormat] = useState<"curl" | "fetch">("curl");
+  const [showRawBody, setShowRawBody] = useState(false);
 
-  const [formPairs, setFormPairs] = useState<Array<{ key: string; value: string }>>(() => parseFormBody(body))
-  const bodyRef = useRef(body)
+  const [formPairs, setFormPairs] = useState<Array<{ key: string; value: string }>>(() =>
+    parseFormBody(body),
+  );
+  const bodyRef = useRef(body);
   if (bodyRef.current !== body) {
-    bodyRef.current = body
-    setFormPairs(parseFormBody(body))
+    bodyRef.current = body;
+    setFormPairs(parseFormBody(body));
   }
 
   const updateFormPair = (index: number, field: "key" | "value", value: string) => {
-    const newPairs = formPairs.map((p, i) => (i === index ? { ...p, [field]: value } : p))
-    setFormPairs(newPairs)
-    onBodyChange(serializeFormBody(newPairs))
-  }
+    const newPairs = formPairs.map((p, i) => (i === index ? { ...p, [field]: value } : p));
+    setFormPairs(newPairs);
+    onBodyChange(serializeFormBody(newPairs));
+  };
 
   const addFormPair = () => {
-    setFormPairs([...formPairs, { key: "", value: "" }])
-  }
+    setFormPairs([...formPairs, { key: "", value: "" }]);
+  };
 
   const removeFormPair = (index: number) => {
-    const newPairs = formPairs.filter((_, i) => i !== index)
-    setFormPairs(newPairs)
-    onBodyChange(serializeFormBody(newPairs))
-  }
-  const [exportCopied, setExportCopied] = useState(false)
-  const urlInputRef = useRef<HTMLInputElement>(null)
+    const newPairs = formPairs.filter((_, i) => i !== index);
+    setFormPairs(newPairs);
+    onBodyChange(serializeFormBody(newPairs));
+  };
+  const [exportCopied, setExportCopied] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement>(null);
 
-  const hasUrl = url.trim().length > 0
-
-  const normalizeUrl = (candidateUrl: string) => {
-    const safeUrl = candidateUrl.trim()
-      .replace(/%20/gi, " ")
-      .replace(/^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)(?:\s+|%20)+/i, "")
-      .replace(/^(https?:)\/(?!\/)/i, "$1://")
-      .replace(/^(https?:)\s*:\s*\/\s*\/+/, "$1://")
-
-    if (safeUrl.startsWith("//")) {
-      return `https:${safeUrl}`
-    }
-
-    if (!/^https?:\/\//i.test(safeUrl)) {
-      const localhostLike = /^(localhost|127(?:\.[0-9]{1,3}){0,3}|\[::1\])(?::\d+)?(?:[\/\?#]|$)/i.test(safeUrl)
-      const ipLike = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::\d+)?(?:[\/\?#]|$)/.test(safeUrl)
-      const hostLike = /^[^/?#\s]+\.[^/?#\s]+/.test(safeUrl)
-
-      if (localhostLike || ipLike) {
-        return `http://${safeUrl}`
-      }
-      if (hostLike) {
-        return `https://${safeUrl}`
-      }
-    }
-
-    return safeUrl
-  }
+  const hasUrl = url.trim().length > 0;
 
   const buildFullUrl = () => {
     try {
-      const finalUrl = new URL(normalizeUrl(url))
+      const finalUrl = new URL(canonicalNormalizeUrl(url));
       queryParams.forEach((param) => {
-        if (param.key.trim() && param.value.trim()) {
-          finalUrl.searchParams.set(param.key.trim(), param.value.trim())
-        }
-      })
-      return finalUrl.toString()
+        if (param.enabled === false) return;
+        if (!param.key.trim() || !param.value.trim()) return;
+        finalUrl.searchParams.append(param.key.trim(), param.value.trim());
+      });
+      return finalUrl.toString();
     } catch {
       const queryString = queryParams
-        .filter((param) => param.key.trim() && param.value.trim())
+        .filter((param) => param.enabled !== false && param.key.trim() && param.value.trim())
         .map(
-          (param) => `${encodeURIComponent(param.key.trim())}=${encodeURIComponent(param.value.trim())}`,
+          (param) =>
+            `${encodeURIComponent(param.key.trim())}=${encodeURIComponent(param.value.trim())}`,
         )
-        .join("&")
-      if (!queryString) return url
-      return url + (url.includes("?") ? "&" : "?") + queryString
+        .join("&");
+      if (!queryString) return url;
+      return url + (url.includes("?") ? "&" : "?") + queryString;
     }
-  }
+  };
 
   const buildAuthHeaders = () => {
-    const authHeaders: Array<[string, string]> = []
+    const authHeaders: Array<[string, string]> = [];
     if (authType !== "none" && authToken.trim()) {
       if (authType === "bearer" || authType === "oauth2") {
-        authHeaders.push(["Authorization", `Bearer ${authToken.trim()}`])
+        authHeaders.push(["Authorization", `Bearer ${authToken.trim()}`]);
       } else if (authType === "basic") {
-        authHeaders.push(["Authorization", `Basic ${authToken.trim()}`])
+        authHeaders.push(["Authorization", `Basic ${authToken.trim()}`]);
       } else if (authType === "api-key") {
-        authHeaders.push(["x-api-key", authToken.trim()])
+        authHeaders.push(["x-api-key", authToken.trim()]);
       }
     }
-    return authHeaders
-  }
+    return authHeaders;
+  };
 
   const buildRequestHeaders = () => {
-    const requestHeaders: Array<[string, string]> = [...buildAuthHeaders()]
+    const requestHeaders: Array<[string, string]> = [...buildAuthHeaders()];
     headers.forEach((header) => {
       if (header.key.trim() && header.value.trim()) {
-        requestHeaders.push([header.key.trim(), header.value.trim()])
+        requestHeaders.push([header.key.trim(), header.value.trim()]);
       }
-    })
-    return requestHeaders
-  }
+    });
+    return requestHeaders;
+  };
 
   const buildCurlCommand = () => {
-    const finalUrl = buildFullUrl()
+    const finalUrl = buildFullUrl();
     const headerLines = buildRequestHeaders().map(
       ([key, value]) => `-H "${key}: ${value.replace(/"/g, '\\"')}"`,
-    )
-    const bodyText = body && method !== "GET" ? `--data-raw '${body.replace(/'/g, "'\\''")}'` : ""
-    const parts = ["curl", `-X ${method}`, ...headerLines]
-    if (bodyText) parts.push(bodyText)
-    parts.push(`"${finalUrl}"`)
-    return parts.join(" \\\n      ")
-  }
+    );
+    const bodyText = body && method !== "GET" ? `--data-raw '${body.replace(/'/g, "'\\''")}'` : "";
+    const parts = ["curl", `-X ${method}`, ...headerLines];
+    if (bodyText) parts.push(bodyText);
+    parts.push(`"${finalUrl}"`);
+    return parts.join(" \\\n      ");
+  };
 
   const buildFetchCommand = () => {
-    const finalUrl = buildFullUrl()
-    const headersObject = Object.fromEntries(buildRequestHeaders())
-    const bodyPart = body && method !== "GET" ? `  body: ${JSON.stringify(body)},\n` : ""
+    const finalUrl = buildFullUrl();
+    const headersObject = Object.fromEntries(buildRequestHeaders());
+    const bodyPart = body && method !== "GET" ? `  body: ${JSON.stringify(body)},\n` : "";
     return `fetch("${finalUrl}", {
   method: "${method}",
   headers: ${JSON.stringify(headersObject, null, 2)},
 ${bodyPart}})
   .then((res) => res.text())
-  .then((text) => console.log(text));`
-  }
+  .then((text) => console.log(text));`;
+  };
 
-  const getExportSnippet = () => (exportFormat === "curl" ? buildCurlCommand() : buildFetchCommand())
+  const getExportSnippet = () =>
+    exportFormat === "curl" ? buildCurlCommand() : buildFetchCommand();
 
   const handleCopyExport = async () => {
     try {
-      await navigator.clipboard.writeText(getExportSnippet())
-      setExportCopied(true)
-      setTimeout(() => setExportCopied(false), 2000)
+      await navigator.clipboard.writeText(getExportSnippet());
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
     } catch {
-      setExportCopied(false)
+      setExportCopied(false);
     }
-  }
+  };
 
   const handleFormatJson = () => {
-    if (bodyType !== "json" || !body.trim()) return
+    if (bodyType !== "json" || !body.trim()) return;
     try {
-      const parsed = JSON.parse(body)
-      onBodyChange(JSON.stringify(parsed, null, 2))
+      const parsed = JSON.parse(body);
+      onBodyChange(JSON.stringify(parsed, null, 2));
     } catch {
       // invalid json, do nothing
     }
-  }
+  };
 
   const isValidJson = useMemo(() => {
-    if (!body.trim() || bodyType !== "json") return null
-    try { JSON.parse(body); return true } catch { return false }
-  }, [body, bodyType])
+    if (!body.trim() || bodyType !== "json") return null;
+    try {
+      JSON.parse(body);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [body, bodyType]);
 
   const methodColors: Record<HttpMethod, string> = {
     GET: "bg-emerald-500/25 text-emerald-600 border-emerald-500/30",
@@ -296,7 +282,7 @@ ${bodyPart}})
     HEAD: "bg-slate-500/25 text-slate-600 border-slate-500/30",
     OPTIONS: "bg-slate-500/25 text-slate-600 border-slate-500/30",
     GRAPHQL: "bg-pink-500/25 text-pink-600 border-pink-500/30",
-  }
+  };
 
   const methodBgMap: Record<HttpMethod, string> = {
     GET: "bg-emerald-500",
@@ -307,7 +293,7 @@ ${bodyPart}})
     HEAD: "bg-slate-500",
     OPTIONS: "bg-slate-500",
     GRAPHQL: "bg-pink-500",
-  }
+  };
 
   const bodyTypeLabels: Record<BodyType, string> = {
     json: "JSON",
@@ -315,7 +301,7 @@ ${bodyPart}})
     "x-www-form": "x-www-form",
     raw: "Raw",
     binary: "Binary",
-  }
+  };
 
   const authTypeLabels: Record<AuthType, string> = {
     none: "No Auth",
@@ -323,7 +309,7 @@ ${bodyPart}})
     basic: "Basic Auth",
     "api-key": "API Key",
     oauth2: "OAuth 2.0",
-  }
+  };
 
   return (
     <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
@@ -332,10 +318,7 @@ ${bodyPart}})
         {/* URL Bar — prominent glow container */}
         <div className="flex items-center gap-2 rounded-lg border border-input/50 px-3 py-1.5 transition-all duration-200">
           {/* Method select — compact */}
-          <Select
-            value={method}
-            onValueChange={(value) => onMethodChange(value as HttpMethod)}
-          >
+          <Select value={method} onValueChange={(value) => onMethodChange(value as HttpMethod)}>
             <SelectTrigger
               aria-label="HTTP method"
               data-testid="method-selector"
@@ -351,14 +334,16 @@ ${bodyPart}})
               {(["GET", "POST", "PUT", "PATCH", "DELETE"] as const).map((m) => (
                 <SelectItem key={m} value={m}>
                   <span className="flex items-center gap-2">
-                    <span className={cn(
-                      "size-1.5 rounded-full shrink-0",
-                      m === "GET" && "bg-emerald-500",
-                      m === "POST" && "bg-blue-500",
-                      m === "PUT" && "bg-amber-500",
-                      m === "PATCH" && "bg-purple-500",
-                      m === "DELETE" && "bg-red-500",
-                    )} />
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full shrink-0",
+                        m === "GET" && "bg-emerald-500",
+                        m === "POST" && "bg-blue-500",
+                        m === "PUT" && "bg-amber-500",
+                        m === "PATCH" && "bg-purple-500",
+                        m === "DELETE" && "bg-red-500",
+                      )}
+                    />
                     {m}
                   </span>
                 </SelectItem>
@@ -387,43 +372,45 @@ ${bodyPart}})
                 className="h-8 rounded-md border border-input/50 bg-muted/30 px-2 text-[11px] font-mono text-muted-foreground cursor-pointer outline-none hover:border-muted-foreground/30 appearance-none"
                 value=""
                 onChange={(e) => {
-                  const name = e.target.value
+                  const name = e.target.value;
                   if (name && urlInputRef.current) {
-                    const input = urlInputRef.current
-                    const start = input.selectionStart ?? url.length
-                    const end = input.selectionEnd ?? url.length
-                    const newUrl = url.slice(0, start) + `{{${name}}}` + url.slice(end)
-                    onUrlChange(newUrl)
+                    const input = urlInputRef.current;
+                    const start = input.selectionStart ?? url.length;
+                    const end = input.selectionEnd ?? url.length;
+                    const newUrl = url.slice(0, start) + `{{${name}}}` + url.slice(end);
+                    onUrlChange(newUrl);
                     requestAnimationFrame(() => {
-                      const pos = start + name.length + 4
-                      input.setSelectionRange(pos, pos)
-                      input.focus()
-                    })
+                      const pos = start + name.length + 4;
+                      input.setSelectionRange(pos, pos);
+                      input.focus();
+                    });
                   }
-                  e.target.value = ""
+                  e.target.value = "";
                 }}
               >
-                <option value="" disabled>Variables</option>
+                <option value="" disabled>
+                  Variables
+                </option>
                 {variableNames.map((n) => (
                   <option key={n} value={n}>{`{{${n}}}`}</option>
                 ))}
               </select>
             </div>
           )}
-          
+
           <Button
             disabled={!hasUrl || isLoading}
             data-testid="send-button"
             onClick={async () => {
-              if (!hasUrl) return
-              await onSend()
+              if (!hasUrl) return;
+              await onSend();
             }}
             className={cn(
               "h-8 shrink-0 gap-2 px-4 text-sm font-semibold transition-all duration-200",
               methodBgMap[method],
               "text-white hover:opacity-85",
             )}
-            title={!hasUrl ? 'URL required to send' : 'Send request'}
+            title={!hasUrl ? "URL required to send" : "Send request"}
           >
             {isLoading ? (
               <Loader2 className="size-4 animate-spin fill-current" />
@@ -438,7 +425,7 @@ ${bodyPart}})
         {hasUrl && url.includes("{{") && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 animate-slide-up">
             {Array.from(url.matchAll(/\{\{\s*(\w+)\s*\}\}/g)).map((match) => {
-              const varName = match[1]
+              const varName = match[1];
               return (
                 <span
                   key={varName}
@@ -447,7 +434,7 @@ ${bodyPart}})
                   <Braces className="size-3" />
                   {varName}
                 </span>
-              )
+              );
             })}
             {url.match(/\{\{[^}]+\}\}/g)?.some((m) => !m.match(/^\{\{\s*\w+\s*\}\}$/)) && (
               <span className="text-[11px] font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md">
@@ -457,13 +444,18 @@ ${bodyPart}})
           </div>
         )}
         {!hasUrl && (
-          <p className="mt-1 text-xs text-muted-foreground/70">Enter a valid URL to enable sending.</p>
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            Enter a valid URL to enable sending.
+          </p>
         )}
 
         {/* Export row */}
         <div className="mt-2 flex items-center justify-end gap-1.5 flex-wrap">
           <div className="flex items-center gap-1.5">
-            <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as "curl" | "fetch")}>
+            <Select
+              value={exportFormat}
+              onValueChange={(value) => setExportFormat(value as "curl" | "fetch")}
+            >
               <SelectTrigger className="h-8 w-auto gap-2 border-input bg-muted/30 text-xs font-medium text-muted-foreground transition-all duration-200 hover:border-muted-foreground/30">
                 <Code className="size-3.5" />
                 <SelectValue placeholder="Export" />
@@ -478,7 +470,7 @@ ${bodyPart}})
               onClick={handleCopyExport}
               className={cn(
                 "h-8 gap-1.5 text-xs font-medium transition-all duration-200",
-                exportCopied ? "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" : ""
+                exportCopied ? "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" : "",
               )}
             >
               {exportCopied ? (
@@ -520,7 +512,10 @@ ${bodyPart}})
                   </div>
                 )}
                 {queryParams.map((param, index) => (
-                  <div key={index} className="group/param flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1">
+                  <div
+                    key={index}
+                    className="group/param flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
+                  >
                     <Input
                       type="text"
                       value={param.key}
@@ -579,7 +574,10 @@ ${bodyPart}})
                   </div>
                 )}
                 {headers.map((header, index) => (
-                  <div key={index} className="group/header flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1">
+                  <div
+                    key={index}
+                    className="group/header flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
+                  >
                     <Input
                       type="text"
                       value={header.key}
@@ -630,116 +628,130 @@ ${bodyPart}})
             </AccordionTrigger>
             <AccordionContent>
               <div className="flex items-center gap-3 mb-3">
-                    <Select value={bodyType} onValueChange={(value) => onBodyTypeChange(value as BodyType)}>
-                      <SelectTrigger className="w-32 h-9 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
-                        <SelectValue placeholder="Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="json">
-                          <span className="font-mono">JSON</span>
-                        </SelectItem>
-                        <SelectItem value="form-data">Form Data</SelectItem>
-                        <SelectItem value="x-www-form">x-www-form</SelectItem>
-                        <SelectItem value="raw">Raw</SelectItem>
-                        <SelectItem value="binary">Binary</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {bodyType === "json" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleFormatJson}
-                        className="h-9 gap-1.5 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30"
-                        title="Format JSON"
-                      >
-                        <Code className="size-3.5" />
-                        Format
-                      </Button>
+                <Select
+                  value={bodyType}
+                  onValueChange={(value) => onBodyTypeChange(value as BodyType)}
+                >
+                  <SelectTrigger className="w-32 h-9 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="json">
+                      <span className="font-mono">JSON</span>
+                    </SelectItem>
+                    <SelectItem value="form-data">Form Data</SelectItem>
+                    <SelectItem value="x-www-form">x-www-form</SelectItem>
+                    <SelectItem value="raw">Raw</SelectItem>
+                    <SelectItem value="binary">Binary</SelectItem>
+                  </SelectContent>
+                </Select>
+                {bodyType === "json" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFormatJson}
+                    className="h-9 gap-1.5 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30"
+                    title="Format JSON"
+                  >
+                    <Code className="size-3.5" />
+                    Format
+                  </Button>
+                )}
+                {bodyType === "json" && body.trim() && isValidJson !== null && (
+                  <span
+                    className={cn(
+                      "text-[11px] font-mono font-medium transition-colors duration-200",
+                      isValidJson ? "text-emerald-500" : "text-red-500",
                     )}
-                    {bodyType === "json" && body.trim() && isValidJson !== null && (
-                      <span className={cn(
-                        "text-[11px] font-mono font-medium transition-colors duration-200",
-                        isValidJson ? "text-emerald-500" : "text-red-500"
-                      )}>
-                        {isValidJson ? "Valid" : "Invalid"}
-                      </span>
-                    )}
-                    {(bodyType === "form-data" || bodyType === "x-www-form") && (
+                  >
+                    {isValidJson ? "Valid" : "Invalid"}
+                  </span>
+                )}
+                {(bodyType === "form-data" || bodyType === "x-www-form") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowRawBody(!showRawBody)}
+                    className="h-9 gap-1.5 text-xs font-medium transition-all duration-200 text-muted-foreground/70 hover:text-foreground"
+                  >
+                    <Code className="size-3.5" />
+                    {showRawBody ? "Parsed" : "Raw"}
+                  </Button>
+                )}
+              </div>
+              {(bodyType === "form-data" || bodyType === "x-www-form") && !showRawBody ? (
+                <div className="space-y-2">
+                  {formPairs.length === 0 && body.trim() === "" && (
+                    <div className="flex flex-col items-center justify-center py-6 text-xs text-muted-foreground/60">
+                      <span>No fields added yet</span>
+                    </div>
+                  )}
+                  {formPairs.map((pair, index) => (
+                    <div
+                      key={index}
+                      className="group/formpair flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
+                    >
+                      <Input
+                        type="text"
+                        value={pair.key}
+                        onChange={(e) => updateFormPair(index, "key", e.target.value)}
+                        placeholder="Key"
+                        className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
+                      />
+                      <span className="shrink-0 text-muted-foreground/30">=</span>
+                      <Input
+                        type="text"
+                        value={pair.value}
+                        onChange={(e) => updateFormPair(index, "value", e.target.value)}
+                        placeholder="Value"
+                        className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
+                      />
                       <Button
                         variant="ghost"
-                        size="sm"
-                        onClick={() => setShowRawBody(!showRawBody)}
-                        className="h-9 gap-1.5 text-xs font-medium transition-all duration-200 text-muted-foreground/70 hover:text-foreground"
+                        size="icon"
+                        onClick={() => removeFormPair(index)}
+                        className="shrink-0 size-8 text-muted-foreground/50 hover:text-destructive opacity-0 group-hover/formpair:opacity-100 transition-all duration-200"
                       >
-                        <Code className="size-3.5" />
-                        {showRawBody ? "Parsed" : "Raw"}
+                        <Trash2 className="size-3.5" />
                       </Button>
-                    )}
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    onClick={addFormPair}
+                    className="w-full border-dashed border-muted-foreground/20 text-muted-foreground/70 hover:text-foreground hover:border-muted-foreground/40 transition-all duration-200 h-9 text-xs font-medium"
+                  >
+                    <Plus className="size-3.5 mr-1" />
+                    Add Field
+                  </Button>
+                </div>
+              ) : (
+                <div className="h-48 overflow-auto rounded-lg border border-border bg-code-bg flex flex-col transition-all duration-200 focus-within:border-primary/30 focus-within:shadow-[0_0_0_2px] focus-within:shadow-primary/10">
+                  <div className="flex items-center justify-between bg-code-header-bg px-4 py-1.5 border-b border-border/50">
+                    <div className="flex items-center gap-1.5">
+                      <span className="size-2.5 rounded-full bg-red-500/70" />
+                      <span className="size-2.5 rounded-full bg-yellow-500/70" />
+                      <span className="size-2.5 rounded-full bg-emerald-500/70" />
+                    </div>
+                    <span className="text-[10px] font-mono text-muted-foreground/50">
+                      {bodyType.toUpperCase()}
+                    </span>
                   </div>
-                  {(bodyType === "form-data" || bodyType === "x-www-form") && !showRawBody ? (
-                    <div className="space-y-2">
-                      {formPairs.length === 0 && body.trim() === "" && (
-                        <div className="flex flex-col items-center justify-center py-6 text-xs text-muted-foreground/60">
-                          <span>No fields added yet</span>
-                        </div>
-                      )}
-                      {formPairs.map((pair, index) => (
-                        <div key={index} className="group/formpair flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1">
-                          <Input
-                            type="text"
-                            value={pair.key}
-                            onChange={(e) => updateFormPair(index, "key", e.target.value)}
-                            placeholder="Key"
-                            className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
-                          />
-                          <span className="shrink-0 text-muted-foreground/30">=</span>
-                          <Input
-                            type="text"
-                            value={pair.value}
-                            onChange={(e) => updateFormPair(index, "value", e.target.value)}
-                            placeholder="Value"
-                            className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeFormPair(index)}
-                            className="shrink-0 size-8 text-muted-foreground/50 hover:text-destructive opacity-0 group-hover/formpair:opacity-100 transition-all duration-200"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        onClick={addFormPair}
-                        className="w-full border-dashed border-muted-foreground/20 text-muted-foreground/70 hover:text-foreground hover:border-muted-foreground/40 transition-all duration-200 h-9 text-xs font-medium"
-                      >
-                        <Plus className="size-3.5 mr-1" />
-                        Add Field
-                      </Button>
-                    </div>
-                  ) : (
-                  <div className="h-48 overflow-auto rounded-lg border border-border bg-code-bg flex flex-col transition-all duration-200 focus-within:border-primary/30 focus-within:shadow-[0_0_0_2px] focus-within:shadow-primary/10">
-                    <div className="flex items-center justify-between bg-code-header-bg px-4 py-1.5 border-b border-border/50">
-                      <div className="flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-full bg-red-500/70" />
-                        <span className="size-2.5 rounded-full bg-yellow-500/70" />
-                        <span className="size-2.5 rounded-full bg-emerald-500/70" />
-                      </div>
-                      <span className="text-[10px] font-mono text-muted-foreground/50">{bodyType.toUpperCase()}</span>
-                    </div>
                   <textarea
                     value={body}
                     onChange={(e) => onBodyChange(e.target.value)}
-                    onKeyDown={bodyType === "json" ? createJsonKeyDownHandler(body, onBodyChange) : undefined}
+                    onKeyDown={
+                      bodyType === "json" ? createJsonKeyDownHandler(body, onBodyChange) : undefined
+                    }
                     className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
                     spellCheck={false}
-                    placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
+                    placeholder={
+                      bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."
+                    }
                     data-testid="request-body-textarea"
                   />
                 </div>
-                  )}
+              )}
             </AccordionContent>
           </AccordionItem>
 
@@ -761,7 +773,10 @@ ${bodyPart}})
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Authentication Type
                   </label>
-                  <Select value={authType} onValueChange={(value) => onAuthChange(value as AuthType, authToken)}>
+                  <Select
+                    value={authType}
+                    onValueChange={(value) => onAuthChange(value as AuthType, authToken)}
+                  >
                     <SelectTrigger className="w-full h-10 border-input bg-muted/20 text-sm transition-all duration-200 hover:border-muted-foreground/30">
                       <SelectValue placeholder="Select auth type" />
                     </SelectTrigger>
@@ -778,9 +793,13 @@ ${bodyPart}})
                 {authType !== "none" && (
                   <div className="space-y-2 animate-slide-up">
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {authType === "bearer" ? "Bearer Token" :
-                       authType === "basic" ? "Credentials (Base64)" :
-                       authType === "api-key" ? "API Key" : "OAuth2 Token"}
+                      {authType === "bearer"
+                        ? "Bearer Token"
+                        : authType === "basic"
+                          ? "Credentials (Base64)"
+                          : authType === "api-key"
+                            ? "API Key"
+                            : "OAuth2 Token"}
                     </label>
                     <div className="relative">
                       <Input
@@ -791,10 +810,10 @@ ${bodyPart}})
                           authType === "bearer"
                             ? "eyJhbGciOiJIUzI1NiIs..."
                             : authType === "basic"
-                            ? "base64(username:password)"
-                            : authType === "api-key"
-                            ? "sk-..."
-                            : "ya29.a0AfH6S..."
+                              ? "base64(username:password)"
+                              : authType === "api-key"
+                                ? "sk-..."
+                                : "ya29.a0AfH6S..."
                         }
                         className="h-10 bg-muted/20 border-input pr-10 font-mono text-sm transition-all duration-200 focus:bg-muted/40"
                       />
@@ -824,8 +843,8 @@ ${bodyPart}})
                             {authType === "basic"
                               ? `Authorization: Basic ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`
                               : authType === "api-key"
-                              ? `x-api-key: ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`
-                              : `Authorization: Bearer ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`}
+                                ? `x-api-key: ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`
+                                : `Authorization: Bearer ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`}
                           </span>
                         </div>
                       )}
@@ -899,7 +918,7 @@ ${bodyPart}})
         </Accordion>
       </div>
     </div>
-  )
+  );
 }
 
 const assertionTypeLabels: Record<AssertionType, string> = {
@@ -907,16 +926,16 @@ const assertionTypeLabels: Record<AssertionType, string> = {
   bodyContains: "Body Contains",
   headerExists: "Header Exists",
   jsonPath: "JSON Path",
-}
+};
 
 function TestAssertionPanel({
   assertions,
   onChange,
   onRunTests,
 }: {
-  assertions: RequestTestAssertion[]
-  onChange: (assertions: RequestTestAssertion[]) => void
-  onRunTests?: () => void
+  assertions: RequestTestAssertion[];
+  onChange: (assertions: RequestTestAssertion[]) => void;
+  onRunTests?: () => void;
 }) {
   const addAssertion = () => {
     const newAssertion: RequestTestAssertion = {
@@ -925,17 +944,17 @@ function TestAssertionPanel({
       target: "200",
       expected: "",
       enabled: true,
-    }
-    onChange([...assertions, newAssertion])
-  }
+    };
+    onChange([...assertions, newAssertion]);
+  };
 
   const removeAssertion = (index: number) => {
-    onChange(assertions.filter((_, i) => i !== index))
-  }
+    onChange(assertions.filter((_, i) => i !== index));
+  };
 
   const updateAssertion = (index: number, patch: Partial<RequestTestAssertion>) => {
-    onChange(assertions.map((a, i) => (i === index ? { ...a, ...patch } : a)))
-  }
+    onChange(assertions.map((a, i) => (i === index ? { ...a, ...patch } : a)));
+  };
 
   return (
     <div className="space-y-3">
@@ -960,11 +979,13 @@ function TestAssertionPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(["status", "bodyContains", "headerExists", "jsonPath"] as AssertionType[]).map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {assertionTypeLabels[t]}
-                    </SelectItem>
-                  ))}
+                  {(["status", "bodyContains", "headerExists", "jsonPath"] as AssertionType[]).map(
+                    (t) => (
+                      <SelectItem key={t} value={t}>
+                        {assertionTypeLabels[t]}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
               <Switch
@@ -982,10 +1003,10 @@ function TestAssertionPanel({
                   assertion.type === "status"
                     ? "200 or >= 200 && < 300"
                     : assertion.type === "bodyContains"
-                    ? "text to find"
-                    : assertion.type === "headerExists"
-                    ? "header-name"
-                    : "$.data.id"
+                      ? "text to find"
+                      : assertion.type === "headerExists"
+                        ? "header-name"
+                        : "$.data.id"
                 }
                 className="flex-1 h-8 border-input bg-muted/20 text-xs font-mono transition-all duration-200 focus:bg-muted/40 min-w-0"
               />
@@ -1034,5 +1055,5 @@ function TestAssertionPanel({
         )}
       </div>
     </div>
-  )
+  );
 }

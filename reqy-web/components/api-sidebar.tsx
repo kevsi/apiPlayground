@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import Link from "next/link"
+import Link from "next/link";
 import {
   LayoutDashboard,
   Zap,
@@ -11,79 +11,73 @@ import {
   FolderCode,
   ChevronsLeft,
   ChevronsRight,
-} from "lucide-react"
-import { AppIcon } from "@/components/app-icon"
-import { ToolsSection } from "@/components/sidebar/tools-section"
-import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
-import { useRequestStore } from "@/hooks/use-request-store"
-import { Button } from "@/components/ui/button"
-import { persistence } from "@/lib/persistence"
+  FolderKanban,
+  Play,
+} from "lucide-react";
+import { AppIcon } from "@/components/app-icon";
+import { ToolsSection } from "@/components/sidebar/tools-section";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useRequestStore } from "@/hooks/use-request-store";
+import { Button } from "@/components/ui/button";
+import { useAiChatHidden, setAiChatHidden } from "@/hooks/use-ai-chat-visibility";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/", key: "dashboard" },
   { icon: Zap, label: "API Endpoints", href: "/", key: "api-endpoints" },
   { icon: Folder, label: "Collections", href: "/collections/", key: "collections" },
   { icon: FolderCode, label: "Projects", href: "/my-projects/", key: "projects" },
+  { icon: FolderKanban, label: "Workspaces", href: "/workspaces/", key: "workspaces" },
+  { icon: Play, label: "Runner", href: "/runner/", key: "runner" },
   { icon: Sparkles, label: "AI Assistant", href: "/ai-insights/", key: "ai-insights" },
   { icon: Settings, label: "Settings", href: "/settings/", key: "settings" },
-]
+];
 
 interface ApiSidebarProps {
-  activePage?: string
-  collapsed?: boolean
-  onCollapse?: (v: boolean) => void
+  activePage?: string;
+  collapsed?: boolean;
+  onCollapse?: (v: boolean) => void;
 }
 
-export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlledCollapsed, onCollapse }: ApiSidebarProps) {
-  const [internalCollapsed, setInternalCollapsed] = useState(false)
-  const collapsed = controlledCollapsed ?? internalCollapsed
+export function ApiSidebar({
+  activePage = "api-endpoints",
+  collapsed: controlledCollapsed,
+  onCollapse,
+}: ApiSidebarProps) {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const collapsed = controlledCollapsed ?? internalCollapsed;
   const setCollapsed = (v: boolean) => {
-    setInternalCollapsed(v)
-    onCollapse?.(v)
-  }
+    setInternalCollapsed(v);
+    onCollapse?.(v);
+  };
   // Atomic selectors: this sidebar no longer re-renders on unrelated store
   // mutations (tab switches, response updates, etc.) — only when the workspace
   // list or the active workspace id actually changes.
-  const activeWorkspaceId = useRequestStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useRequestStore((s) => s.activeWorkspaceId);
 
-  const [aiHidden, setAiHidden] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false
-    try {
-      return persistence.getItem<string>("reqly-hide-ai-chat") === "true"
-    } catch {
-      return false
-    }
-  })
+  // Subscribed via useSyncExternalStore — no polling. Wakes up on the storage
+  // event fired by `setAiChatHidden` (and by other tabs via the native
+  // cross-tab storage event).
+  const aiHidden = useAiChatHidden();
 
-  useEffect(() => {
-    const check = () => {
-      try {
-        setAiHidden(persistence.getItem<string>("reqly-hide-ai-chat") === "true")
-      } catch {
-        /* ignore */
-      }
-    }
-    const interval = window.setInterval(check, 1000)
-    return () => window.clearInterval(interval)
-  }, [])
-
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <aside
       aria-label="Main navigation"
       className={cn(
         "group/sidebar fixed inset-y-0 left-0 z-30 flex h-screen flex-col border-r bg-sidebar transition-[width] duration-200 ease-out will-change-auto",
-        collapsed ? "w-[60px]" : "w-64"
+        collapsed ? "w-[60px]" : "w-64",
       )}
     >
       {/* Header */}
-      <div className={cn(
-        "flex items-center border-b border-sidebar-border px-3 py-4",
-        collapsed ? "justify-center" : "gap-3 px-4"
-      )}>
+      <div
+        className={cn(
+          "flex items-center border-b border-sidebar-border px-3 py-4",
+          collapsed ? "justify-center" : "gap-3 px-4",
+        )}
+      >
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-sm">
           <AppIcon aria-hidden="true" className="size-5" />
         </div>
@@ -96,14 +90,24 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
             </span>
           </div>
         )}
-        {!collapsed && <ChevronDown aria-hidden="true" className="ml-auto size-4 shrink-0 text-muted-foreground/60" />}
+        {!collapsed && (
+          <ChevronDown
+            aria-hidden="true"
+            className="ml-auto size-4 shrink-0 text-muted-foreground/60"
+          />
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden px-2 scrollbar-discreet", collapsed ? "py-2" : "py-4")}>
+      <nav
+        className={cn(
+          "flex-1 overflow-y-auto overflow-x-hidden px-2 scrollbar-discreet",
+          collapsed ? "py-2" : "py-4",
+        )}
+      >
         <ul className="space-y-0.5">
           {navItems.map((item) => {
-            const isActive = item.key === activePage
+            const isActive = item.key === activePage;
             return (
               <li key={item.label} className="relative">
                 {isActive && (
@@ -117,26 +121,31 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
                     collapsed ? "justify-center" : "gap-3 px-3",
                     isActive
                       ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                   )}
                 >
-                  <item.icon aria-hidden="true" className={cn(
-                    "size-[18px] shrink-0",
-                    isActive && "text-primary",
-                    !isActive && "group-hover/nav-item:text-foreground"
-                  )} />
+                  <item.icon
+                    aria-hidden="true"
+                    className={cn(
+                      "size-[18px] shrink-0",
+                      isActive && "text-primary",
+                      !isActive && "group-hover/nav-item:text-foreground",
+                    )}
+                  />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                   {isActive && (
-                    <span className={cn(
-                      "rounded-full bg-primary shadow-sm shadow-primary/50",
-                      collapsed
-                        ? "absolute -right-0.5 top-1/2 -translate-y-1/2 size-2"
-                        : "ml-auto flex size-1.5"
-                    )} />
+                    <span
+                      className={cn(
+                        "rounded-full bg-primary shadow-sm shadow-primary/50",
+                        collapsed
+                          ? "absolute -right-0.5 top-1/2 -translate-y-1/2 size-2"
+                          : "ml-auto flex size-1.5",
+                      )}
+                    />
                   )}
                 </Link>
               </li>
-            )
+            );
           })}
         </ul>
         <ToolsSection />
@@ -148,7 +157,7 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
           href="/ai-insights"
           className={cn(
             "group/ai relative flex items-center rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-accent/30 px-3 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:from-primary/15 hover:via-primary/10 hover:to-accent/50 hover:animate-pulse-glow",
-            collapsed ? "justify-center px-2" : "gap-3"
+            collapsed ? "justify-center px-2" : "gap-3",
           )}
         >
           <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 shadow-sm shadow-primary/20">
@@ -170,14 +179,7 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
             variant="ghost"
             size="sm"
             className="w-full justify-start text-xs text-muted-foreground"
-            onClick={() => {
-              try {
-                void persistence.setItem("reqly-hide-ai-chat", "false")
-              } catch {
-                /* ignore */
-              }
-              setAiHidden(false)
-            }}
+            onClick={() => setAiChatHidden(false)}
             data-testid="show-ai-chat-button"
           >
             <Sparkles className="mr-2 size-3" />
@@ -200,5 +202,5 @@ export function ApiSidebar({ activePage = "api-endpoints", collapsed: controlled
         )}
       </button>
     </aside>
-  )
+  );
 }

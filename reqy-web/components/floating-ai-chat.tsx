@@ -1,372 +1,363 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import { Sparkles, X, Send, Loader2, Minimize2, ChevronDown, Bot, Clock } from "lucide-react"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { useAIEngine } from "@/hooks/use-ai-engine"
-import { useAiContext } from "@/hooks/use-ai-context"
-import { persistence } from "@/lib/persistence"
-import {
-  type AIProvider,
-  loadAIProvider,
-  saveAIProvider,
-  saveApiKey,
-} from "@/lib/projects-store"
-import { isAiConfigured } from "@/lib/ai-config"
-import { MessageActions } from "@/components/message-actions"
-import { toast } from "@/hooks/use-toast"
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Sparkles, X, Send, Loader2, Minimize2, ChevronDown, Bot, Clock } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { useAIEngine } from "@/hooks/use-ai-engine";
+import { useAiContext } from "@/hooks/use-ai-context";
+import { persistence } from "@/lib/persistence";
+import { useAiChatHidden, setAiChatHidden } from "@/hooks/use-ai-chat-visibility";
+import { type AIProvider, loadAIProvider, saveAIProvider, saveApiKey } from "@/lib/projects-store";
+import { isAiConfigured } from "@/lib/ai-config";
+import { MessageActions } from "@/components/message-actions";
+import { toast } from "@/hooks/use-toast";
 
 interface ChatMessage {
-  role: "user" | "assistant"
-  content: string
+  role: "user" | "assistant";
+  content: string;
 }
 
 interface ConversationSession {
-  id: string
-  title: string
-  messages: ChatMessage[]
-  createdAt: string
-  updatedAt: string
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-type ChatState = "closed" | "minimized" | "open"
+type ChatState = "closed" | "minimized" | "open";
 
 export function FloatingAiChat() {
-  const pathname = usePathname()
-  const [chatState, setChatState] = useState<ChatState>("closed")
-  const [hidden, setHidden] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false
-    try {
-      return persistence.getItem<string>("reqly-hide-ai-chat") === "true"
-    } catch {
-      return false
+  const pathname = usePathname();
+  const [chatState, setChatState] = useState<ChatState>("closed");
+  // Subscribed via useSyncExternalStore — no polling. The hook stays live
+  // even when this component returns `null` below (React keeps the instance
+  // mounted, only the rendered output is empty).
+  const hidden = useAiChatHidden();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [conversationHistory, setConversationHistory] = useState<ConversationSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Inline AI config state — initialised to safe defaults to avoid any SSR/CSR
+  // mismatch. The actual provider / configured flag is hydrated from storage in
+  // a useEffect after mount (see below).
+  const [showConfig, setShowConfig] = useState(true);
+  const [configProvider, setConfigProvider] = useState<string>("openai");
+  const [configApiKey, setConfigApiKey] = useState("");
+
+  useEffect(() => {
+    // Hydrate AI configuration state from storage. useEffect only runs on
+    // the client, so we don't need `typeof window` guards here.
+    if (isAiConfigured()) {
+      setShowConfig(false);
     }
-  })
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editingText, setEditingText] = useState("")
-  const [conversationHistory, setConversationHistory] = useState<ConversationSession[]>([])
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
-  const [historyOpen, setHistoryOpen] = useState(false)
+    setConfigProvider(loadAIProvider());
+  }, []);
 
-  // Inline AI config state
-  const configured = typeof window !== "undefined" ? isAiConfigured() : false
-  const [showConfig, setShowConfig] = useState(!configured)
-  const [configProvider, setConfigProvider] = useState<string>(
-    typeof window !== "undefined" ? loadAIProvider() : "openai"
-  )
-  const [configApiKey, setConfigApiKey] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const aiContext = useAiContext();
+  const aiEngine = useAIEngine();
 
-  const aiContext = useAiContext()
-  const aiEngine = useAIEngine()
-
-  const HISTORY_STORAGE_KEY = "floating-ai-chat-history"
-  const MESSAGES_STORAGE_KEY = "reqly-ai-chat-history"
+  const HISTORY_STORAGE_KEY = "floating-ai-chat-history";
+  const MESSAGES_STORAGE_KEY = "reqly-ai-chat-history";
 
   const getSessionTitle = (msgs: ChatMessage[]) => {
-    const firstUserMessage = msgs.find((msg) => msg.role === "user")?.content || "Nouvelle conversation"
-    return firstUserMessage.length > 40
-      ? `${firstUserMessage.slice(0, 37)}...`
-      : firstUserMessage
-  }
+    const firstUserMessage =
+      msgs.find((msg) => msg.role === "user")?.content || "Nouvelle conversation";
+    return firstUserMessage.length > 40 ? `${firstUserMessage.slice(0, 37)}...` : firstUserMessage;
+  };
 
   const formatSessionDate = (timestamp: string) => {
-    const date = new Date(timestamp)
+    const date = new Date(timestamp);
     return date.toLocaleString("fr-FR", {
       dateStyle: "short",
       timeStyle: "short",
-    })
-  }
+    });
+  };
 
   const loadConversationHistory = () => {
-    if (typeof window === "undefined") return []
-    const raw = persistence.getItem<string>(HISTORY_STORAGE_KEY)
-    if (!raw) return []
+    if (typeof window === "undefined") return [];
+    const raw = persistence.getItem<string>(HISTORY_STORAGE_KEY);
+    if (!raw) return [];
 
     try {
-      const parsed = JSON.parse(raw) as ConversationSession[]
-      return parsed
+      const parsed = JSON.parse(raw) as ConversationSession[];
+      return parsed;
     } catch {
-      return []
+      return [];
     }
-  }
+  };
 
   const saveConversationHistory = (history: ConversationSession[]) => {
-    if (typeof window === "undefined") return
+    if (typeof window === "undefined") return;
     if (history.length === 0) {
-      try { void persistence.removeItem(HISTORY_STORAGE_KEY) } catch { /* ignore */ }
-      return
+      try {
+        void persistence.removeItem(HISTORY_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      return;
     }
 
-    try { void persistence.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history)) } catch { /* ignore */ }
-  }
+    try {
+      void persistence.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+    } catch {
+      /* ignore */
+    }
+  };
 
   const loadSession = (session: ConversationSession) => {
-    setMessages(session.messages)
-    setCurrentSessionId(session.id)
-    setChatState("open")
-    setHistoryOpen(false)
-  }
+    setMessages(session.messages);
+    setCurrentSessionId(session.id);
+    setChatState("open");
+    setHistoryOpen(false);
+  };
 
   /* ── Load saved conversation history ─────────────────────────── */
   useEffect(() => {
-    const historyTimeout = window.setTimeout(() => {
-      setConversationHistory(loadConversationHistory())
-    }, 0)
-    return () => window.clearTimeout(historyTimeout)
-  }, [])
+    // useEffect already runs after hydration — no need for the setTimeout(0)
+    // wrapper that used to live here (Chunk 3 of the plan).
+    setConversationHistory(loadConversationHistory());
+  }, []);
 
   /* ── Persist conversation history locally ────────────────────── */
   useEffect(() => {
-    saveConversationHistory(conversationHistory)
-  }, [conversationHistory])
+    saveConversationHistory(conversationHistory);
+  }, [conversationHistory]);
 
   /* ── Load messages from localStorage on mount ───────────────── */
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const loadTimeout = window.setTimeout(() => {
-      try {
-        const raw = persistence.getItem<string>(MESSAGES_STORAGE_KEY)
-        if (raw) {
-          const parsed = JSON.parse(raw) as ChatMessage[]
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setMessages(parsed)
-          }
+    try {
+      const raw = persistence.getItem<string>(MESSAGES_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
         }
-      } catch {
-        // ignore corrupt data
       }
-    }, 0)
-
-    return () => window.clearTimeout(loadTimeout)
-  }, [])
+    } catch {
+      // ignore corrupt data
+    }
+  }, []);
 
   /* ── Persist messages to localStorage, trimmed to 50 ────────── */
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (typeof window === "undefined") return;
     try {
-      const trimmed = messages.slice(-50)
-      void persistence.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(trimmed))
+      const trimmed = messages.slice(-50);
+      void persistence.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(trimmed));
     } catch {
       // quota exceeded, silently ignore
     }
-  }, [messages])
+  }, [messages]);
 
   /* ── Keep the active session up to date with message changes ──── */
   useEffect(() => {
-    if (messages.length === 0) return
+    if (messages.length === 0) return;
 
-    const historyTimeout = window.setTimeout(() => {
-      setConversationHistory((prev) => {
-        const title = getSessionTitle(messages)
-        const timestamp = new Date().toISOString()
+    setConversationHistory((prev) => {
+      const title = getSessionTitle(messages);
+      const timestamp = new Date().toISOString();
 
-        if (currentSessionId) {
-          return prev.map((session) =>
-            session.id === currentSessionId
-              ? { ...session, title, messages, updatedAt: timestamp }
-              : session
-          )
-        }
+      if (currentSessionId) {
+        return prev.map((session) =>
+          session.id === currentSessionId
+            ? { ...session, title, messages, updatedAt: timestamp }
+            : session,
+        );
+      }
 
-        const newSession: ConversationSession = {
-          id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      const newSession: ConversationSession = {
+        id:
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
             ? crypto.randomUUID()
             : `${Date.now()}`,
-          title,
-          messages,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        }
+        title,
+        messages,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
 
-        setCurrentSessionId(newSession.id)
-        return [...prev, newSession]
-      })
-    }, 0)
-
-    return () => window.clearTimeout(historyTimeout)
-  }, [messages, currentSessionId])
+      setCurrentSessionId(newSession.id);
+      return [...prev, newSession];
+    });
+  }, [messages, currentSessionId]);
 
   /* ── Auto-scroll to latest message ─────────────────────────────── */
   useEffect(() => {
     if (chatState === "open") {
-      const el = messagesEndRef.current?.parentElement
-      if (!el) return
-      const threshold = 80
-      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+      const el = messagesEndRef.current?.parentElement;
+      if (!el) return;
+      const threshold = 80;
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
       if (isNearBottom) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "instant" })
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
       }
     }
-  }, [messages, chatState])
+  }, [messages, chatState]);
 
   /* ── Focus input when chat opens ──────────────────────────────── */
   useEffect(() => {
     if (chatState === "open") {
-      setTimeout(() => inputRef.current?.focus(), 120)
+      setTimeout(() => inputRef.current?.focus(), 120);
     }
-  }, [chatState])
+  }, [chatState]);
 
   /* ── Send message ─────────────────────────────────────────────── */
   const handleSend = useCallback(async () => {
-    const prompt = input.trim()
-    if (!prompt || loading) return
+    const prompt = input.trim();
+    if (!prompt || loading) return;
 
     // If AI not configured, show config form instead of sending
     if (!isAiConfigured()) {
-      setConfigProvider(loadAIProvider())
-      setConfigApiKey("")
-      setShowConfig(true)
-      return
+      setConfigProvider(loadAIProvider());
+      setConfigApiKey("");
+      setShowConfig(true);
+      return;
     }
 
-    setError(null)
-    setInput("")
+    setError(null);
+    setInput("");
 
-    const userMsg: ChatMessage = { role: "user", content: prompt }
-    setMessages((prev) => [...prev, userMsg])
-    setLoading(true)
+    const userMsg: ChatMessage = { role: "user", content: prompt };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
 
     try {
       const assistantContent = await aiEngine.sendMessage(
         prompt,
         aiContext.systemPrompt,
-        aiEngine.buildContext()
-      )
+        aiEngine.buildContext(),
+      );
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: assistantContent || "L'IA n'a pas renvoyé de réponse." },
-      ])
+      ]);
     } catch (err) {
-      setError(`Erreur : ${String(err)}`)
+      setError(`Erreur : ${String(err)}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [input, loading, aiContext.systemPrompt, aiEngine])
+  }, [input, loading, aiContext.systemPrompt, aiEngine]);
 
   /* ── Keyboard submit ──────────────────────────────────────────── */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   const handleEditMessage = (index: number) => {
     if (messages[index].role === "user") {
-      setEditingIndex(index)
-      setEditingText(messages[index].content)
-      setInput(messages[index].content)
+      setEditingIndex(index);
+      setEditingText(messages[index].content);
+      setInput(messages[index].content);
     }
-  }
+  };
 
   const handleCancelEdit = () => {
-    setEditingIndex(null)
-    setEditingText("")
-    setInput("")
-  }
+    setEditingIndex(null);
+    setEditingText("");
+    setInput("");
+  };
 
   const handleConfirmEdit = async () => {
     if (!editingText.trim()) {
-      handleCancelEdit()
-      return
+      handleCancelEdit();
+      return;
     }
 
-    const newMessages = messages.slice(0, editingIndex ?? 0)
-    setMessages(newMessages)
-    setEditingIndex(null)
-    setEditingText("")
+    const newMessages = messages.slice(0, editingIndex ?? 0);
+    setMessages(newMessages);
+    setEditingIndex(null);
+    setEditingText("");
 
-    setInput(editingText)
+    setInput(editingText);
     setTimeout(() => {
-      handleSend()
-    }, 0)
-  }
+      handleSend();
+    }, 0);
+  };
 
   const handleRetryMessage = async (assistantMessageIndex: number) => {
-    let lastUserMessageIndex = -1
+    let lastUserMessageIndex = -1;
     for (let i = assistantMessageIndex - 1; i >= 0; i--) {
       if (messages[i].role === "user") {
-        lastUserMessageIndex = i
-        break
+        lastUserMessageIndex = i;
+        break;
       }
     }
 
-    if (lastUserMessageIndex === -1) return
+    if (lastUserMessageIndex === -1) return;
 
-    const lastUserMessage = messages[lastUserMessageIndex].content
-    const newMessages = messages.slice(0, assistantMessageIndex)
-    setMessages(newMessages)
+    const lastUserMessage = messages[lastUserMessageIndex].content;
+    const newMessages = messages.slice(0, assistantMessageIndex);
+    setMessages(newMessages);
 
-    setInput(lastUserMessage)
-    setLoading(true)
-    setError(null)
+    setInput(lastUserMessage);
+    setLoading(true);
+    setError(null);
 
     try {
-      const assistantContent = await aiEngine.sendMessage(lastUserMessage, aiContext.systemPrompt, aiEngine.buildContext())
+      const assistantContent = await aiEngine.sendMessage(
+        lastUserMessage,
+        aiContext.systemPrompt,
+        aiEngine.buildContext(),
+      );
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: assistantContent || "L'IA n'a pas renvoyé de réponse." },
-      ])
+      ]);
     } catch (err) {
-      setError(`Erreur réseau : ${String(err)}`)
+      setError(`Erreur réseau : ${String(err)}`);
     } finally {
-      setLoading(false)
-      setInput("")
+      setLoading(false);
+      setInput("");
     }
-  }
+  };
 
   /* ── Save inline AI config ────────────────────────────────────── */
   const handleSaveConfig = useCallback(() => {
-    if (!configApiKey.trim()) return
-    saveAIProvider(configProvider as AIProvider)
-    saveApiKey(configProvider as AIProvider, configApiKey.trim())
-    setShowConfig(false)
-    toast({ title: "IA configurée", description: `${configProvider.toUpperCase()} prêt` })
-  }, [configProvider, configApiKey])
+    if (!configApiKey.trim()) return;
+    saveAIProvider(configProvider as AIProvider);
+    saveApiKey(configProvider as AIProvider, configApiKey.trim());
+    setShowConfig(false);
+    toast({ title: "IA configurée", description: `${configProvider.toUpperCase()} prêt` });
+  }, [configProvider, configApiKey]);
 
   /* ── Toggle chat open / close ─────────────────────────────────── */
   const toggleChat = () => {
     setChatState((prev) => {
-      if (prev === "closed" || prev === "minimized") return "open"
-      return "closed"
-    })
-  }
+      if (prev === "closed" || prev === "minimized") return "open";
+      return "closed";
+    });
+  };
 
-  const minimize = () => setChatState("minimized")
-  const close = () => setChatState("closed")
+  const minimize = () => setChatState("minimized");
+  const close = () => setChatState("closed");
 
   /* ── Unread indicator (messages from AI while minimized) ─────── */
-  const hasUnread = chatState !== "open" && messages.some((m) => m.role === "assistant")
-  const activeSession = conversationHistory.find((session) => session.id === currentSessionId)
+  const hasUnread = chatState !== "open" && messages.some((m) => m.role === "assistant");
+  const activeSession = conversationHistory.find((session) => session.id === currentSessionId);
 
-  // React to same-tab persistent changes (e.g. when the sidebar "Show AI chat" button is clicked)
-  useEffect(() => {
-    const check = () => {
-      try {
-        const next = persistence.getItem<string>("reqly-hide-ai-chat") === "true"
-        setHidden((prev) => (prev === next ? prev : next))
-      } catch {
-        /* ignore */
-      }
-    }
-    const interval = window.setInterval(check, 1000)
-    return () => window.clearInterval(interval)
-  }, [])
+  // (The polling useEffect that used to live here was removed in Chunk 2 of
+  // the plan — see `hooks/use-ai-chat-visibility.ts`.)
 
   if (pathname === "/ai-insights") {
-    return null
+    return null;
   }
 
   if (hidden) {
-    return null
+    return null;
   }
 
   return (
@@ -383,7 +374,7 @@ export function FloatingAiChat() {
           "bg-violet-600 text-white",
           "transition-all duration-300 hover:scale-105 hover:shadow-[0_8px_30px_rgba(124,58,237,0.25)]",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
-          chatState !== "closed" && "scale-95 opacity-0 pointer-events-none"
+          chatState !== "closed" && "scale-95 opacity-0 pointer-events-none",
         )}
       >
         {hasUnread && (
@@ -395,14 +386,7 @@ export function FloatingAiChat() {
       {/* ── Permanently hide the AI chat ─────────────────────────────── */}
       {chatState === "closed" && (
         <button
-          onClick={() => {
-            try {
-              void persistence.setItem("reqly-hide-ai-chat", "true")
-            } catch {
-              /* storage unavailable, ignore */
-            }
-            setHidden(true)
-          }}
+          onClick={() => setAiChatHidden(true)}
           aria-label="Masquer le chat IA"
           title="Masquer le chat IA"
           className={cn(
@@ -410,7 +394,7 @@ export function FloatingAiChat() {
             "size-7 bg-slate-900/80 text-white/70 backdrop-blur-sm",
             "border border-white/10 shadow-lg",
             "transition-all duration-200 hover:bg-slate-800 hover:text-white",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
           )}
         >
           <X className="size-3.5" />
@@ -429,8 +413,8 @@ export function FloatingAiChat() {
           chatState === "open"
             ? "w-[calc(100vw-32px)] sm:w-[370px] max-w-sm max-h-[560px] opacity-100 scale-100 pointer-events-auto"
             : chatState === "minimized"
-            ? "w-[calc(100vw-32px)] sm:w-[240px] max-h-[44px] opacity-100 scale-100 pointer-events-auto overflow-hidden"
-            : "w-[calc(100vw-32px)] sm:w-[370px] max-w-sm max-h-[560px] opacity-0 scale-90 pointer-events-none"
+              ? "w-[calc(100vw-32px)] sm:w-[240px] max-h-[44px] opacity-100 scale-100 pointer-events-auto overflow-hidden"
+              : "w-[calc(100vw-32px)] sm:w-[370px] max-w-sm max-h-[560px] opacity-0 scale-90 pointer-events-none",
         )}
       >
         {/* Header */}
@@ -439,7 +423,7 @@ export function FloatingAiChat() {
             "flex items-center justify-between gap-2 px-4 py-3",
             "bg-slate-950/95",
             "rounded-t-2xl border-b border-white/10 backdrop-blur-sm",
-            chatState === "minimized" && "rounded-b-2xl"
+            chatState === "minimized" && "rounded-b-2xl",
           )}
         >
           <div className="flex items-center gap-2 min-w-0">
@@ -447,9 +431,7 @@ export function FloatingAiChat() {
               <Bot className="size-4 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white leading-none truncate">
-                Monu IA
-              </p>
+              <p className="text-sm font-semibold text-white leading-none truncate">Monu IA</p>
               <p className="text-[10px] text-white/60 truncate mt-0.5">
                 {aiContext.contextSummary}
               </p>
@@ -472,7 +454,7 @@ export function FloatingAiChat() {
               onClick={() => setHistoryOpen((prev) => !prev)}
               className={cn(
                 "flex size-6 items-center justify-center rounded-full text-white/70 transition-colors",
-                historyOpen ? "bg-white/10 text-white" : "hover:bg-white/15 hover:text-white"
+                historyOpen ? "bg-white/10 text-white" : "hover:bg-white/15 hover:text-white",
               )}
               aria-label="Historique des conversations"
               title="Historique des conversations"
@@ -522,7 +504,9 @@ export function FloatingAiChat() {
               </button>
             </div>
             {conversationHistory.length === 0 ? (
-              <p className="text-xs text-white/50">Aucun historique de conversation pour l’instant.</p>
+              <p className="text-xs text-white/50">
+                Aucun historique de conversation pour l’instant.
+              </p>
             ) : (
               <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
                 {conversationHistory.map((session) => (
@@ -534,7 +518,7 @@ export function FloatingAiChat() {
                       "w-full rounded-2xl px-3 py-2 text-left text-sm transition",
                       session.id === currentSessionId
                         ? "bg-white/10 text-white"
-                        : "bg-white/5 text-white/80 hover:bg-white/10"
+                        : "bg-white/5 text-white/80 hover:bg-white/10",
                     )}
                   >
                     <div className="font-medium truncate">{session.title}</div>
@@ -631,7 +615,7 @@ export function FloatingAiChat() {
                     key={i}
                     className={cn(
                       "flex gap-3",
-                      msg.role === "user" ? "justify-end" : "justify-start"
+                      msg.role === "user" ? "justify-end" : "justify-start",
                     )}
                   >
                     {msg.role === "assistant" && (
@@ -679,7 +663,9 @@ export function FloatingAiChat() {
                           </div>
                         ) : (
                           <div className="rounded-[28px] bg-violet-600/90 border border-white/10 px-4 py-3 text-sm leading-relaxed shadow-sm">
-                            <p className="whitespace-pre-wrap break-words text-white">{msg.content}</p>
+                            <p className="whitespace-pre-wrap break-words text-white">
+                              {msg.content}
+                            </p>
                           </div>
                         )}
                         {editingIndex !== i && (
@@ -731,7 +717,7 @@ export function FloatingAiChat() {
                     "flex-1 resize-none rounded-xl bg-white/8 border border-white/10",
                     "px-3 py-2 text-sm text-white placeholder:text-white/30",
                     "focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40",
-                    "transition-all leading-relaxed max-h-28 overflow-y-auto"
+                    "transition-all leading-relaxed max-h-28 overflow-y-auto",
                   )}
                   style={{ scrollbarWidth: "none" }}
                 />
@@ -744,7 +730,7 @@ export function FloatingAiChat() {
                     "flex size-9 shrink-0 items-center justify-center rounded-xl",
                     "bg-violet-600 text-white",
                     "transition-all hover:scale-105 hover:shadow-lg hover:shadow-violet-500/20",
-                    "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100",
                   )}
                 >
                   {loading ? (
@@ -756,8 +742,7 @@ export function FloatingAiChat() {
               </div>
 
               <p className="mt-1.5 text-center text-[10px] text-white/25">
-                Contexte :{" "}
-                <span className="text-white/40 font-medium">{aiContext.pageLabel}</span>{" "}
+                Contexte : <span className="text-white/40 font-medium">{aiContext.pageLabel}</span>{" "}
                 · Shift+Entrée pour nouvelle ligne
               </p>
             </div>
@@ -765,5 +750,5 @@ export function FloatingAiChat() {
         )}
       </div>
     </>
-  )
+  );
 }

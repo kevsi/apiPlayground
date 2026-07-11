@@ -1,7 +1,7 @@
-import type { Metadata } from 'next'
-import Script from 'next/script'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
+import type { Metadata } from "next";
+import Script from "next/script";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -12,30 +12,31 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-import { ThemeProvider } from '@/components/theme-provider'
-import './globals.css'
+import { ThemeProvider } from "@/components/theme-provider";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Reqly - API Playground',
-  description: 'Professional API endpoint testing and management platform',
-  generator: 'v0.app',
+  title: "Reqly - API Playground",
+  description: "Professional API endpoint testing and management platform",
+  generator: "v0.app",
   icons: {
-    icon: '/icon.png',
-    apple: '/icon.png',
+    icon: "/icon.png",
+    apple: "/icon.png",
   },
-}
+};
 
-import { SidebarProvider } from '@/contexts/sidebar-context'
-import { Toaster } from '@/components/ui/toaster'
-import { FloatingAiChat } from '@/app/floating-ai-chat-client'
-import { ErrorBoundary } from '@/components/error-boundary'
-import { ClientLayoutShell } from '@/components/client-layout-shell'
-import { AiShortcutBridge } from '@/components/ai-shortcut-bridge'
+import { SidebarProvider } from "@/contexts/sidebar-context";
+import { Toaster } from "@/components/ui/toaster";
+import { FloatingAiChat } from "@/app/floating-ai-chat-client";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { ClientLayoutShell } from "@/components/client-layout-shell";
+import { AiShortcutBridge } from "@/components/ai-shortcut-bridge";
+import { StoreInitializer } from "@/components/store-initializer";
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -47,19 +48,24 @@ export default function RootLayout({
         <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
       </head>
-      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}>
-        <ThemeProvider defaultTheme="light" storageKey="reqly-theme">
+      <body
+        className={`${geist.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
+      >
+        <ThemeProvider>
           <ErrorBoundary>
             <SidebarProvider>
-              <ClientLayoutShell>{children}</ClientLayoutShell>
+              <ClientLayoutShell>
+                <StoreInitializer />
+                {children}
+              </ClientLayoutShell>
             </SidebarProvider>
             <FloatingAiChat />
             <AiShortcutBridge />
             <Toaster />
           </ErrorBoundary>
         </ThemeProvider>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
-  )
+  );
 }

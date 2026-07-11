@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import { useEffect, useCallback, useRef } from "react"
-import { invoke } from "@tauri-apps/api/core"
-import { listen, type UnlistenFn } from "@tauri-apps/api/event"
-import { useWsStore } from "@/hooks/use-websocket-store"
-import type { WsStatus } from "@/types/websocket"
-import type { WsTauriMessageEvent, WsTauriStatusEvent, WsTauriErrorEvent } from "@/types/websocket"
+import { useEffect, useCallback, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { useWsStore } from "@/hooks/use-websocket-store";
+import type { WsStatus } from "@/types/websocket";
+import type { WsTauriMessageEvent, WsTauriStatusEvent, WsTauriErrorEvent } from "@/types/websocket";
 
 /**
  * Detect if we're running inside a Tauri webview by checking for the IPC bridge.
@@ -13,43 +13,53 @@ import type { WsTauriMessageEvent, WsTauriStatusEvent, WsTauriErrorEvent } from 
  * `__TAURI__` alone can be a false positive (browser extensions, dev tools, etc.).
  */
 function canUseTauriInvoke(): boolean {
-  if (typeof window === "undefined") return false
-  const internals = (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
-  return typeof internals === "object" && internals !== null
+  if (typeof window === "undefined") return false;
+  const internals = (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+  return typeof internals === "object" && internals !== null;
 }
 
 // ─── Browser fallback: native WebSocket API ──────────────────────────────
 function useBrowserFallback(connectionId: string | null) {
-  const store = useWsStore()
-  const wsRef = useRef<WebSocket | null>(null)
-  const cleanupRef = useRef<(() => void) | null>(null)
+  const store = useWsStore();
+  const wsRef = useRef<WebSocket | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (!connectionId) return
+    if (!connectionId) return;
     cleanupRef.current = () => {
       if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) {
-        wsRef.current.close()
-        wsRef.current = null
+        wsRef.current.close();
+        wsRef.current = null;
       }
-    }
-    return () => cleanupRef.current?.()
-  }, [connectionId])
+    };
+    return () => cleanupRef.current?.();
+  }, [connectionId]);
 
   const connect = useCallback(
     async (url: string, _headers: Record<string, string>) => {
-      const id = crypto.randomUUID()
-      store.createConnection(id, url, {})
+      const id = crypto.randomUUID();
+      store.createConnection(id, url, {});
 
       // Browser WebSocket API ignores custom headers for non-browser WS
-      store.setStatus(id, "connecting")
+      store.setStatus(id, "connecting");
 
-      const socket = new WebSocket(url)
-      wsRef.current = socket
+      const socket = new WebSocket(url);
+      wsRef.current = socket;
+
+      // Connection timeout: if the socket doesn't open within 15s, abort
+      const connectTimeout = setTimeout(() => {
+        if (socket.readyState === WebSocket.CONNECTING) {
+          socket.close();
+          store.setStatus(id, "error", "Connection timed out after 15 seconds");
+          store.setDisconnectedAt(id);
+        }
+      }, 15_000);
 
       socket.onopen = () => {
-        store.setStatus(id, "connected")
-        store.setConnectedAt(id)
-      }
+        clearTimeout(connectTimeout);
+        store.setStatus(id, "connected");
+        store.setConnectedAt(id);
+      };
 
       socket.onmessage = (event) => {
         store.appendMessage(id, {
@@ -58,36 +68,40 @@ function useBrowserFallback(connectionId: string | null) {
           content: event.data as string,
           timestamp: Date.now(),
           byteSize: new Blob([event.data]).size,
-        })
-      }
+        });
+      };
 
       socket.onerror = () => {
-        store.setStatus(id, "error", "WebSocket connection error")
-        store.setDisconnectedAt(id)
-      }
+        clearTimeout(connectTimeout);
+        store.setStatus(id, "error", "WebSocket connection error");
+        store.setDisconnectedAt(id);
+      };
 
       socket.onclose = (event) => {
+        clearTimeout(connectTimeout);
         if (event.code !== 1000) {
-          store.setStatus(id, "disconnected", `Closed with code ${event.code}`)
+          store.setStatus(id, "disconnected", `Closed with code ${event.code}`);
         } else {
-          store.setStatus(id, "disconnected")
+          store.setStatus(id, "disconnected");
         }
-        store.setDisconnectedAt(id)
-        if (wsRef.current === socket) wsRef.current = null
-      }
+        store.setDisconnectedAt(id);
+        // Clear messages for this connection to avoid stale state on reconnect
+        store.clearMessages(id);
+        if (wsRef.current === socket) wsRef.current = null;
+      };
 
-      return id
+      return id;
     },
     [store],
-  )
+  );
 
   const send = useCallback(
     async (message: string) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(message)
+        wsRef.current.send(message);
         const connection = Object.values(store.connections).find(
           (c) => connectionId && c.id === connectionId,
-        )
+        );
         if (connection) {
           store.appendMessage(connectionId!, {
             id: crypto.randomUUID(),
@@ -95,140 +109,140 @@ function useBrowserFallback(connectionId: string | null) {
             content: message,
             timestamp: Date.now(),
             byteSize: new Blob([message]).size,
-          })
+          });
         }
       }
     },
     [connectionId, store],
-  )
+  );
 
   const disconnect = useCallback(async () => {
-    if (connectionId) store.setStatus(connectionId, "disconnecting")
+    if (connectionId) store.setStatus(connectionId, "disconnecting");
     if (wsRef.current) {
-      wsRef.current.close(1000, "User disconnected")
-      wsRef.current = null
+      wsRef.current.close(1000, "User disconnected");
+      wsRef.current = null;
     }
-  }, [connectionId, store])
+  }, [connectionId, store]);
 
-  return { connect, send, disconnect }
+  return { connect, send, disconnect };
 }
 
 // ─── Tauri backend: Rust tokio-tungstenite ──────────────────────────────
 function useTauriBackend(connectionId: string | null) {
-  const store = useWsStore()
-  const unlistenFnsRef = useRef<UnlistenFn[]>([])
+  const store = useWsStore();
+  const unlistenFnsRef = useRef<UnlistenFn[]>([]);
 
   useEffect(() => {
     // Clear stale listeners from previous connectionId
-    unlistenFnsRef.current.forEach((fn) => fn())
-    unlistenFnsRef.current = []
+    unlistenFnsRef.current.forEach((fn) => fn());
+    unlistenFnsRef.current = [];
 
-    if (!connectionId || !canUseTauriInvoke()) return
+    if (!connectionId || !canUseTauriInvoke()) return;
 
-    let cancelled = false
+    let cancelled = false;
 
     const setup = async () => {
       const messageUnlisten = await listen<WsTauriMessageEvent>("ws://message", (event) => {
-        if (event.payload.connection_id !== connectionId) return
+        if (event.payload.connection_id !== connectionId) return;
         store.appendMessage(connectionId, {
           id: crypto.randomUUID(),
           direction: "received",
           content: event.payload.content,
           timestamp: event.payload.timestamp,
           byteSize: new Blob([event.payload.content]).size,
-        })
-      })
+        });
+      });
       const statusUnlisten = await listen<WsTauriStatusEvent>("ws://status", (event) => {
-        if (event.payload.connection_id !== connectionId) return
-        const status = event.payload.status.toLowerCase() as WsStatus
-        store.setStatus(connectionId, status, event.payload.reason)
+        if (event.payload.connection_id !== connectionId) return;
+        const status = event.payload.status.toLowerCase() as WsStatus;
+        store.setStatus(connectionId, status, event.payload.reason);
         if (status === "connected") {
-          store.setConnectedAt(connectionId)
+          store.setConnectedAt(connectionId);
         }
         if (status === "disconnected" || status === "error") {
-          store.setDisconnectedAt(connectionId)
+          store.setDisconnectedAt(connectionId);
         }
-      })
+      });
       const errorUnlisten = await listen<WsTauriErrorEvent>("ws://error", (event) => {
-        if (event.payload.connection_id !== connectionId) return
-        store.setStatus(connectionId, "error", event.payload.message)
-        store.setDisconnectedAt(connectionId)
-      })
+        if (event.payload.connection_id !== connectionId) return;
+        store.setStatus(connectionId, "error", event.payload.message);
+        store.setDisconnectedAt(connectionId);
+      });
       if (!cancelled) {
-        unlistenFnsRef.current = [messageUnlisten, statusUnlisten, errorUnlisten]
+        unlistenFnsRef.current = [messageUnlisten, statusUnlisten, errorUnlisten];
       } else {
-        messageUnlisten()
-        statusUnlisten()
-        errorUnlisten()
+        messageUnlisten();
+        statusUnlisten();
+        errorUnlisten();
       }
-    }
+    };
 
-    setup()
+    setup();
 
     return () => {
-      cancelled = true
-      unlistenFnsRef.current.forEach((fn) => fn())
-      unlistenFnsRef.current = []
-    }
-  }, [connectionId, store])
+      cancelled = true;
+      unlistenFnsRef.current.forEach((fn) => fn());
+      unlistenFnsRef.current = [];
+    };
+  }, [connectionId, store]);
 
   const connect = useCallback(
     async (url: string, headers: Record<string, string> = {}) => {
-      if (!canUseTauriInvoke()) return null
+      if (!canUseTauriInvoke()) return null;
       try {
-        const id = await invoke<string>("ws_connect", { url, headers })
-        store.createConnection(id, url, headers)
-        store.setStatus(id, "connecting")
-        return id
+        const id = await invoke<string>("ws_connect", { url, headers });
+        store.createConnection(id, url, headers);
+        store.setStatus(id, "connecting");
+        return id;
       } catch (e) {
-        console.error("Tauri WebSocket connection failed:", e)
-        throw e
+        console.error("Tauri WebSocket connection failed:", e);
+        throw e;
       }
     },
     [store],
-  )
+  );
 
   const send = useCallback(
     async (message: string) => {
-      if (!connectionId || !canUseTauriInvoke()) return
+      if (!connectionId || !canUseTauriInvoke()) return;
       try {
-        await invoke("ws_send", { connectionId, message })
+        await invoke("ws_send", { connectionId, message });
         store.appendMessage(connectionId, {
           id: crypto.randomUUID(),
           direction: "sent",
           content: message,
           timestamp: Date.now(),
           byteSize: new Blob([message]).size,
-        })
+        });
       } catch (e) {
-        console.error("Tauri WebSocket send failed:", e)
-        throw e
+        console.error("Tauri WebSocket send failed:", e);
+        throw e;
       }
     },
     [connectionId, store],
-  )
+  );
 
   const disconnect = useCallback(async () => {
-    if (!connectionId || !canUseTauriInvoke()) return
+    if (!connectionId || !canUseTauriInvoke()) return;
     try {
-      store.setStatus(connectionId, "disconnecting")
-      await invoke("ws_disconnect", { connectionId })
+      store.setStatus(connectionId, "disconnecting");
+      await invoke("ws_disconnect", { connectionId });
     } catch (e) {
-      console.error("Tauri WebSocket disconnect failed:", e)
+      console.error("Tauri WebSocket disconnect failed:", e);
     }
-  }, [connectionId, store])
+  }, [connectionId, store]);
 
-  return { connect, send, disconnect }
+  return { connect, send, disconnect };
 }
 
 // ─── Unified hook ────────────────────────────────────────────────────────
 export function useWebSocket(connectionId: string | null) {
-  const store = useWsStore()
+  const store = useWsStore();
 
   // Always call both hooks unconditionally to respect React's Rules of Hooks.
   // Each backend function checks internally whether it should activate.
-  const tauriBackend = useTauriBackend(connectionId)
-  const browserBackend = useBrowserFallback(connectionId)
+  const tauriBackend = useTauriBackend(connectionId);
+  const browserBackend = useBrowserFallback(connectionId);
 
   // Unified connect: try Tauri first, fall back to browser if not available
   const connect = useCallback(
@@ -236,48 +250,48 @@ export function useWebSocket(connectionId: string | null) {
       // Try Tauri backend if the IPC bridge is available
       if (canUseTauriInvoke()) {
         try {
-          return await tauriBackend.connect(url, headers)
+          return await tauriBackend.connect(url, headers);
         } catch (e) {
-          console.warn("Tauri connect failed, falling back to browser WebSocket:", e)
+          console.warn("Tauri connect failed, falling back to browser WebSocket:", e);
           // Fall through to browser fallback
         }
       }
-      return browserBackend.connect(url, headers)
+      return browserBackend.connect(url, headers);
     },
     [tauriBackend, browserBackend],
-  )
+  );
 
   const send = useCallback(
     async (message: string) => {
       if (canUseTauriInvoke()) {
         try {
-          return await tauriBackend.send(message)
+          return await tauriBackend.send(message);
         } catch (e) {
-          console.warn("Tauri send failed, falling back to browser WebSocket:", e)
+          console.warn("Tauri send failed, falling back to browser WebSocket:", e);
         }
       }
-      return browserBackend.send(message)
+      return browserBackend.send(message);
     },
     [tauriBackend, browserBackend],
-  )
+  );
 
   const disconnect = useCallback(async () => {
     if (canUseTauriInvoke()) {
       try {
-        return await tauriBackend.disconnect()
+        return await tauriBackend.disconnect();
       } catch (e) {
-        console.warn("Tauri disconnect failed, falling back to browser WebSocket:", e)
+        console.warn("Tauri disconnect failed, falling back to browser WebSocket:", e);
       }
     }
-    return browserBackend.disconnect()
-  }, [tauriBackend, browserBackend])
+    return browserBackend.disconnect();
+  }, [tauriBackend, browserBackend]);
 
   const clearMessages = useCallback(() => {
-    if (!connectionId) return
-    store.clearMessages(connectionId)
-  }, [connectionId, store])
+    if (!connectionId) return;
+    store.clearMessages(connectionId);
+  }, [connectionId, store]);
 
-  const connection = connectionId ? store.connections[connectionId] ?? null : null
+  const connection = connectionId ? (store.connections[connectionId] ?? null) : null;
 
   return {
     connection,
@@ -286,5 +300,5 @@ export function useWebSocket(connectionId: string | null) {
     disconnect,
     clearMessages,
     store,
-  }
+  };
 }
