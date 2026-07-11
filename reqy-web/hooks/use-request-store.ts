@@ -477,10 +477,7 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
         }),
       );
     },
-    initStore: async () => {
-      const loaded = await loadFromStorageAsync();
-      set(loaded);
-    },
+    initStore,
     fetchWorkspacesFromApi,
     ...mutations,
     getFoldersForCollection,
