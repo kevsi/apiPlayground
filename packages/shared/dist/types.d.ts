@@ -52,4 +52,53 @@ export interface AssertionResult {
     assertion?: Assertion;
     actualValue?: unknown;
 }
+export interface RequestItem {
+    id?: string;
+    name: string;
+    method: HttpMethod;
+    url: string;
+    endpoint?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    bodyType?: BodyType | "graphql";
+    authType?: AuthType;
+    authToken?: string;
+    queryParams?: Array<{
+        key: string;
+        value: string;
+    }>;
+    folderId?: string | null;
+    sortOrder: number;
+}
+export interface Collection {
+    id?: string;
+    name: string;
+    description?: string;
+    color?: string;
+    icon?: string;
+    requests: RequestItem[];
+    folders?: CollectionFolder[];
+}
+export interface CollectionFolder {
+    id: string;
+    name: string;
+    parentId?: string | null;
+    collectionId?: string;
+    order?: number;
+    requests?: string[];
+    children?: CollectionFolder[];
+}
+export interface ExportBundle {
+    version?: string;
+    exportedAt?: string;
+    collections: Collection[];
+    environments?: Environment[];
+    variableMappings?: Array<{
+        id?: string;
+        name: string;
+        sourceRequestId: string;
+        sourcePath: string;
+        enabled?: boolean;
+    }>;
+}
 //# sourceMappingURL=types.d.ts.map

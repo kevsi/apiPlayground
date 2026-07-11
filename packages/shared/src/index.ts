@@ -1,5 +1,4 @@
 // @reqly/shared — Barrel export
-// Ce package contient les modules partagés entre recli, reqy-mcp, reqy-web
 
 export type {
   HttpMethod,
@@ -12,7 +11,46 @@ export type {
   GraphQLConfig,
   Assertion,
   AssertionResult,
-} from "./types.js"
+  RequestItem,
+  Collection,
+  CollectionFolder,
+  ExportBundle,
+} from "./types.js";
 
-export { parseCurlCommand, generateCurlCommand } from "./curl-parser/index.js"
-export type { ParsedCurl } from "./curl-parser/index.js"
+export { parseCurlCommand, generateCurlCommand } from "./curl-parser/index.js";
+export type { ParsedCurl } from "./curl-parser/index.js";
+
+export { importOpenAPI, exportToOpenApi } from "./openapi/index.js";
+
+export {
+  evaluateAssertion,
+  evaluateAssertions,
+  evaluateTextAssertion,
+  evaluateTextAssertions,
+  evaluateStructuredAssertion,
+  evaluateStructuredAssertions,
+  evaluateSchemaAssertion,
+  assertsPassed,
+  runResultToContext,
+  resolveField,
+  compareValues,
+  tokenize,
+  parseExpectedValue,
+  resolveVars,
+  validateSchema,
+  validateSchemaResult,
+  type UnifiedEvalContext,
+  type TextEvaluateOptions,
+  type StructuredAssertionType,
+  type StructuredAssertionOperator,
+  type JSONSchema,
+} from "./assertions/index.js";
+
+export {
+  resolveJsonPath,
+  tokenizePath,
+  tryParseJson,
+  getValueByPath,
+  parseResponseForExtraction,
+  type PathExtractionResult,
+} from "./variable-path/index.js";

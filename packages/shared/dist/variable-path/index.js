@@ -1,0 +1,160 @@
+/**
+ * Unified JSONPath utilities.
+ *
+ * Provides both API styles previously found across packages:
+ * - `resolveJsonPath` / `tokenizePath` / `tryParseJson` (recli style)
+ * - `getValueByPath` / `PathExtractionResult` / `parseResponseForExtraction`
+ *   (reqy-mcp / reqy-web style)
+ *
+ * Web-specific extractors (XML, regex, content-type detection) stay in
+ * reqy-web since they depend on browser APIs (DOMParser, Blob).
+ */
+// ── recli-style API ────────────────────────────────────────
+/**
+ * Split a dotted/bracketed path into segments.
+ *
+ *   "a.b[0].c" -> ["a", "b", "0", "c"]
+ *   "items[2].name" -> ["items", "2", "name"]
+ */
+export function tokenizePath(path) {
+    const parts = [];
+    let current = "";
+    let inBracket = false;
+    for (let i = 0; i < path.length; i++) {
+        const c = path[i];
+        if (c === "[") {
+            if (current) {
+                parts.push(current);
+                current = "";
+            }
+            inBracket = true;
+        }
+        else if (c === "]") {
+            if (current) {
+                parts.push(current);
+                current = "";
+            }
+            inBracket = false;
+        }
+        else if (c === "." && !inBracket) {
+            if (current) {
+                parts.push(current);
+                current = "";
+            }
+        }
+        else {
+            current += c;
+        }
+    }
+    if (current)
+        parts.push(current);
+    return parts;
+}
+/**
+ * Resolve a path string against an object. Returns `undefined` when the
+ * path cannot be resolved (intermediate value is null/undefined, or the
+ * key does not exist).
+ *
+ *   resolveJsonPath({a: {b: [{c: 1}]}}, "a.b[0].c") === 1
+ */
+export function resolveJsonPath(obj, path) {
+    if (!path)
+        return undefined;
+    const parts = tokenizePath(path);
+    let current = obj;
+    for (const part of parts) {
+        if (current === null || current === undefined)
+            return undefined;
+        if (Array.isArray(current)) {
+            if (part === "length") {
+                current = current.length;
+                continue;
+            }
+            const idx = parseInt(part, 10);
+            if (!Number.isNaN(idx)) {
+                current = current[idx];
+                continue;
+            }
+            return undefined;
+        }
+        if (typeof current === "object") {
+            current = current[part];
+        }
+        else {
+            return undefined;
+        }
+    }
+    return current;
+}
+/**
+ * Try to parse a string as JSON. Returns the original string when parsing fails.
+ */
+export function tryParseJson(body) {
+    if (!body)
+        return null;
+    try {
+        return JSON.parse(body);
+    }
+    catch {
+        return body;
+    }
+}
+/**
+ * Read a value at a dotted path. Supports `$.foo`, `foo.bar`, `items[0]`.
+ * Returns a structured result so callers can distinguish a real `undefined`
+ * value from a missing path.
+ */
+export function getValueByPath(value, path) {
+    if (!path || typeof path !== "string" || !path.trim()) {
+        return { success: true, value };
+    }
+    const trimmedPath = path.trim();
+    try {
+        // Strip optional JSONPath-style $ prefix so "$.id" matches "id".
+        const normalizedPath = trimmedPath.replace(/^\$\.?/, "");
+        const result = normalizedPath
+            .split(".")
+            .reduce((current, segment) => {
+            if (current === undefined || current === null)
+                return undefined;
+            const parts = segment
+                .replace(/\[(\d+)\]/g, ".$1")
+                .split(".")
+                .filter(Boolean);
+            return parts.reduce((acc, key) => {
+                if (acc === undefined || acc === null)
+                    return undefined;
+                if (typeof acc !== "object")
+                    return undefined;
+                return acc[key];
+            }, current);
+        }, value);
+        if (result === undefined) {
+            return { success: false, error: `Path not found: ${trimmedPath}` };
+        }
+        return { success: true, value: result };
+    }
+    catch (err) {
+        return {
+            success: false,
+            error: `Extraction error: ${err instanceof Error ? err.message : String(err)}`,
+        };
+    }
+}
+/**
+ * Parse a response body for value extraction. Returns the parsed value
+ * alongside a flag indicating whether the original looked like JSON.
+ */
+export function parseResponseForExtraction(responseBody) {
+    const trimmed = responseBody.trim();
+    if (!trimmed) {
+        return { parsed: "", isJson: false };
+    }
+    try {
+        return { parsed: JSON.parse(responseBody), isJson: true };
+    }
+    catch {
+        return { parsed: responseBody, isJson: false };
+    }
+}
+//# sourceMappingURL=index.js.map
