@@ -16,11 +16,22 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAIEngine } from "@/hooks/use-ai-engine";
+import { useRequestStore } from "@/hooks/use-request-store";
+import { useShallow } from "zustand/react/shallow";
 import { usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { persistence } from "@/lib/persistence";
+import { callAI } from "@/lib/ai-engine/providers";
+import { dispatchAIActions } from "@/lib/ai-engine/dispatch";
+import {
+  loadAIProvider,
+  loadApiKey,
+  loadAiBaseUrl,
+  loadAiModel,
+  loadOllamaConfig,
+} from "@/lib/projects-store";
+import type { AIContext, CurrentRequest, TestAssertion } from "@/lib/ai-engine/types";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -55,7 +66,22 @@ interface AiSidebarProps {
 
 export function AiSidebar({ open, onClose }: AiSidebarProps) {
   const pathname = usePathname();
-  const aiEngine = useAIEngine();
+  const store = useRequestStore(
+    useShallow((s) => ({
+      currentRequest: s.currentRequest,
+      lastResponse: s.lastResponse,
+      environmentVariables: s.environmentVariables,
+      collectionHistory: s.collectionHistory,
+      activeCollection: s.activeCollection,
+      patchRequest: s.patchRequest,
+      addAssertions: s.addAssertions,
+      setVariable: s.setVariable,
+      setDoc: s.setDoc,
+      addNotification: s.addNotification,
+      executeRequest: s.executeRequest,
+      aiAutoApply: s.aiAutoApply,
+    })),
+  );
 
   // Width
   const [width, setWidth] = useState(() => {
@@ -204,25 +230,109 @@ export function AiSidebar({ open, onClose }: AiSidebarProps) {
       setIsLoading(true);
 
       try {
-        const ctx = aiEngine.buildContext();
-        const sysPrompt = `Tu es un assistant IA intégré dans l'application Reqly (API Playground).
+        // Build context
+        const ctx: AIContext = {
+          currentRequest: store.currentRequest ?? {
+            method: "GET",
+            url: "",
+            headers: {},
+            params: {},
+          },
+          lastResponse: store.lastResponse ?? null,
+          environmentVariables: store.environmentVariables ?? {},
+          collectionHistory: (store.collectionHistory ?? []).slice(0, 10),
+          activeCollection: store.activeCollection ?? null,
+        };
+
+        // Load AI config from settings
+        const provider = loadAIProvider();
+        const apiKey = loadApiKey(provider);
+        const aiModel = loadAiModel(provider);
+        const aiBaseUrl = loadAiBaseUrl(provider);
+        const ollamaConfig = loadOllamaConfig();
+
+        const aiConfig = {
+          provider,
+          apiKey,
+          model: aiModel || undefined,
+          openaiUrl:
+            provider === "openai" || provider === "custom" ? aiBaseUrl || undefined : undefined,
+          ollamaUrl:
+            provider === "ollama"
+              ? `http://${ollamaConfig.host || "127.0.0.1"}:${ollamaConfig.port ?? 11434}`
+              : undefined,
+        };
+
+        const systemContent = `Tu es un assistant IA intégré dans l'application Reqly (API Playground).
 Page : ${pathname}
 
 L'utilisateur te demande d'interagir avec l'application. Tu peux :
-- Modifier la requête courante (méthode, URL, headers, body)
+- Modifier la requête courante (méthode, URL, headers, body, auth)
+- Ajouter des assertions de test
+- Définir des variables d'environnement
 - Exécuter des requêtes
 - Gérer les collections
 - Gérer les projets et workspaces
 - Naviguer dans l'application
 
-Contexte actuel :
+Contexte actuel de la requête :
 ${JSON.stringify(ctx, null, 2)}
 
-Réponds en français de manière concise et utile.
-Quand tu proposes une action, explique ce que tu fais.`;
+Pour modifier la requête, utilise FILL_REQUEST.
+Pour exécuter, utilise EXECUTE_REQUEST avec run:true dans FILL_REQUEST.
+Pour ajouter des assertions, utilise ADD_ASSERTIONS.
+Pour définir une variable, utilise SET_VARIABLE.
 
-        const response = await aiEngine.sendMessage(content, sysPrompt, ctx);
-        setMessages((prev) => [...prev, { role: "assistant", content: response }]);
+Réponds en français de manière concise et utile.
+Quand tu proposes une action, explique ce que tu fais puis exécute-la.`;
+
+        // Call AI with action pipeline
+        const aiRes = await callAI(
+          `[INSTUCTION]\n${content}\n\n[RÈGLES]\n${systemContent}[/INSTRUCTION]`,
+          aiConfig,
+        );
+
+        // Dispatch actions to the store
+        if (aiRes.actions && aiRes.actions.length > 0) {
+          const handlers = {
+            setRequest: (patch: Partial<CurrentRequest>) => store.patchRequest(patch),
+            addAssertions: (assertions: TestAssertion[], autoApply?: boolean) =>
+              store.addAssertions(assertions),
+            setVariable: (name: string, value: string, description?: string) =>
+              store.setVariable(name, value, description),
+            setDoc: (markdown: string, title?: string) => store.setDoc(markdown, title),
+            notify: (message: string) =>
+              store.addNotification
+                ? store.addNotification({
+                    title: "Assistant IA",
+                    body: String(message),
+                    type: "info",
+                  })
+                : undefined,
+            executeRequest: (request: Partial<CurrentRequest>) =>
+              store.executeRequest ? (store.executeRequest as any)(request) : undefined,
+            runBatch: async (requests: Array<Partial<CurrentRequest>>) => {
+              const results: unknown[] = [];
+              for (const req of requests) {
+                if (store.executeRequest) {
+                  const res = await (store.executeRequest as any)(req);
+                  results.push(res);
+                }
+              }
+              return results;
+            },
+            audit: (entry: { actionType: string; detail?: unknown; result?: unknown }) => {
+              // optional — skip if not available
+            },
+          };
+
+          await dispatchAIActions(aiRes.actions, handlers, ctx, {
+            allowAutoApply: Boolean(store.aiAutoApply),
+          });
+        }
+
+        const responseText = aiRes.summary || aiRes.actions?.[0]?.type || "Action effectuée.";
+        setMessages((prev) => [...prev, { role: "assistant", content: responseText }]);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Erreur de communication avec l'IA";
         setError(msg);
@@ -233,7 +343,7 @@ Quand tu proposes une action, explique ce que tu fais.`;
         setEditingText("");
       }
     },
-    [messages, isLoading, aiEngine, pathname],
+    [messages, isLoading, pathname, store],
   );
 
   // ── Handlers ─────────────────────────────────────────────────────────────
