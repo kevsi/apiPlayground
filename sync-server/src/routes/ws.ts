@@ -64,11 +64,39 @@ export function handleWsUpgrade(
     wsConn.on("close", () => clearInterval(pingInterval));
     wsConn.on("error", () => clearInterval(pingInterval));
 
+    // Periodic session re-verification: check every 60s that the session
+    // is still valid. If the user was logged out (session expired / revoked),
+    // terminate the connection.
+    const sessionRecheck = setInterval(() => {
+      if (wsConn.readyState !== WebSocket.OPEN) {
+        clearInterval(sessionRecheck);
+        return;
+      }
+      // Re-parse the session from the cookie to check expiry
+      const cookieHeader = req.headers.cookie ?? "";
+      const reMatch = cookieHeader.match(new RegExp(`${escapeRegex(COOKIE_NAME)}=([^;]+)`));
+      const reSession = parseSessionCookie(reMatch?.[1]);
+      if (!reSession || !reSession.userId) {
+        wsConn.send(JSON.stringify({ type: "error", payload: "Session expired" }));
+        wsConn.close(4001, "Session expired");
+        clearInterval(sessionRecheck);
+      }
+    }, 60_000);
+
     // Send hello
     try {
       wsConn.send(JSON.stringify({ type: "hello", workspaceId }));
     } catch {
       // ignore: socket may already be closing
     }
+
+    // Extend cleanup to include the recheck timer
+    const originalCleanup = cleanup;
+    const cleanupWithTimers = () => {
+      clearInterval(sessionRecheck);
+      originalCleanup();
+    };
+    wsConn.on("close", cleanupWithTimers);
+    wsConn.on("error", cleanupWithTimers);
   });
 }

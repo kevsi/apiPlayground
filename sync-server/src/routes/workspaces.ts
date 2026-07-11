@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import db from "../db.js";
 import { requireAuth, type AuthContext } from "../auth.js";
+import { safeParseJson } from "../validation.js";
 
 const workspaces = new Hono<{ Variables: { auth: AuthContext } }>();
 workspaces.use("*", requireAuth);
@@ -11,7 +12,9 @@ const CreateSchema = z.object({ name: z.string().min(1).max(100) });
 
 workspaces.post("/", async (c) => {
   const auth = c.get("auth") as AuthContext;
-  const body = CreateSchema.parse(await c.req.json());
+  const parsed = await safeParseJson(c, CreateSchema);
+  if (!parsed.success) return parsed.response;
+  const body = parsed.data;
   const id = `ws-${randomUUID()}`;
   const now = Date.now();
 
@@ -69,6 +72,56 @@ workspaces.post("/:id/invitations", (c) => {
     `INSERT INTO invitations (token, workspace_id, role, created_at, expires_at, created_by) VALUES (?, ?, ?, ?, ?, ?)`,
   ).run(token, id, "editor", now, expiresAt, auth.userId);
   return c.json({ token, expiresAt, role: "editor" });
+});
+
+workspaces.get("/:id/members", (c) => {
+  const auth = c.get("auth") as AuthContext;
+  const id = c.req.param("id");
+
+  // Verify access: must be a member of this workspace
+  const ownMembership = db
+    .prepare(`SELECT role FROM memberships WHERE workspace_id = ? AND user_id = ?`)
+    .get(id, auth.userId) as { role: string } | undefined;
+  if (!ownMembership) {
+    return c.json({ error: "Not a member of this workspace" }, 403);
+  }
+
+  const rows = db
+    .prepare(
+      `
+      SELECT u.id, u.name, u.email, m.role, m.created_at as joinedAt
+      FROM memberships m
+      JOIN users u ON u.id = m.user_id
+      WHERE m.workspace_id = ?
+      ORDER BY m.created_at ASC
+      `,
+    )
+    .all(id) as Array<{ id: string; name: string; email: string; role: string; joinedAt: number }>;
+
+  return c.json({ members: rows });
+});
+
+workspaces.delete("/:id", (c) => {
+  const auth = c.get("auth") as AuthContext;
+  const id = c.req.param("id");
+
+  const workspace = db.prepare(`SELECT owner_id FROM workspaces WHERE id = ?`).get(id) as
+    { owner_id: string } | undefined;
+  if (!workspace) {
+    return c.json({ error: "Workspace not found" }, 404);
+  }
+  if (workspace.owner_id !== auth.userId) {
+    return c.json({ error: "Only the owner can delete this workspace" }, 403);
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM memberships WHERE workspace_id = ?`).run(id);
+    db.prepare(`DELETE FROM invitations WHERE workspace_id = ?`).run(id);
+    db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(id);
+  });
+  tx();
+
+  return c.json({ success: true });
 });
 
 export default workspaces;

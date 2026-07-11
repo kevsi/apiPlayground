@@ -8,6 +8,7 @@ import sync from "./routes/sync.js";
 import { handleWsUpgrade } from "./routes/ws.js";
 import { closeAll } from "./ws-hub.js";
 import { parseOrigins } from "./cors/index.js";
+import { apiLimiter, syncLimiter, rateLimitMiddleware } from "./rate-limiter.js";
 
 const app = new Hono();
 
@@ -33,6 +34,27 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+// Body size limit: reject bodies larger than 5 MB to prevent resource exhaustion
+const MAX_BODY_BYTES = 5_242_880; // 5 MB
+app.use("/api/*", async (c, next) => {
+  const contentLength = c.req.header("content-length");
+  if (contentLength) {
+    const len = Number(contentLength);
+    if (!Number.isNaN(len) && len > MAX_BODY_BYTES) {
+      return c.json({ error: "Request body too large (max 5 MB)" }, 413);
+    }
+  }
+  return next();
+});
+
+// Apply API-wide rate limiting (non-sync endpoints)
+app.use("/api/workspaces/*", rateLimitMiddleware(apiLimiter));
+app.use("/api/memberships/*", rateLimitMiddleware(apiLimiter));
+
+// Sync endpoints have a lower rate limit (bursty polling)
+app.use("/api/sync/*", rateLimitMiddleware(syncLimiter));
+
 app.route("/api/workspaces", workspaces);
 app.route("/api/memberships", memberships);
 app.route("/api/sync", sync);

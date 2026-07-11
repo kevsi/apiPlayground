@@ -1,13 +1,17 @@
-import Database from "better-sqlite3"
-import path from "node:path"
-import fs from "node:fs"
+import Database from "better-sqlite3";
+import path from "node:path";
+import fs from "node:fs";
 
-const DB_DIR = path.resolve(process.cwd(), "data")
-if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
+const DB_PATH = process.env.REQLY_DB_PATH
+  ? path.resolve(process.env.REQLY_DB_PATH)
+  : path.join(path.resolve(process.cwd(), "data"), "reqly-sync.db");
 
-const db = new Database(path.join(DB_DIR, "reqly-sync.db"))
-db.pragma("journal_mode = WAL")
-db.pragma("foreign_keys = ON")
+const DB_DIR = path.dirname(DB_PATH);
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+
+const db = new Database(DB_PATH);
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -78,6 +82,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_collections_ws ON collections(workspace_id, updated_at);
   CREATE INDEX IF NOT EXISTS idx_environments_ws ON environments(workspace_id, updated_at);
   CREATE INDEX IF NOT EXISTS idx_folders_col ON folders(collection_id, updated_at);
-`)
+`);
 
-export default db
+export default db;
