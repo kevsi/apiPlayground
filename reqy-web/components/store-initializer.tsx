@@ -18,6 +18,20 @@ export function StoreInitializer() {
     // using stale localStorage data that will be silently replaced a few
     // ms later, causing flash + potential data loss in the first render.
     let cancelled = false;
+    let forceLoaded = false;
+
+    // Safety timeout: if persistence or initStore hangs (e.g. IndexedDB
+    // unavailable or a migration stalls), force isLoaded after 3 s so the
+    // UI doesn't stay stuck on loading screens forever.
+    const safeTimer = setTimeout(() => {
+      if (cancelled || forceLoaded) return;
+      console.warn("[StoreInitializer] init timed out — forcing isLoaded");
+      // Use unknown cast to bypass strict setState type — runtime behavior is correct
+      (requestStore as unknown as { setState: (s: Record<string, unknown>) => void }).setState({
+        isLoaded: true,
+      });
+    }, 3000);
+
     void (async () => {
       try {
         await persistence.waitForReady();
@@ -29,12 +43,15 @@ export function StoreInitializer() {
       if (state.isLoaded) return;
       try {
         await state.initStore();
+        forceLoaded = true;
+        clearTimeout(safeTimer);
       } catch (err) {
         console.warn("[StoreInitializer] initStore failed:", err);
       }
     })();
     return () => {
       cancelled = true;
+      clearTimeout(safeTimer);
     };
   }, []);
 
