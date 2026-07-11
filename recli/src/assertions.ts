@@ -24,7 +24,9 @@ export function evaluateAssertion(
   result: RunResult,
   vars?: Map<string, string>,
 ): AssertionResult {
-  return evaluateTextAssertion(assertion, runResultToContext(result), { vars });
+  return evaluateTextAssertion(assertion, runResultToContext(result), {
+    vars,
+  }) as unknown as AssertionResult;
 }
 
 export function evaluateAssertions(
@@ -32,7 +34,9 @@ export function evaluateAssertions(
   result: RunResult,
   vars?: Map<string, string>,
 ): AssertionResult[] {
-  return evaluateTextAssertions(assertions, runResultToContext(result), { vars });
+  return evaluateTextAssertions(assertions, runResultToContext(result), {
+    vars,
+  }) as unknown as AssertionResult[];
 }
 
 export { evaluateSchemaAssertion } from "@reqly/shared/assertions";

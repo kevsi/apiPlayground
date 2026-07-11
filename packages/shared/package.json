@@ -6,12 +6,30 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./types": "./dist/types.js",
-    "./curl-parser": "./dist/curl-parser/index.js",
-    "./openapi": "./dist/openapi/index.js",
-    "./assertions": "./dist/assertions/index.js",
-    "./variable-path": "./dist/variable-path/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./curl-parser": {
+      "types": "./dist/curl-parser/index.d.ts",
+      "default": "./dist/curl-parser/index.js"
+    },
+    "./openapi": {
+      "types": "./dist/openapi/index.d.ts",
+      "default": "./dist/openapi/index.js"
+    },
+    "./assertions": {
+      "types": "./dist/assertions/index.d.ts",
+      "default": "./dist/assertions/index.js"
+    },
+    "./variable-path": {
+      "types": "./dist/variable-path/index.d.ts",
+      "default": "./dist/variable-path/index.js"
+    }
   },
   "scripts": {
     "build": "tsc",

@@ -10,14 +10,14 @@
  * The unified API exposes both evaluation styles so existing callers can
  * migrate incrementally without breaking their call sites.
  */
-import { tokenize, parseExpectedValue, resolveVars, } from "./text-parser.js";
+import { tokenize, parseExpectedValue, resolveVars } from "./text-parser.js";
 import { validateSchema } from "./json-schema.js";
-import { getValueByPath, parseResponseForExtraction, } from "../variable-path/index.js";
+import { getValueByPath, parseResponseForExtraction } from "../variable-path/index.js";
 import { resolveJsonPath, tryParseJson } from "../variable-path/index.js";
 // ── Public re-exports ──────────────────────────────────────
-export { tokenize, parseExpectedValue, resolveVars, } from "./text-parser.js";
+export { tokenize, parseExpectedValue, resolveVars } from "./text-parser.js";
 export { validateSchema, validateSchemaResult } from "./json-schema.js";
-export { resolveJsonPath, tryParseJson, tokenizePath, getValueByPath } from "../variable-path/index.js";
+export { resolveJsonPath, tryParseJson, tokenizePath, getValueByPath, } from "../variable-path/index.js";
 /**
  * Convert a recli/reqy-mcp RunResult into the unified context.
  */
@@ -49,11 +49,7 @@ export function resolveField(field, ctx) {
         return resolveJsonPath(body, rest);
     }
     if (field.startsWith("headers")) {
-        const headerKey = field
-            .slice(7)
-            .replace(/^\./, "")
-            .toLowerCase()
-            .replace(/-/g, "");
+        const headerKey = field.slice(7).replace(/^\./, "").toLowerCase().replace(/-/g, "");
         if (!ctx.headers)
             return undefined;
         for (const [key, value] of Object.entries(ctx.headers)) {
@@ -375,8 +371,7 @@ export function evaluateStructuredAssertion(assertion, ctx) {
                         break;
                     case "regex":
                         passed =
-                            typeof assertion.value === "string" &&
-                                new RegExp(assertion.value).test(actual);
+                            typeof assertion.value === "string" && new RegExp(assertion.value).test(actual);
                         break;
                     default:
                         return {

@@ -11,9 +11,9 @@
  * migrate incrementally without breaking their call sites.
  */
 import type { Assertion, AssertionResult } from "../types.js";
-export { tokenize, parseExpectedValue, resolveVars, type ParsedToken, } from "./text-parser.js";
+export { tokenize, parseExpectedValue, resolveVars, type ParsedToken } from "./text-parser.js";
 export { validateSchema, validateSchemaResult, type JSONSchema } from "./json-schema.js";
-export { resolveJsonPath, tryParseJson, tokenizePath, getValueByPath } from "../variable-path/index.js";
+export { resolveJsonPath, tryParseJson, tokenizePath, getValueByPath, } from "../variable-path/index.js";
 /**
  * Unified context for assertion evaluation. Callers (recli/reqy-mcp/reqy-web)
  * can adapt their own structures to this shape.

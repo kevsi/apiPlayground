@@ -44,7 +44,11 @@ export function importOpenAPI(specYamlOrJson) {
                     if (param.in === "query") {
                         queryParams.push({
                             key: param.name,
-                            value: param.example !== undefined ? String(param.example) : param.schema?.default !== undefined ? String(param.schema.default) : "",
+                            value: param.example !== undefined
+                                ? String(param.example)
+                                : param.schema?.default !== undefined
+                                    ? String(param.schema.default)
+                                    : "",
                         });
                     }
                     else if (param.in === "header") {
@@ -106,7 +110,9 @@ function generateExampleFromSchema(schema) {
         return result;
     }
     if (schema.type === "array") {
-        const items = schema.items ? generateExampleFromSchema(schema.items) : "";
+        const items = schema.items
+            ? generateExampleFromSchema(schema.items)
+            : "";
         return [items];
     }
     if (schema.type === "string") {
@@ -188,7 +194,10 @@ export function exportToOpenApi(collections) {
                 }
                 : undefined;
             paths[path][method] = {
-                operationId: `${collection.name}_${request.name}_${request.method}`.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, ""),
+                operationId: `${collection.name}_${request.name}_${request.method}`
+                    .toLowerCase()
+                    .replace(/[^a-z0-9_]+/g, "_")
+                    .replace(/^_+|_+$/g, ""),
                 tags: [collection.name],
                 summary: request.name || `${request.method} ${path}`,
                 parameters,

@@ -112,9 +112,7 @@ export function getValueByPath(value, path) {
     try {
         // Strip optional JSONPath-style $ prefix so "$.id" matches "id".
         const normalizedPath = trimmedPath.replace(/^\$\.?/, "");
-        const result = normalizedPath
-            .split(".")
-            .reduce((current, segment) => {
+        const result = normalizedPath.split(".").reduce((current, segment) => {
             if (current === undefined || current === null)
                 return undefined;
             const parts = segment

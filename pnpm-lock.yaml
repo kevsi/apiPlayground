@@ -38,6 +38,9 @@ importers:
 
   recli:
     dependencies:
+      "@reqly/shared":
+        specifier: workspace:*
+        version: link:../packages/shared
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
