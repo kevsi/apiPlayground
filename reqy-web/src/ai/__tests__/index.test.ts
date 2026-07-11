@@ -71,7 +71,7 @@ describe("@/src/ai public API surface", () => {
         "callAIText",
         "dispatchAIActions",
         "parseAIResponse",
-      ].sort()
+      ].sort(),
     );
     // None of the internal payload-type names should be re-exported as values.
     for (const internal of [
@@ -117,9 +117,7 @@ describe("@/src/ai re-exports work end-to-end", () => {
     };
     expect(typeof PROMPTS.analyzeResponse(ctx)).toBe("string");
     expect(typeof PROMPTS.generateTests(ctx)).toBe("string");
-    expect(typeof PROMPTS.naturalLanguageToRequest("Create a user", ctx)).toBe(
-      "string"
-    );
+    expect(typeof PROMPTS.naturalLanguageToRequest("Create a user", ctx)).toBe("string");
     expect(typeof PROMPTS.debugError(ctx)).toBe("string");
     expect(typeof PROMPTS.generateDocs([])).toBe("string");
   });
@@ -137,9 +135,7 @@ describe("@/src/ai re-exports work end-to-end", () => {
 
   it("dispatchAIActions routes EXPLAIN through the notify handler", async () => {
     const notify = vi.fn();
-    const actions: AIAction[] = [
-      { type: "EXPLAIN", payload: { message: "hello via re-export" } },
-    ];
+    const actions: AIAction[] = [{ type: "EXPLAIN", payload: { message: "hello via re-export" } }];
     await dispatchAIActions(actions, { notify });
     expect(notify).toHaveBeenCalledWith("hello via re-export");
   });
@@ -170,7 +166,7 @@ describe("@/src/ai re-exports work end-to-end", () => {
 
   it("callAIText throws for unsupported provider via the re-export", async () => {
     await expect(
-      callAIText("test", { provider: "nope" as unknown as AIProvider })
+      callAIText("test", { provider: "nope" as unknown as AIProvider, apiKey: "x" }),
     ).rejects.toThrow(/Unsupported provider/);
   });
 });
