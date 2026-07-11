@@ -36,12 +36,14 @@ reqy-mcp/dist/
 **/test-results/
 *.tsbuildinfo
 
-# ── Agent/tooling working directories (keep .kimchi/ docs) ─────────
+# ── Agent/tooling working directories ──────────────────────────
 .kilo/
 .claude/
+.kimchi/
 .imgtool-tmp/
 autoresearch/
 tasks/
+docs/superpowers/
 
 # ── Misc temp/debug files ──────────────────────────────────────────
 test.txt
