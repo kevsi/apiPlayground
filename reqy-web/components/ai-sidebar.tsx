@@ -427,33 +427,33 @@ Quand tu proposes une action, explique ce que tu fais puis exécute-la.`;
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  if (!open) return null;
-
   return (
     <>
-      {/* Mobile overlay */}
-      <div className="fixed inset-0 z-30 bg-black/20 md:hidden" onClick={onClose} />
+      {/* Overlay for mobile */}
+      {open && <div className="fixed inset-0 z-30 bg-black/20 md:hidden" onClick={onClose} />}
 
-      {/* Resize handle */}
-      <div
-        className={cn(
-          "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10",
-          "hover:bg-primary/30 hover:w-1.5 transition-all duration-150",
-          isResizing && "bg-primary/50 w-1.5",
-        )}
-        onMouseDown={handleResizeStart}
-      />
+      {/* Resize handle — only interactive when open */}
+      {open && (
+        <div
+          className={cn(
+            "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10",
+            "hover:bg-primary/30 hover:w-1.5 transition-all duration-150",
+            isResizing && "bg-primary/50 w-1.5",
+          )}
+          onMouseDown={handleResizeStart}
+        />
+      )}
 
       {/* Sidebar */}
       <div
         ref={sidebarRef}
         className={cn(
           "relative flex flex-col border-l border-border bg-background",
-          "h-screen shrink-0",
-          "transition-[width] duration-150 ease-out",
+          "h-screen shrink-0 overflow-hidden",
+          "transition-[width] duration-200 ease-out",
           isResizing && "transition-none",
         )}
-        style={{ width }}
+        style={{ width: open ? width : 0 }}
       >
         {/* ── Header ────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-border px-4 h-12 shrink-0">
