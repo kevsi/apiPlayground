@@ -180,21 +180,23 @@ export async function callAI(
     model?: string;
     openaiUrl?: string;
     ollamaUrl?: string;
+    system?: string; // optional override for SYSTEM_PROMPT
   },
 ): Promise<AIResponse> {
   const provider = config.provider;
   const model = config.model || DEFAULT_MODELS[provider] || "gpt-4o-mini";
+  const systemPrompt = config.system ?? SYSTEM_PROMPT;
 
   try {
     const group = getProviderGroup(provider);
     if (group === "OLLAMA") {
-      return await callOllamaProvider(userPrompt, SYSTEM_PROMPT, model, config.ollamaUrl);
+      return await callOllamaProvider(userPrompt, systemPrompt, model, config.ollamaUrl);
     }
     if (!config.apiKey) throw new Error(`${provider} requires apiKey in config`);
     return await callProxyProvider(
       provider,
       userPrompt,
-      SYSTEM_PROMPT,
+      systemPrompt,
       model,
       config.apiKey,
       config.openaiUrl,

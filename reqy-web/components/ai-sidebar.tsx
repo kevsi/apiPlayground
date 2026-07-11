@@ -22,8 +22,7 @@ import { usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { persistence } from "@/lib/persistence";
-import { callAI } from "@/lib/ai-engine/providers";
-import { dispatchAIActions } from "@/lib/ai-engine/dispatch";
+import { callAIText } from "@/lib/ai-engine/providers";
 import {
   loadAIProvider,
   loadApiKey,
@@ -31,7 +30,7 @@ import {
   loadAiModel,
   loadOllamaConfig,
 } from "@/lib/projects-store";
-import type { AIContext, CurrentRequest, TestAssertion } from "@/lib/ai-engine/types";
+import type { AIContext } from "@/lib/ai-engine/types";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -271,67 +270,18 @@ L'utilisateur te demande d'interagir avec l'application. Tu peux :
 - Ajouter des assertions de test
 - Définir des variables d'environnement
 - Exécuter des requêtes
-- Gérer les collections
-- Gérer les projets et workspaces
-- Naviguer dans l'application
+- Gérer les collections, projets et workspaces
 
 Contexte actuel de la requête :
 ${JSON.stringify(ctx, null, 2)}
 
-Pour modifier la requête, utilise FILL_REQUEST.
-Pour exécuter, utilise EXECUTE_REQUEST avec run:true dans FILL_REQUEST.
-Pour ajouter des assertions, utilise ADD_ASSERTIONS.
-Pour définir une variable, utilise SET_VARIABLE.
+Réponds en français de manière concise et utile.`;
 
-Réponds en français de manière concise et utile.
-Quand tu proposes une action, explique ce que tu fais puis exécute-la.`;
-
-        // Call AI with action pipeline
-        const aiRes = await callAI(
-          `[INSTUCTION]\n${content}\n\n[RÈGLES]\n${systemContent}[/INSTRUCTION]`,
-          aiConfig,
-        );
-
-        // Dispatch actions to the store
-        if (aiRes.actions && aiRes.actions.length > 0) {
-          const handlers = {
-            setRequest: (patch: Partial<CurrentRequest>) => store.patchRequest(patch),
-            addAssertions: (assertions: TestAssertion[], autoApply?: boolean) =>
-              store.addAssertions(assertions),
-            setVariable: (name: string, value: string, description?: string) =>
-              store.setVariable(name, value, description),
-            setDoc: (markdown: string, title?: string) => store.setDoc(markdown, title),
-            notify: (message: string) =>
-              store.addNotification
-                ? store.addNotification({
-                    title: "Assistant IA",
-                    body: String(message),
-                    type: "info",
-                  })
-                : undefined,
-            executeRequest: (request: Partial<CurrentRequest>) =>
-              store.executeRequest ? (store.executeRequest as any)(request) : undefined,
-            runBatch: async (requests: Array<Partial<CurrentRequest>>) => {
-              const results: unknown[] = [];
-              for (const req of requests) {
-                if (store.executeRequest) {
-                  const res = await (store.executeRequest as any)(req);
-                  results.push(res);
-                }
-              }
-              return results;
-            },
-            audit: (entry: { actionType: string; detail?: unknown; result?: unknown }) => {
-              // optional — skip if not available
-            },
-          };
-
-          await dispatchAIActions(aiRes.actions, handlers, ctx, {
-            allowAutoApply: Boolean(store.aiAutoApply),
-          });
-        }
-
-        const responseText = aiRes.summary || aiRes.actions?.[0]?.type || "Action effectuée.";
+        // Use callAIText for conversational chat
+        const responseText = await callAIText(content, {
+          ...aiConfig,
+          system: systemContent,
+        });
         setMessages((prev) => [...prev, { role: "assistant", content: responseText }]);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Erreur de communication avec l'IA";
