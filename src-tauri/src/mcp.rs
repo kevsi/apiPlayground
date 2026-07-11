@@ -286,3 +286,65 @@ fn resolve_script_path(app: &AppHandle) -> Result<String, AppError> {
       .join(", ")
   )))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mcp_server_status_default_running_false() {
+        let status = McpServerStatus {
+            running: false,
+            port: None,
+            pid: None,
+        };
+        assert!(!status.running);
+        assert!(status.port.is_none());
+        assert!(status.pid.is_none());
+    }
+
+    #[test]
+    fn test_mcp_server_status_serialization() {
+        let status = McpServerStatus {
+            running: true,
+            port: Some(3311),
+            pid: Some(12345),
+        };
+        let json = serde_json::to_string(&status).expect("serialize");
+        assert!(json.contains("\"running\":true"));
+        assert!(json.contains("\"port\":3311"));
+        assert!(json.contains("\"pid\":12345"));
+        // Verify camelCase
+        assert!(json.contains("\"running\""));
+    }
+
+    #[test]
+    fn test_mcp_server_config_defaults() {
+        let config = McpServerConfig::default();
+        assert!(config.port.is_none());
+        assert!(config.env_name.is_none());
+        assert!(!config.allow_local_hosts);
+        assert!(config.max_response_size.is_none());
+    }
+
+    #[test]
+    fn test_mcp_process_state_default_not_running() {
+        let state = McpProcessState::default();
+        assert!(state.process.is_none());
+        assert!(state.port.is_none());
+    }
+
+    #[test]
+    fn test_mcp_server_config_custom_values() {
+        let config = McpServerConfig {
+            port: Some(8080),
+            env_name: Some("production".into()),
+            allow_local_hosts: true,
+            max_response_size: Some(5_242_880),
+        };
+        assert_eq!(config.port, Some(8080));
+        assert_eq!(config.env_name, Some("production".into()));
+        assert!(config.allow_local_hosts);
+        assert_eq!(config.max_response_size, Some(5_242_880));
+    }
+}
