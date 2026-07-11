@@ -39,6 +39,7 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
   const [provider, setProvider] = useState<AIProvider>(() => loadAIProvider());
   const [apiKey, setApiKey] = useState(() => loadApiKey(loadAIProvider()));
   const [showKey, setShowKey] = useState(false);
+  const [showAiConfig, setShowAiConfig] = useState(false);
   const [folderPath, setFolderPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState("");
@@ -157,42 +158,71 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
           </div>
 
           {/* AI options */}
-          {mode === "ai" && (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-              <div className="relative">
-                <select
-                  value={provider}
-                  onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
-                  className="w-full appearance-none rounded-md border border-border bg-background px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          {mode === "ai" &&
+            (!showAiConfig && apiKey.trim().length > 0 ? (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+                <span className="text-sm text-muted-foreground">
+                  Analyse avec{" "}
+                  <strong>{PROVIDERS.find((p) => p.value === provider)?.label ?? provider}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAiConfig(true)}
+                  className="text-xs text-primary hover:underline"
                 >
-                  {PROVIDERS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  Changer
+                </button>
               </div>
-              {provider !== "ollama" && (
-                <div className="relative">
-                  <Input
-                    type={showKey ? "text" : "password"}
-                    placeholder="Clé API…"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="pr-9 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
+            ) : (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Configuration IA
+                  </span>
+                  {apiKey.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAiConfig(false)}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      Replier
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+                <div className="relative">
+                  <select
+                    value={provider}
+                    onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
+                    className="w-full appearance-none rounded-md border border-border bg-background px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {PROVIDERS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
+                {provider !== "ollama" && (
+                  <div className="relative">
+                    <Input
+                      type={showKey ? "text" : "password"}
+                      placeholder="Clé API…"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="pr-9 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
 
           {/* Folder picker */}
           <div className="flex gap-2">
