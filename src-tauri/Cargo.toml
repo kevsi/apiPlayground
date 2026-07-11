@@ -39,3 +39,6 @@ tauri-plugin-notification = "2"
 open = "5.3"
 base64 = "0.22"
 tiny_http = "0.12"
+
+[dev-dependencies]
+tauri = { version = "2.11.1", features = ["test"] }

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 mod error;
-mod websocket;
+pub mod websocket;
 mod mcp;
 mod capture;
 mod open;

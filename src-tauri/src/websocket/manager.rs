@@ -54,3 +54,65 @@ impl ConnectionManager {
         map.get(id).map(|h| h.status.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::mpsc;
+
+    #[tokio::test]
+    async fn register_creates_connection_with_connecting_status() {
+        let manager = ConnectionManager::new();
+        let (_tx, _rx) = mpsc::channel::<WsCommand>(1);
+        manager.register("conn-1".into(), _tx).await;
+
+        let status = manager.get_status("conn-1").await;
+        assert_eq!(status, Some(WsStatus::Connecting));
+    }
+
+    #[tokio::test]
+    async fn unregister_removes_connection() {
+        let manager = ConnectionManager::new();
+        let (_tx, _rx) = mpsc::channel::<WsCommand>(1);
+        manager.register("conn-1".into(), _tx).await;
+        manager.unregister("conn-1").await;
+
+        let status = manager.get_status("conn-1").await;
+        assert!(status.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_sender_returns_none_for_unknown_id() {
+        let manager = ConnectionManager::new();
+        let sender = manager.get_sender("missing").await;
+        assert!(sender.is_none());
+    }
+
+    #[tokio::test]
+    async fn set_status_updates_existing_connection() {
+        let manager = ConnectionManager::new();
+        let (_tx, _rx) = mpsc::channel::<WsCommand>(1);
+        manager.register("conn-1".into(), _tx).await;
+        manager.set_status("conn-1", WsStatus::Connected).await;
+
+        let status = manager.get_status("conn-1").await;
+        assert_eq!(status, Some(WsStatus::Connected));
+    }
+
+    #[tokio::test]
+    async fn set_status_is_noop_for_unknown_id() {
+        let manager = ConnectionManager::new();
+        manager.set_status("missing", WsStatus::Connected).await;
+        // Should not panic; nothing to verify beyond that
+    }
+
+    #[tokio::test]
+    async fn get_sender_clones_sender_for_existing_connection() {
+        let manager = ConnectionManager::new();
+        let (tx, _rx) = mpsc::channel::<WsCommand>(1);
+        manager.register("conn-1".into(), tx).await;
+
+        let sender = manager.get_sender("conn-1").await;
+        assert!(sender.is_some());
+    }
+}
