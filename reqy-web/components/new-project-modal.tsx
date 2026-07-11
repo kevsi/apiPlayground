@@ -1,32 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Loader2,
-  FolderOpen,
-  Sparkles,
-  Code2,
-  ChevronDown,
-  Eye,
-  EyeOff,
-  AlertCircle,
-} from "lucide-react";
+import { Loader2, FolderOpen, Sparkles, Code2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { isTauriAvailable } from "@/lib/tauri";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { AIProvider, AnalysisMode, SavedProject } from "@/lib/projects-store";
-import { loadApiKey, saveApiKey, loadAIProvider } from "@/lib/projects-store";
+import type { AnalysisMode, SavedProject } from "@/lib/projects-store";
+import { loadApiKey, loadAIProvider } from "@/lib/projects-store";
 import { analyzeProject } from "../lib/project-analyzer";
 import { toast } from "@/hooks/use-toast";
-
-const PROVIDERS: { value: AIProvider; label: string }[] = [
-  { value: "anthropic", label: "Anthropic (Claude)" },
-  { value: "openai", label: "OpenAI (GPT-4o)" },
-  { value: "gemini", label: "Gemini 2.0 Flash" },
-  { value: "ollama", label: "Ollama (local)" },
-];
 
 interface NewProjectModalProps {
   open: boolean;
@@ -36,19 +20,10 @@ interface NewProjectModalProps {
 
 export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) {
   const [mode, setMode] = useState<AnalysisMode>("static");
-  const [provider, setProvider] = useState<AIProvider>(() => loadAIProvider());
-  const [apiKey, setApiKey] = useState(() => loadApiKey(loadAIProvider()));
-  const [showKey, setShowKey] = useState(false);
-  const [showAiConfig, setShowAiConfig] = useState(false);
   const [folderPath, setFolderPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState("");
   const [analysisResult, setAnalysisResult] = useState<SavedProject | null>(null);
-
-  const handleProviderChange = (p: AIProvider) => {
-    setProvider(p);
-    setApiKey(loadApiKey(p));
-  };
 
   const pickFolder = async () => {
     if (isTauriAvailable()) {
@@ -75,19 +50,24 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
       toast({ title: "Sélectionnez un dossier", variant: "destructive" });
       return;
     }
-    if (mode === "ai" && provider !== "ollama" && !apiKey.trim()) {
-      toast({ title: "Clé API requise", variant: "destructive" });
+    const aiProvider = loadAIProvider();
+    const aiKey = loadApiKey(aiProvider);
+    if (mode === "ai" && aiProvider !== "ollama" && !aiKey.trim()) {
+      toast({
+        title: "Aucune clé IA configurée",
+        description: "Configurez un provider IA dans les Settings",
+        variant: "destructive",
+      });
       return;
     }
-    if (mode === "ai" && provider !== "ollama") saveApiKey(provider, apiKey);
     setLoading(true);
     try {
       setStep("Analyse en cours…");
       const result = await analyzeProject(
         folderPath,
         mode,
-        provider,
-        mode === "ai" ? apiKey : undefined,
+        aiProvider,
+        mode === "ai" ? aiKey : undefined,
       );
       setAnalysisResult(result);
       toast({
@@ -157,72 +137,14 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
             </button>
           </div>
 
-          {/* AI options */}
-          {mode === "ai" &&
-            (!showAiConfig && apiKey.trim().length > 0 ? (
-              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
-                <span className="text-sm text-muted-foreground">
-                  Analyse avec{" "}
-                  <strong>{PROVIDERS.find((p) => p.value === provider)?.label ?? provider}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowAiConfig(true)}
-                  className="text-xs text-primary hover:underline"
-                >
-                  Changer
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Configuration IA
-                  </span>
-                  {apiKey.trim().length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAiConfig(false)}
-                      className="text-xs text-muted-foreground hover:underline"
-                    >
-                      Replier
-                    </button>
-                  )}
-                </div>
-                <div className="relative">
-                  <select
-                    value={provider}
-                    onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
-                    className="w-full appearance-none rounded-md border border-border bg-background px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    {PROVIDERS.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                </div>
-                {provider !== "ollama" && (
-                  <div className="relative">
-                    <Input
-                      type={showKey ? "text" : "password"}
-                      placeholder="Clé API…"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      className="pr-9 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKey((v) => !v)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+          {mode === "ai" && (
+            <p className="text-xs text-muted-foreground">
+              Utilise le provider IA configuré dans les{" "}
+              <a href="/settings#ai" className="text-primary hover:underline">
+                Settings
+              </a>
+            </p>
+          )}
 
           {/* Folder picker */}
           <div className="flex gap-2">
