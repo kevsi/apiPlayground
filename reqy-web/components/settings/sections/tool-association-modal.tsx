@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState, type FormEvent } from "react"
+import { useState, type FormEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,70 +8,70 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { useToast } from "@/hooks/use-toast";
 
 export interface Tool {
-  id: string
-  name: string
-  description: string
-  logoEmoji: string
-  logo?: string
-  scopes: string[]
-  oauthUrl?: string
+  id: string;
+  name: string;
+  description: string;
+  logoEmoji: string;
+  logo?: string;
+  scopes: string[];
+  oauthUrl?: string;
   apiKey?: {
-    endpoint: string
-    placeholder: string
-    instructions: string
-  }
+    endpoint: string;
+    placeholder: string;
+    instructions: string;
+  };
 }
 
 interface ToolAssociationModalProps {
-  tool: Tool | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onConnected?: () => void
-  connected?: boolean
+  tool: Tool | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConnected?: () => void;
+  connected?: boolean;
 }
 
 function ApiKeyForm({ tool, onSuccess }: { tool: Tool; onSuccess: () => void }) {
-  const { toast } = useToast()
-  const [apiKey, setApiKey] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [show, setShow] = useState(false)
-  const config = tool.apiKey!
+  const { toast } = useToast();
+  const [apiKey, setApiKey] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [show, setShow] = useState(false);
+  const config = tool.apiKey!;
 
-  const isValid = /^PMAK-[A-Za-z0-9_-]+$/.test(apiKey.trim())
+  const isValid = /^PMAK-[A-Za-z0-9_-]+$/.test(apiKey.trim());
 
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (!isValid) {
-      setError("La clé doit commencer par PMAK-")
-      return
+      setError("La clé doit commencer par PMAK-");
+      return;
     }
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch(config.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: apiKey.trim() }),
-      })
-      const data = await res.json().catch(() => ({}))
+      });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Clé rejetée par le serveur")
-        return
+        setError(data.error ?? "Clé rejetée par le serveur");
+        return;
       }
-      toast({ title: "Connecté", description: `Outil ${tool.name} associé avec succès.` })
-      onSuccess()
+      toast({ title: "Connecté", description: `Outil ${tool.name} associé avec succès.` });
+      onSuccess();
     } catch {
-      setError("Erreur réseau, réessayez")
+      setError("Erreur réseau, réessayez");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -82,28 +82,33 @@ function ApiKeyForm({ tool, onSuccess }: { tool: Tool; onSuccess: () => void }) 
         <p className="text-muted-foreground">{config.instructions}</p>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="api-key">Clé API</Label>
-        <div className="flex items-center gap-2">
-          <Input
-            id="api-key"
-            type={show ? "text" : "password"}
-            value={apiKey}
-            onChange={(e) => { setApiKey(e.target.value); setError(null) }}
-            placeholder={config.placeholder}
-            autoComplete="off"
-            spellCheck={false}
-            required
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setShow((s) => !s)}
-            aria-label={show ? "Masquer" : "Afficher"}
-          >
-            {show ? "🙈" : "👁"}
-          </Button>
-        </div>
+        <Field>
+          <FieldLabel htmlFor="api-key">Clé API</FieldLabel>
+          <div className="flex items-center gap-2">
+            <Input
+              id="api-key"
+              type={show ? "text" : "password"}
+              value={apiKey}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                setError(null);
+              }}
+              placeholder={config.placeholder}
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShow((s) => !s)}
+              aria-label={show ? "Masquer" : "Afficher"}
+            >
+              {show ? "🙈" : "👁"}
+            </Button>
+          </div>
+        </Field>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
       <DialogFooter>
@@ -112,21 +117,21 @@ function ApiKeyForm({ tool, onSuccess }: { tool: Tool; onSuccess: () => void }) 
         </Button>
       </DialogFooter>
     </form>
-  )
+  );
 }
 
 function OAuthFlow({ tool, onOpenChange }: { tool: Tool; onOpenChange: (v: boolean) => void }) {
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
 
   async function handleAssociate() {
     if (!tool.oauthUrl) {
-      toast({ title: "Bientôt disponible", description: `${tool.name} sera bientôt disponible.` })
-      onOpenChange(false)
-      return
+      toast({ title: "Bientôt disponible", description: `${tool.name} sera bientôt disponible.` });
+      onOpenChange(false);
+      return;
     }
-    setLoading(true)
-    window.location.href = tool.oauthUrl
+    setLoading(true);
+    window.location.href = tool.oauthUrl;
   }
 
   return (
@@ -153,31 +158,31 @@ function OAuthFlow({ tool, onOpenChange }: { tool: Tool; onOpenChange: (v: boole
         </Button>
       </DialogFooter>
     </>
-  )
+  );
 }
 
 function DisconnectView({ tool, onDisconnected }: { tool: Tool; onDisconnected: () => void }) {
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const endpoint =
     tool.id === "github"
       ? "/api/github-auth/logout"
       : tool.id === "postman"
         ? "/api/postman-auth"
-        : null
+        : null;
 
   async function handleDisconnect() {
-    if (!endpoint) return
-    setLoading(true)
+    if (!endpoint) return;
+    setLoading(true);
     try {
-      const res = await fetch(endpoint, { method: "DELETE", credentials: "include" })
-      if (!res.ok) throw new Error()
-      toast({ title: "Déconnecté", description: `${tool.name} a été déconnecté.` })
-      onDisconnected()
+      const res = await fetch(endpoint, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error();
+      toast({ title: "Déconnecté", description: `${tool.name} a été déconnecté.` });
+      onDisconnected();
     } catch {
-      toast({ title: "Erreur", description: "Impossible de se déconnecter, réessayez." })
+      toast({ title: "Erreur", description: "Impossible de se déconnecter, réessayez." });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -195,10 +200,16 @@ function DisconnectView({ tool, onDisconnected }: { tool: Tool; onDisconnected: 
         </Button>
       </DialogFooter>
     </div>
-  )
+  );
 }
 
-export function ToolAssociationModal({ tool, open, onOpenChange, onConnected, connected }: ToolAssociationModalProps) {
+export function ToolAssociationModal({
+  tool,
+  open,
+  onOpenChange,
+  onConnected,
+  connected,
+}: ToolAssociationModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -209,7 +220,9 @@ export function ToolAssociationModal({ tool, open, onOpenChange, onConnected, co
                 {tool.logo ? (
                   <img src={tool.logo} alt="" className="size-8 shrink-0 rounded object-contain" />
                 ) : (
-                  <span className="text-3xl" aria-hidden="true">{tool.logoEmoji}</span>
+                  <span className="text-3xl" aria-hidden="true">
+                    {tool.logoEmoji}
+                  </span>
                 )}
                 <div>
                   <DialogTitle>{connected ? tool.name : `Associer ${tool.name}`}</DialogTitle>
@@ -218,9 +231,21 @@ export function ToolAssociationModal({ tool, open, onOpenChange, onConnected, co
               </div>
             </DialogHeader>
             {connected ? (
-              <DisconnectView tool={tool} onDisconnected={() => { onOpenChange(false); onConnected?.() }} />
+              <DisconnectView
+                tool={tool}
+                onDisconnected={() => {
+                  onOpenChange(false);
+                  onConnected?.();
+                }}
+              />
             ) : tool.apiKey ? (
-              <ApiKeyForm tool={tool} onSuccess={() => { onOpenChange(false); onConnected?.() }} />
+              <ApiKeyForm
+                tool={tool}
+                onSuccess={() => {
+                  onOpenChange(false);
+                  onConnected?.();
+                }}
+              />
             ) : (
               <OAuthFlow tool={tool} onOpenChange={onOpenChange} />
             )}
@@ -228,5 +253,5 @@ export function ToolAssociationModal({ tool, open, onOpenChange, onConnected, co
         )}
       </DialogContent>
     </Dialog>
-  )
+  );
 }
