@@ -42,21 +42,9 @@ describe("streamLLM", () => {
     const encoder = new TextEncoder();
     const sseStream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(
-          encoder.encode(
-            'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n'
-          )
-        );
-        controller.enqueue(
-          encoder.encode(
-            'data: {"choices":[{"delta":{"content":" "}}]}\n\n'
-          )
-        );
-        controller.enqueue(
-          encoder.encode(
-            'data: {"choices":[{"delta":{"content":"world"}}]}\n\n'
-          )
-        );
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":" "}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"world"}}]}\n\n'));
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },
@@ -69,12 +57,16 @@ describe("streamLLM", () => {
 
     mockFetch(res);
 
-    const tokens: string[] = [];
+    const tokens: Array<{ type: string; value: string }> = [];
     for await (const t of streamLLM(baseOpts)) {
       tokens.push(t);
     }
 
-    expect(tokens).toEqual(["Hello", " ", "world"]);
+    expect(tokens).toEqual([
+      { type: "text", value: "Hello" },
+      { type: "text", value: " " },
+      { type: "text", value: "world" },
+    ]);
   });
 
   it("yields a single token for JSON fallback (anthropic / gemini)", async () => {
@@ -85,12 +77,12 @@ describe("streamLLM", () => {
 
     mockFetch(res);
 
-    const tokens: string[] = [];
+    const tokens: Array<{ type: string; value: string }> = [];
     for await (const t of streamLLM(baseOpts)) {
       tokens.push(t);
     }
 
-    expect(tokens).toEqual(["Single response"]);
+    expect(tokens).toEqual([{ type: "text", value: "Single response" }]);
   });
 
   it("throws on proxy error", async () => {
@@ -106,7 +98,7 @@ describe("streamLLM", () => {
         for await (const _ of streamLLM(baseOpts)) {
           void _;
         }
-      })()
+      })(),
     ).rejects.toThrow("Bad API key");
   });
 
@@ -119,7 +111,7 @@ describe("streamLLM", () => {
         for await (const _ of streamLLM(baseOpts)) {
           void _;
         }
-      })()
+      })(),
     ).rejects.toThrow("Proxy error 404");
   });
 
@@ -127,17 +119,9 @@ describe("streamLLM", () => {
     const encoder = new TextEncoder();
     const sseStream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(
-          encoder.encode(
-            'data: {"choices":[{"delta":{"content":"A"}}]}\n\n'
-          )
-        );
-        controller.enqueue(encoder.encode('data: not valid json\n\n'));
-        controller.enqueue(
-          encoder.encode(
-            'data: {"choices":[{"delta":{"content":"B"}}]}\n\n'
-          )
-        );
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"A"}}]}\n\n'));
+        controller.enqueue(encoder.encode("data: not valid json\n\n"));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"B"}}]}\n\n'));
         controller.close();
       },
     });
@@ -149,11 +133,14 @@ describe("streamLLM", () => {
 
     mockFetch(res);
 
-    const tokens: string[] = [];
+    const tokens: Array<{ type: string; value: string }> = [];
     for await (const t of streamLLM(baseOpts)) {
       tokens.push(t);
     }
 
-    expect(tokens).toEqual(["A", "B"]);
+    expect(tokens).toEqual([
+      { type: "text", value: "A" },
+      { type: "text", value: "B" },
+    ]);
   });
 });

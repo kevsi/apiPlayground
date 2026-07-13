@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+import path from "path"
 import withBundleAnalyzer from "@next/bundle-analyzer"
 
 const AUTH_SIGNING_SECRET = process.env.AUTH_SIGNING_SECRET
@@ -64,7 +65,7 @@ const internalHost = process.env.TAURI_DEV_HOST ?? 'localhost'
 
 const nextConfig = {
   turbopack: {
-    root: import.meta.dirname,
+    root: path.resolve(process.cwd(), ".."),
   },
   images: {
     unoptimized: true,

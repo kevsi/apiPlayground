@@ -34,7 +34,7 @@ function extractBearerToken(authorization: string | null): string | null {
   return match[1].trim();
 }
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
   if (isExempt(pathname)) {

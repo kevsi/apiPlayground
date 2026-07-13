@@ -3,10 +3,10 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * Tests for the Bearer SERVICE_TOKEN gate in `reqy-web/middleware.ts`.
+ * Tests for the Bearer SERVICE_TOKEN gate in `reqy-web/proxy.ts`.
  *
  * Threat model recap: reqly-web runs as a sidecar bound to 127.0.0.1
- * (see the Phase 1 step-3 plan). The middleware protects against a
+ * (see the Phase 1 step-3 plan). The proxy protects against a
  * third-party process on the same machine trying to call the sidecar's
  * sensitive API routes. It is NOT a public-Internet auth gate.
  */
@@ -20,10 +20,10 @@ interface MockRequestInit {
 
 /**
  * Build a minimal NextRequest stub that satisfies the surface the
- * middleware actually touches: `nextUrl.pathname` and `headers.get()`.
- * We deliberately do NOT use the real NextRequest because the middleware
+ * proxy actually touches: `nextUrl.pathname` and `headers.get()`.
+ * We deliberately do NOT use the real NextRequest because the proxy
  * function is the unit under test — pulling in Next.js server runtime
- * for a middleware test would couple the test to framework internals.
+ * for a proxy test would couple the test to framework internals.
  */
 function makeMockRequest({ pathname, authorization }: MockRequestInit): NextRequest {
   const headers = new Map<string, string>();
@@ -55,26 +55,26 @@ describe("proxy: UI routes pass through without token", () => {
   });
 
   it("passes through /", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/" }));
     expect(res.status).toBe(200);
   });
 
   it("passes through /_next/static/foo.png", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/_next/static/foo.png" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/_next/static/foo.png" }));
     expect(res.status).toBe(200);
   });
 
   it("passes through arbitrary /api routes NOT in the protected list (e.g. /api/auth/foo)", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api/auth/foo" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api/auth/foo" }));
     expect(res.status).toBe(200);
   });
 
   it("passes through /api (exact root) since /api alone is not in the protected prefixes", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api" }));
     expect(res.status).toBe(200);
   });
 });
@@ -85,30 +85,30 @@ describe("proxy: protected routes without valid token return 401", () => {
   });
 
   it("rejects /api/proxy with no Authorization header", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api/proxy" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api/proxy" }));
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toMatchObject({ error: "Unauthorized", code: "PROXY_AUTH_REQUIRED" });
   });
 
   it("rejects /api/proxy-ai with malformed Authorization header", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({ pathname: "/api/proxy-ai", authorization: "Basic dXNlcjpwYXNz" }),
     );
     expect(res.status).toBe(401);
   });
 
   it("rejects /api/proxy-models with empty Bearer", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api/proxy-models", authorization: "Bearer " }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api/proxy-models", authorization: "Bearer " }));
     expect(res.status).toBe(401);
   });
 
   it("rejects /api/test-runner/run with wrong token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/test-runner/run",
         authorization: "Bearer " + "z".repeat(48),
@@ -120,14 +120,14 @@ describe("proxy: protected routes without valid token return 401", () => {
   // Phase 4: import/export and postman-auth routes must be gated too
   // (they read stored Postman/GitHub tokens and trigger external API calls).
   it("rejects /api/postman-import with no Authorization header", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api/postman-import" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api/postman-import" }));
     expect(res.status).toBe(401);
   });
 
   it("rejects /api/postman-import/save with wrong token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/postman-import/save",
         authorization: "Bearer " + "z".repeat(48),
@@ -137,14 +137,14 @@ describe("proxy: protected routes without valid token return 401", () => {
   });
 
   it("rejects /api/postman-export with no Authorization header", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api/postman-export" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api/postman-export" }));
     expect(res.status).toBe(401);
   });
 
   it("rejects /api/github-import with wrong token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/github-import",
         authorization: "Bearer " + "z".repeat(48),
@@ -154,14 +154,14 @@ describe("proxy: protected routes without valid token return 401", () => {
   });
 
   it("rejects /api/postman-auth with no Authorization header", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api/postman-auth" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api/postman-auth" }));
     expect(res.status).toBe(401);
   });
 
   it("rejects /api/postman-auth/collections with wrong token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/postman-auth/collections",
         authorization: "Bearer " + "z".repeat(48),
@@ -171,8 +171,8 @@ describe("proxy: protected routes without valid token return 401", () => {
   });
 
   // Phase 2 step 7: /api/mock and /api/mock/config routes are deleted.
-  // The corresponding middleware tests are removed. The matcher entry
-  // in middleware.ts is kept as a defensive failsafe.
+  // The corresponding proxy tests are removed. The matcher entry
+  // in proxy.ts is kept as a defensive failsafe.
 });
 
 describe("proxy: protected routes with valid token return 200", () => {
@@ -181,8 +181,8 @@ describe("proxy: protected routes with valid token return 200", () => {
   });
 
   it("allows /api/proxy with matching Bearer token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({ pathname: "/api/proxy", authorization: `Bearer ${VALID_TOKEN}` }),
     );
     expect(res.status).toBe(200);
@@ -196,16 +196,16 @@ describe("proxy: protected routes with valid token return 200", () => {
   });
 
   it("is case-insensitive on the Bearer scheme", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({ pathname: "/api/proxy", authorization: `bearer ${VALID_TOKEN}` }),
     );
     expect(res.status).toBe(200);
   });
 
   it("trims whitespace around the token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/proxy",
         authorization: `Bearer    ${VALID_TOKEN}   `,
@@ -217,8 +217,8 @@ describe("proxy: protected routes with valid token return 200", () => {
   // Phase 4: verify the newly protected import/export + postman-auth
   // routes also pass through with a valid token.
   it("allows /api/postman-import with matching Bearer token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/postman-import",
         authorization: `Bearer ${VALID_TOKEN}`,
@@ -228,8 +228,8 @@ describe("proxy: protected routes with valid token return 200", () => {
   });
 
   it("allows /api/postman-import/save with matching Bearer token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/postman-import/save",
         authorization: `Bearer ${VALID_TOKEN}`,
@@ -239,8 +239,8 @@ describe("proxy: protected routes with valid token return 200", () => {
   });
 
   it("allows /api/postman-export with matching Bearer token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/postman-export",
         authorization: `Bearer ${VALID_TOKEN}`,
@@ -250,8 +250,8 @@ describe("proxy: protected routes with valid token return 200", () => {
   });
 
   it("allows /api/github-import with matching Bearer token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/github-import",
         authorization: `Bearer ${VALID_TOKEN}`,
@@ -261,8 +261,8 @@ describe("proxy: protected routes with valid token return 200", () => {
   });
 
   it("allows /api/postman-auth with matching Bearer token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/postman-auth",
         authorization: `Bearer ${VALID_TOKEN}`,
@@ -272,8 +272,8 @@ describe("proxy: protected routes with valid token return 200", () => {
   });
 
   it("allows /api/postman-auth/collections with matching Bearer token", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({
         pathname: "/api/postman-auth/collections",
         authorization: `Bearer ${VALID_TOKEN}`,
@@ -293,14 +293,14 @@ describe("proxy: public OAuth routes pass through without token", () => {
   });
 
   it("passes through /api/github-auth/start (OAuth initiation redirect)", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(makeMockRequest({ pathname: "/api/github-auth/start" }));
+    const { proxy } = await import("../../proxy");
+    const res = proxy(makeMockRequest({ pathname: "/api/github-auth/start" }));
     expect(res.status).toBe(200);
   });
 
   it("passes through /api/github-auth/callback (OAuth code exchange)", async () => {
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({ pathname: "/api/github-auth/callback?code=abc&state=xyz" }),
     );
     expect(res.status).toBe(200);
@@ -310,8 +310,8 @@ describe("proxy: public OAuth routes pass through without token", () => {
 describe("proxy: fail-closed when env not configured", () => {
   it("returns 503 when PROXY_SERVICE_TOKEN is unset", async () => {
     delete process.env.PROXY_SERVICE_TOKEN;
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({ pathname: "/api/proxy", authorization: `Bearer ${VALID_TOKEN}` }),
     );
     expect(res.status).toBe(503);
@@ -321,19 +321,19 @@ describe("proxy: fail-closed when env not configured", () => {
 
   it("returns 503 when PROXY_SERVICE_TOKEN is too short (< 32 bytes)", async () => {
     process.env.PROXY_SERVICE_TOKEN = "short-token";
-    const { middleware } = await import("../../middleware");
-    const res = middleware(
+    const { proxy } = await import("../../proxy");
+    const res = proxy(
       makeMockRequest({ pathname: "/api/proxy", authorization: `Bearer ${VALID_TOKEN}` }),
     );
     expect(res.status).toBe(503);
   });
 
-  it("does not allow UI routes even when env is misconfigured (middleware returns 200 for UI passes-through; this test guards the env-check ordering)", async () => {
+  it("does not allow UI routes even when env is misconfigured (proxy returns 200 for UI passes-through; this test guards the env-check ordering)", async () => {
     delete process.env.PROXY_SERVICE_TOKEN;
-    const { middleware } = await import("../../middleware");
+    const { proxy } = await import("../../proxy");
     // UI paths short-circuit BEFORE the env check, so they must still
     // pass through. The 503 is reserved for *protected* paths.
-    const res = middleware(makeMockRequest({ pathname: "/" }));
+    const res = proxy(makeMockRequest({ pathname: "/" }));
     expect(res.status).toBe(200);
   });
 });
