@@ -1,18 +1,23 @@
-"use client"
-import { Label } from "@/components/ui/label"
+"use client";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 interface Props {
-  preRequestScript?: string
-  postResponseScript?: string
-  onPreChange: (next: string) => void
-  onPostChange: (next: string) => void
+  preRequestScript?: string;
+  postResponseScript?: string;
+  onPreChange: (next: string) => void;
+  onPostChange: (next: string) => void;
 }
 
-export function ScriptEditor({ preRequestScript, postResponseScript, onPreChange, onPostChange }: Props) {
+export function ScriptEditor({
+  preRequestScript,
+  postResponseScript,
+  onPreChange,
+  onPostChange,
+}: Props) {
   return (
-    <div className="space-y-3">
-      <div className="space-y-1">
-        <Label className="text-xs">Pre-request script (JS, sandboxed)</Label>
+    <FieldGroup>
+      <Field>
+        <FieldLabel className="text-xs">Pre-request script (JS, sandboxed)</FieldLabel>
         <textarea
           value={preRequestScript ?? ""}
           onChange={(e) => onPreChange(e.target.value)}
@@ -20,9 +25,9 @@ export function ScriptEditor({ preRequestScript, postResponseScript, onPreChange
           className="w-full h-32 px-2 py-1.5 text-xs font-mono border rounded bg-muted/30"
           spellCheck={false}
         />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Post-response script (JS, sandboxed)</Label>
+      </Field>
+      <Field>
+        <FieldLabel className="text-xs">Post-response script (JS, sandboxed)</FieldLabel>
         <textarea
           value={postResponseScript ?? ""}
           onChange={(e) => onPostChange(e.target.value)}
@@ -30,7 +35,7 @@ export function ScriptEditor({ preRequestScript, postResponseScript, onPreChange
           className="w-full h-32 px-2 py-1.5 text-xs font-mono border rounded bg-muted/30"
           spellCheck={false}
         />
-      </div>
-    </div>
-  )
+      </Field>
+    </FieldGroup>
+  );
 }
