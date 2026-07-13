@@ -11,10 +11,9 @@ import {
   Trash2,
   Edit2,
   Play,
-  Square,
-  CheckSquare,
   GripVertical,
 } from "lucide-react"
+import { methodBadge } from "@/lib/http-method-colors"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,52 +31,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import type { Collection, CollectionFolder, RequestItem, HttpMethod } from "@/hooks/use-request-store"
-import { persistence } from "@/lib/persistence"
+import { getTotalCount, flattenFolderTree } from "@/lib/tree-utils"
+import { usePersistedSet } from "@/hooks/use-persisted-set"
+import { RequestTreeItem } from "@/components/collections-request-tree-item"
 
 const COLLAPSE_KEY = "reqly-folder-collapse"
-
-const methodColors: Record<HttpMethod, string> = {
-  GET: "bg-emerald-500/20 text-emerald-600 border-emerald-500/30",
-  POST: "bg-blue-500/20 text-blue-600 border-blue-500/30",
-  PUT: "bg-amber-500/20 text-amber-600 border-amber-500/30",
-  PATCH: "bg-purple-500/20 text-purple-600 border-purple-500/30",
-  DELETE: "bg-red-500/20 text-red-600 border-red-500/30",
-  HEAD: "bg-slate-500/20 text-slate-600 border-slate-500/30",
-  OPTIONS: "bg-slate-500/20 text-slate-600 border-slate-500/30",
-  GRAPHQL: "bg-pink-500/20 text-pink-600 border-pink-500/30",
-}
-
-function loadCollapsedState(collectionId: string): Set<string> {
-  try {
-    const raw = persistence.getItem<string>(COLLAPSE_KEY)
-    if (!raw) return new Set()
-    const all = JSON.parse(raw) as Record<string, string[]>
-    return new Set(all[collectionId] ?? [])
-  } catch {
-    return new Set()
-  }
-}
-
-function saveCollapsedState(collectionId: string, set: Set<string>) {
-  try {
-    const raw = persistence.getItem<string>(COLLAPSE_KEY)
-    const all: Record<string, string[]> = raw ? JSON.parse(raw) : {}
-    all[collectionId] = [...set]
-    void persistence.setItem(COLLAPSE_KEY, JSON.stringify(all))
-  } catch {
-    // intentionally empty
-  }
-}
-
-function getTotalCount(
-  folder: CollectionFolder,
-  folders: CollectionFolder[],
-  requests: RequestItem[]
-): number {
-  const direct = requests.filter((r) => r.folderId === folder.id).length
-  const children = folders.filter((f) => f.parentId === folder.id)
-  return direct + children.reduce((acc, c) => acc + getTotalCount(c, folders, requests), 0)
-}
 
 function renderFolderTree(
   parentId: string | null,
@@ -132,9 +90,7 @@ export function CollectionsFolderTree({
 }: CollectionsFolderTreeProps) {
   const colId = collection.id
 
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() =>
-    loadCollapsedState(colId)
-  )
+  const [expandedFolders, setExpandedFolders] = usePersistedSet(COLLAPSE_KEY, colId)
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -149,10 +105,6 @@ export function CollectionsFolderTree({
   const [dragFolderId, setDragFolderId] = useState<string | null>(null)
   const dragOverRequestIdRef = useRef<string | null>(null)
   const dragOverFolderIdRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    saveCollapsedState(colId, expandedFolders)
-  }, [colId, expandedFolders])
 
   const toggleFolder = useCallback((folderId: string) => {
     setExpandedFolders((prev) => {
@@ -236,161 +188,27 @@ export function CollectionsFolderTree({
 
   const renderRequest = useCallback((request: RequestItem, depth: number = 0, isLastSibling: boolean = true, stems: number[] = []) => {
     const reqKey = `${collection.id}::${request.id}`
-    const isReqSelected = selectedRequestIds.has(reqKey)
-    const indent = depth * 20
-
     return (
-      <div key={request.id} className="relative group">
-        {/* Connector tree lines from ancestor levels */}
-        {stems.map((sd) => (
-          <span
-            key={sd}
-            className="absolute left-0 top-0 h-full w-px bg-border/40"
-            style={{ left: `${sd * 20 + 6}px` }}
-          />
-        ))}
-        {/* Horizontal branch + vertical stem for current level */}
-        {depth > 0 && (
-          <>
-            <span
-              className="absolute top-1/2 h-px w-[10px] -translate-y-1/2 bg-border/40"
-              style={{ left: `${indent + 6}px` }}
-            />
-            {!isLastSibling && (
-              <span
-                className="absolute left-0 top-0 h-full w-px bg-border/40"
-                style={{ left: `${indent + 6}px` }}
-              />
-            )}
-          </>
-        )}
-
-        <div
-          className={cn(
-            "relative flex items-center gap-1.5 rounded-md px-2 py-1.5 transition-all duration-150",
-            "hover:bg-accent/30 hover:shadow-xs",
-            isReqSelected && "bg-primary/[0.04] ring-1 ring-primary/20",
-            dragRequestId === request.id && "opacity-40 scale-[0.98]"
-          )}
-          style={{ paddingLeft: `${indent + 20}px` }}
-          draggable={!!onReorderRequests}
-          onDragStart={(e) => {
-            setDragRequestId(request.id)
-            e.dataTransfer.effectAllowed = "move"
-            e.dataTransfer.setData("text/plain", request.id)
-            dragOverRequestIdRef.current = null
-          }}
-          onDragOver={(e) => {
-            e.preventDefault()
-            e.dataTransfer.dropEffect = "move"
-            dragOverRequestIdRef.current = request.id
-          }}
-          onDragEnd={() => {
-            const targetId = dragOverRequestIdRef.current
-            const draggedId = request.id
-            if (draggedId && targetId && onReorderRequests && draggedId !== targetId) {
-              const folderId = request.folderId ?? null
-              const siblings = requests
-                .filter((r) => r.folderId === folderId)
-                .map((r) => r.id)
-              const fromIdx = siblings.indexOf(draggedId)
-              const toIdx = siblings.indexOf(targetId)
-              if (fromIdx !== -1 && toIdx !== -1) {
-                siblings.splice(fromIdx, 1)
-                siblings.splice(toIdx, 0, draggedId)
-                onReorderRequests(collection.id, folderId, siblings)
-              }
-            }
-            setDragRequestId(null)
-            dragOverRequestIdRef.current = null
-          }}
-        >
-          {/* Drag handle */}
-          {onReorderRequests && (
-            <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/10 hover:text-muted-foreground/30 transition-colors duration-200">
-              <GripVertical className="size-3" />
-            </div>
-          )}
-
-          <button
-            onClick={() => onToggleSelectRequest(collection.id, request.id)}
-            className={cn(
-              "shrink-0 flex items-center justify-center transition-all duration-150",
-              isReqSelected
-                ? "text-primary"
-                : "text-muted-foreground/20 hover:text-muted-foreground/50"
-            )}
-          >
-            {isReqSelected ? (
-              <span className="flex size-4 items-center justify-center rounded bg-primary/10">
-                <CheckSquare className="size-3 text-primary" />
-              </span>
-            ) : (
-              <Square className="size-3" />
-            )}
-          </button>
-
-          <button
-            onClick={() => onSelectRequest(request)}
-            className="flex flex-1 items-center gap-2 text-left min-w-0"
-          >
-            <span className={cn(
-              "shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide leading-none shadow-xs",
-              methodColors[request.method].replace("border-", "ring-1 ring-").replace("/30", "/20")
-            )}>
-              {request.method}
-            </span>
-            <span className="truncate text-sm text-foreground/85 group-hover:text-foreground transition-colors">
-              {request.name || request.endpoint || request.url}
-            </span>
-            {request.endpoint && (
-              <span className="hidden sm:inline ml-auto shrink-0 truncate text-[10px] text-muted-foreground/40 max-w-[100px] font-mono">
-                {request.endpoint}
-              </span>
-            )}
-          </button>
-
-          {onSelectAndSendRequest && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onSelectAndSendRequest(request)}
-              className="size-6 p-0 text-muted-foreground/30 hover:text-emerald-500 hover:bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-all duration-150"
-              title="Load & execute"
-            >
-              <Play className="size-3" />
-            </Button>
-          )}
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-5 p-0 text-muted-foreground/30 hover:text-foreground hover:bg-accent/60 opacity-0 group-hover:opacity-100 transition-all duration-150"
-              >
-                <MoreHorizontal className="size-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem onClick={() => handleStartMove(request.id)}>
-                <FolderPlus className="mr-2 size-3.5" /> Move
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  confirmDelete(
-                    `Remove "${request.name}" from "${collection.name}"?`,
-                    () => onRemoveRequestFromCollection(collection.id, request.id)
-                  )
-                }
-                className="text-destructive"
-              >
-                <Trash2 className="mr-2 size-3.5" /> Remove
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+      <RequestTreeItem
+        key={request.id}
+        request={request}
+        collectionId={collection.id}
+        collectionName={collection.name}
+        depth={depth}
+        isLastSibling={isLastSibling}
+        stems={stems}
+        isSelected={selectedRequestIds.has(reqKey)}
+        isDragging={dragRequestId === request.id}
+        allRequests={requests}
+        onToggleSelect={onToggleSelectRequest}
+        onSelect={onSelectRequest}
+        onSelectAndSend={onSelectAndSendRequest}
+        onRemove={onRemoveRequestFromCollection}
+        onStartMove={handleStartMove}
+        onConfirmDelete={confirmDelete}
+        onReorder={onReorderRequests}
+        onDragStateChange={setDragRequestId}
+      />
     )
   }, [
     collection.id,

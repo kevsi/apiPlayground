@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useRef } from "react";
 import { Plus, Trash2, Play, Code, Braces, Check, Copy, Loader2, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HttpMethod } from "@/lib/types";
@@ -27,29 +27,10 @@ import type { Assertion } from "@/lib/test-runner/types";
 import { Switch } from "@/components/ui/switch";
 import { AssertionEditor } from "@/components/assertion-editor";
 import { ScriptEditor } from "@/components/script-editor";
-import { createJsonKeyDownHandler } from "@/lib/json-textarea-utils";
-
-function parseFormBody(body: string): Array<{ key: string; value: string }> {
-  if (!body) return [];
-  return body
-    .split("&")
-    .filter(Boolean)
-    .map((pair) => {
-      const eq = pair.indexOf("=");
-      if (eq === -1) return { key: decodeURIComponent(pair), value: "" };
-      return {
-        key: decodeURIComponent(pair.slice(0, eq)),
-        value: decodeURIComponent(pair.slice(eq + 1)),
-      };
-    });
-}
-
-function serializeFormBody(pairs: Array<{ key: string; value: string }>): string {
-  return pairs
-    .filter((p) => p.key.trim())
-    .map((p) => `${encodeURIComponent(p.key.trim())}=${encodeURIComponent(p.value)}`)
-    .join("&");
-}
+import { methodBg, methodDot } from "@/lib/http-method-colors";
+import { KeyValueEditor } from "@/components/key-value-editor";
+import { AuthSection } from "@/components/auth-section";
+import { BodyEditor } from "@/components/body-editor";
 
 interface RequestPanelProps {
   method: HttpMethod;
@@ -110,61 +91,8 @@ export function RequestPanel({
   isLoading,
   variableNames,
 }: RequestPanelProps) {
-  const addQueryParam = () => {
-    onQueryParamsChange([...queryParams, { key: "", value: "" }]);
-  };
-
-  const removeQueryParam = (index: number) => {
-    onQueryParamsChange(queryParams.filter((_, i) => i !== index));
-  };
-
-  const updateQueryParam = (index: number, field: "key" | "value", value: string) => {
-    onQueryParamsChange(
-      queryParams.map((param, i) => (i === index ? { ...param, [field]: value } : param)),
-    );
-  };
-
-  const addHeader = () => {
-    onHeadersChange([...headers, { key: "", value: "" }]);
-  };
-
-  const removeHeader = (index: number) => {
-    onHeadersChange(headers.filter((_, i) => i !== index));
-  };
-
-  const updateHeader = (index: number, field: "key" | "value", value: string) => {
-    onHeadersChange(
-      headers.map((header, i) => (i === index ? { ...header, [field]: value } : header)),
-    );
-  };
-
   const [exportFormat, setExportFormat] = useState<"curl" | "fetch">("curl");
-  const [showRawBody, setShowRawBody] = useState(false);
-
-  const [formPairs, setFormPairs] = useState<Array<{ key: string; value: string }>>(() =>
-    parseFormBody(body),
-  );
-  const bodyRef = useRef(body);
-  if (bodyRef.current !== body) {
-    bodyRef.current = body;
-    setFormPairs(parseFormBody(body));
-  }
-
-  const updateFormPair = (index: number, field: "key" | "value", value: string) => {
-    const newPairs = formPairs.map((p, i) => (i === index ? { ...p, [field]: value } : p));
-    setFormPairs(newPairs);
-    onBodyChange(serializeFormBody(newPairs));
-  };
-
-  const addFormPair = () => {
-    setFormPairs([...formPairs, { key: "", value: "" }]);
-  };
-
-  const removeFormPair = (index: number) => {
-    const newPairs = formPairs.filter((_, i) => i !== index);
-    setFormPairs(newPairs);
-    onBodyChange(serializeFormBody(newPairs));
-  };
+  
   const [exportCopied, setExportCopied] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
@@ -253,64 +181,6 @@ ${bodyPart}})
     }
   };
 
-  const handleFormatJson = () => {
-    if (bodyType !== "json" || !body.trim()) return;
-    try {
-      const parsed = JSON.parse(body);
-      onBodyChange(JSON.stringify(parsed, null, 2));
-    } catch {
-      // invalid json, do nothing
-    }
-  };
-
-  const isValidJson = useMemo(() => {
-    if (!body.trim() || bodyType !== "json") return null;
-    try {
-      JSON.parse(body);
-      return true;
-    } catch {
-      return false;
-    }
-  }, [body, bodyType]);
-
-  const methodColors: Record<HttpMethod, string> = {
-    GET: "bg-emerald-500/25 text-emerald-600 border-emerald-500/30",
-    POST: "bg-blue-500/25 text-blue-600 border-blue-500/30",
-    PUT: "bg-amber-500/25 text-amber-600 border-amber-500/30",
-    PATCH: "bg-purple-500/25 text-purple-600 border-purple-500/30",
-    DELETE: "bg-red-500/25 text-red-600 border-red-500/30",
-    HEAD: "bg-slate-500/25 text-slate-600 border-slate-500/30",
-    OPTIONS: "bg-slate-500/25 text-slate-600 border-slate-500/30",
-    GRAPHQL: "bg-pink-500/25 text-pink-600 border-pink-500/30",
-  };
-
-  const methodBgMap: Record<HttpMethod, string> = {
-    GET: "bg-emerald-500",
-    POST: "bg-blue-500",
-    PUT: "bg-amber-500",
-    PATCH: "bg-purple-500",
-    DELETE: "bg-red-500",
-    HEAD: "bg-slate-500",
-    OPTIONS: "bg-slate-500",
-    GRAPHQL: "bg-pink-500",
-  };
-
-  const bodyTypeLabels: Record<BodyType, string> = {
-    json: "JSON",
-    "form-data": "Form Data",
-    "x-www-form": "x-www-form",
-    raw: "Raw",
-    binary: "Binary",
-  };
-
-  const authTypeLabels: Record<AuthType, string> = {
-    none: "No Auth",
-    bearer: "Bearer Token",
-    basic: "Basic Auth",
-    "api-key": "API Key",
-    oauth2: "OAuth 2.0",
-  };
-
   return (
     <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
       {/* Request URL Section — monumental command bar */}
@@ -324,7 +194,7 @@ ${bodyPart}})
               data-testid="method-selector"
               className={cn(
                 "shrink-0 rounded-lg border-0 px-2.5 py-1 text-[11px] font-bold font-mono cursor-pointer transition-all duration-200 outline-none ring-offset-0 focus:ring-0 focus:ring-offset-0 h-auto w-auto gap-1 [&>svg]:size-3.5",
-                methodBgMap[method],
+                methodBg[method],
                 "text-white",
               )}
             >
@@ -337,11 +207,7 @@ ${bodyPart}})
                     <span
                       className={cn(
                         "size-1.5 rounded-full shrink-0",
-                        m === "GET" && "bg-emerald-500",
-                        m === "POST" && "bg-blue-500",
-                        m === "PUT" && "bg-amber-500",
-                        m === "PATCH" && "bg-purple-500",
-                        m === "DELETE" && "bg-red-500",
+                        methodDot[m],
                       )}
                     />
                     {m}
@@ -407,7 +273,7 @@ ${bodyPart}})
             }}
             className={cn(
               "h-8 shrink-0 gap-2 px-4 text-sm font-semibold transition-all duration-200",
-              methodBgMap[method],
+              methodBg[method],
               "text-white hover:opacity-85",
             )}
             title={!hasUrl ? "URL required to send" : "Send request"}
@@ -505,52 +371,14 @@ ${bodyPart}})
               </span>
             </AccordionTrigger>
             <AccordionContent>
-              <div className="space-y-2">
-                {queryParams.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-6 text-xs text-muted-foreground/60">
-                    <span>No parameters added yet</span>
-                  </div>
-                )}
-                {queryParams.map((param, index) => (
-                  <div
-                    key={index}
-                    className="group/param flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
-                  >
-                    <Input
-                      type="text"
-                      value={param.key}
-                      onChange={(e) => updateQueryParam(index, "key", e.target.value)}
-                      placeholder="Key"
-                      className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
-                    />
-                    <span className="shrink-0 text-muted-foreground/30">=</span>
-                    <Input
-                      type="text"
-                      value={param.value}
-                      onChange={(e) => updateQueryParam(index, "value", e.target.value)}
-                      placeholder="Value"
-                      className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeQueryParam(index)}
-                      className="shrink-0 size-8 text-muted-foreground/50 hover:text-destructive opacity-0 group-hover/param:opacity-100 transition-all duration-200"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={addQueryParam}
-                className="mt-3 w-full border-dashed border-muted-foreground/20 text-muted-foreground/70 hover:text-foreground hover:border-muted-foreground/40 transition-all duration-200 h-9 text-xs font-medium"
-              >
-                <Plus className="size-3.5 mr-1" />
-                Add Parameter
-              </Button>
+              <KeyValueEditor
+                pairs={queryParams}
+                onChange={onQueryParamsChange}
+                keyPlaceholder="Key"
+                valuePlaceholder="Value"
+                addLabel="Add Parameter"
+                emptyLabel="No parameters added yet"
+              />
             </AccordionContent>
           </AccordionItem>
 
@@ -567,293 +395,29 @@ ${bodyPart}})
               </span>
             </AccordionTrigger>
             <AccordionContent>
-              <div className="space-y-2">
-                {headers.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-6 text-xs text-muted-foreground/60">
-                    <span>No headers added yet</span>
-                  </div>
-                )}
-                {headers.map((header, index) => (
-                  <div
-                    key={index}
-                    className="group/header flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
-                  >
-                    <Input
-                      type="text"
-                      value={header.key}
-                      onChange={(e) => updateHeader(index, "key", e.target.value)}
-                      placeholder="Header Name"
-                      className="flex-1 h-9 border-input bg-muted/20 text-sm font-medium transition-all duration-200 focus:bg-muted/40"
-                    />
-                    <span className="shrink-0 text-muted-foreground/30">:</span>
-                    <Input
-                      type="text"
-                      value={header.value}
-                      onChange={(e) => updateHeader(index, "value", e.target.value)}
-                      placeholder="Value"
-                      className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeHeader(index)}
-                      className="shrink-0 size-8 text-muted-foreground/50 hover:text-destructive opacity-0 group-hover/header:opacity-100 transition-all duration-200"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={addHeader}
-                className="mt-3 w-full border-dashed border-muted-foreground/20 text-muted-foreground/70 hover:text-foreground hover:border-muted-foreground/40 transition-all duration-200 h-9 text-xs font-medium"
-              >
-                <Plus className="size-3.5 mr-1" />
-                Add Header
-              </Button>
+              <KeyValueEditor
+                pairs={headers}
+                onChange={onHeadersChange}
+                keyPlaceholder="Header Name"
+                valuePlaceholder="Value"
+                addLabel="Add Header"
+                emptyLabel="No headers added yet"
+              />
             </AccordionContent>
           </AccordionItem>
 
-          {/* Body */}
-          <AccordionItem value="body" className="border border-border rounded-lg px-4 ">
-            <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wider hover:no-underline [&[data-state=open]>svg]:rotate-180">
-              <span className="flex items-center gap-2">
-                Body
-                <span className="text-[10px] font-mono font-normal text-muted-foreground/70">
-                  — {bodyTypeLabels[bodyType]}
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="flex items-center gap-3 mb-3">
-                <Select
-                  value={bodyType}
-                  onValueChange={(value) => onBodyTypeChange(value as BodyType)}
-                >
-                  <SelectTrigger className="w-32 h-9 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="json">
-                      <span className="font-mono">JSON</span>
-                    </SelectItem>
-                    <SelectItem value="form-data">Form Data</SelectItem>
-                    <SelectItem value="x-www-form">x-www-form</SelectItem>
-                    <SelectItem value="raw">Raw</SelectItem>
-                    <SelectItem value="binary">Binary</SelectItem>
-                  </SelectContent>
-                </Select>
-                {bodyType === "json" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFormatJson}
-                    className="h-9 gap-1.5 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30"
-                    title="Format JSON"
-                  >
-                    <Code className="size-3.5" />
-                    Format
-                  </Button>
-                )}
-                {bodyType === "json" && body.trim() && isValidJson !== null && (
-                  <span
-                    className={cn(
-                      "text-[11px] font-mono font-medium transition-colors duration-200",
-                      isValidJson ? "text-emerald-500" : "text-red-500",
-                    )}
-                  >
-                    {isValidJson ? "Valid" : "Invalid"}
-                  </span>
-                )}
-                {(bodyType === "form-data" || bodyType === "x-www-form") && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowRawBody(!showRawBody)}
-                    className="h-9 gap-1.5 text-xs font-medium transition-all duration-200 text-muted-foreground/70 hover:text-foreground"
-                  >
-                    <Code className="size-3.5" />
-                    {showRawBody ? "Parsed" : "Raw"}
-                  </Button>
-                )}
-              </div>
-              {(bodyType === "form-data" || bodyType === "x-www-form") && !showRawBody ? (
-                <div className="space-y-2">
-                  {formPairs.length === 0 && body.trim() === "" && (
-                    <div className="flex flex-col items-center justify-center py-6 text-xs text-muted-foreground/60">
-                      <span>No fields added yet</span>
-                    </div>
-                  )}
-                  {formPairs.map((pair, index) => (
-                    <div
-                      key={index}
-                      className="group/formpair flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
-                    >
-                      <Input
-                        type="text"
-                        value={pair.key}
-                        onChange={(e) => updateFormPair(index, "key", e.target.value)}
-                        placeholder="Key"
-                        className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
-                      />
-                      <span className="shrink-0 text-muted-foreground/30">=</span>
-                      <Input
-                        type="text"
-                        value={pair.value}
-                        onChange={(e) => updateFormPair(index, "value", e.target.value)}
-                        placeholder="Value"
-                        className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFormPair(index)}
-                        className="shrink-0 size-8 text-muted-foreground/50 hover:text-destructive opacity-0 group-hover/formpair:opacity-100 transition-all duration-200"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    onClick={addFormPair}
-                    className="w-full border-dashed border-muted-foreground/20 text-muted-foreground/70 hover:text-foreground hover:border-muted-foreground/40 transition-all duration-200 h-9 text-xs font-medium"
-                  >
-                    <Plus className="size-3.5 mr-1" />
-                    Add Field
-                  </Button>
-                </div>
-              ) : (
-                <div className="h-48 overflow-auto rounded-lg border border-border bg-code-bg flex flex-col transition-all duration-200 focus-within:border-primary/30 focus-within:shadow-[0_0_0_2px] focus-within:shadow-primary/10">
-                  <div className="flex items-center justify-between bg-code-header-bg px-4 py-1.5 border-b border-border/50">
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-full bg-red-500/70" />
-                      <span className="size-2.5 rounded-full bg-yellow-500/70" />
-                      <span className="size-2.5 rounded-full bg-emerald-500/70" />
-                    </div>
-                    <span className="text-[10px] font-mono text-muted-foreground/50">
-                      {bodyType.toUpperCase()}
-                    </span>
-                  </div>
-                  <textarea
-                    value={body}
-                    onChange={(e) => onBodyChange(e.target.value)}
-                    onKeyDown={
-                      bodyType === "json" ? createJsonKeyDownHandler(body, onBodyChange) : undefined
-                    }
-                    className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
-                    spellCheck={false}
-                    placeholder={
-                      bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."
-                    }
-                    data-testid="request-body-textarea"
-                  />
-                </div>
-              )}
-            </AccordionContent>
-          </AccordionItem>
+          <BodyEditor
+            body={body}
+            bodyType={bodyType}
+            onBodyChange={onBodyChange}
+            onBodyTypeChange={onBodyTypeChange}
+          />
 
-          {/* Auth */}
-          <AccordionItem value="auth" className="border border-border rounded-lg px-4 ">
-            <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wider hover:no-underline [&[data-state=open]>svg]:rotate-180">
-              <span className="flex items-center gap-2">
-                Auth
-                {authType !== "none" && (
-                  <span className="text-[10px] font-mono font-normal text-muted-foreground/70">
-                    — {authTypeLabels[authType]}
-                  </span>
-                )}
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Authentication Type
-                  </label>
-                  <Select
-                    value={authType}
-                    onValueChange={(value) => onAuthChange(value as AuthType, authToken)}
-                  >
-                    <SelectTrigger className="w-full h-10 border-input bg-muted/20 text-sm transition-all duration-200 hover:border-muted-foreground/30">
-                      <SelectValue placeholder="Select auth type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Auth</SelectItem>
-                      <SelectItem value="bearer">Bearer Token</SelectItem>
-                      <SelectItem value="basic">Basic Auth</SelectItem>
-                      <SelectItem value="api-key">API Key</SelectItem>
-                      <SelectItem value="oauth2">OAuth 2.0</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {authType !== "none" && (
-                  <div className="space-y-2 animate-slide-up">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {authType === "bearer"
-                        ? "Bearer Token"
-                        : authType === "basic"
-                          ? "Credentials (Base64)"
-                          : authType === "api-key"
-                            ? "API Key"
-                            : "OAuth2 Token"}
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type={authType === "basic" ? "text" : "password"}
-                        value={authToken}
-                        onChange={(event) => onAuthChange(authType, event.target.value)}
-                        placeholder={
-                          authType === "bearer"
-                            ? "eyJhbGciOiJIUzI1NiIs..."
-                            : authType === "basic"
-                              ? "base64(username:password)"
-                              : authType === "api-key"
-                                ? "sk-..."
-                                : "ya29.a0AfH6S..."
-                        }
-                        className="h-10 bg-muted/20 border-input pr-10 font-mono text-sm transition-all duration-200 focus:bg-muted/40"
-                      />
-                      {authToken && (
-                        <button
-                          onClick={() => onAuthChange(authType, "")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-destructive transition-colors"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="rounded-lg border border-border bg-muted/20 p-4 transition-all duration-200">
-                  <div className="flex items-start gap-3">
-                    <div className="size-2 mt-1 rounded-full bg-muted-foreground/30 shrink-0" />
-                    <div>
-                      <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                        Authorization header will be automatically attached to every request.
-                      </p>
-                      {authType !== "none" && authToken && (
-                        <div className="mt-2 rounded-md bg-code-bg px-3 py-2 font-mono text-[11px] leading-relaxed">
-                          <span className="text-muted-foreground/50">{"> "}</span>
-                          <span className="text-code-text">
-                            {authType === "basic"
-                              ? `Authorization: Basic ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`
-                              : authType === "api-key"
-                                ? `x-api-key: ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`
-                                : `Authorization: Bearer ${authToken.slice(0, 30)}${authToken.length > 30 ? "..." : ""}`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
+          <AuthSection
+            authType={authType}
+            authToken={authToken}
+            onAuthChange={onAuthChange}
+          />
 
           {/* Tests */}
           <AccordionItem value="tests" className="border border-border rounded-lg px-4">

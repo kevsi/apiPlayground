@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { GitCompare, Copy, Check, ArrowLeftRight, LayoutPanelLeft, Minus, Plus, Search } from "lucide-react"
+import { getStatusBadgeClass } from "@/lib/http-status-colors"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -134,14 +135,6 @@ export function DiffDialog({
     onOpenChange(newOpen)
   }
 
-  const statusColor = (status?: number | null) => {
-    if (status == null) return "bg-muted text-muted-foreground"
-    if (status < 300) return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-    if (status < 400) return "bg-blue-500/15 text-blue-600 border-blue-500/30"
-    if (status < 500) return "bg-amber-500/15 text-amber-600 border-amber-500/30"
-    return "bg-red-500/15 text-red-600 border-red-500/30"
-  }
-
   const hasSelection = leftId && rightId
   const leftContent = getLeftContent()
   const rightContent = getRightContent()
@@ -204,7 +197,7 @@ export function DiffDialog({
               {leftMeta?.status != null && (
                 <Badge
                   variant="outline"
-                  className={cn("h-4 px-1.5 text-[10px] font-semibold border", statusColor(leftMeta.status))}
+                  className={cn("h-4 px-1.5 text-[10px] font-semibold border", getStatusBadgeClass(leftMeta.status))}
                 >
                   {leftMeta.status}
                 </Badge>
@@ -222,7 +215,7 @@ export function DiffDialog({
                   <SelectItem key={opt.id} value={opt.id} className="text-xs">
                     <div className="flex items-center gap-2">
                       {opt.status != null && (
-                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", statusColor(opt.status))}>
+                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", getStatusBadgeClass(opt.status))}>
                           {opt.status}
                         </span>
                       )}
@@ -252,7 +245,7 @@ export function DiffDialog({
               {rightMeta?.status != null && (
                 <Badge
                   variant="outline"
-                  className={cn("h-4 px-1.5 text-[10px] font-semibold border", statusColor(rightMeta.status))}
+                  className={cn("h-4 px-1.5 text-[10px] font-semibold border", getStatusBadgeClass(rightMeta.status))}
                 >
                   {rightMeta.status}
                 </Badge>
@@ -270,7 +263,7 @@ export function DiffDialog({
                   <SelectItem key={opt.id} value={opt.id} className="text-xs">
                     <div className="flex items-center gap-2">
                       {opt.status != null && (
-                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", statusColor(opt.status))}>
+                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", getStatusBadgeClass(opt.status))}>
                           {opt.status}
                         </span>
                       )}

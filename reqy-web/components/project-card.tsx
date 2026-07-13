@@ -2,7 +2,7 @@
 
 import { Trash2, RefreshCw, FolderOpen, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { SavedProject } from "@/lib/projects-store"
+import type { SavedProject } from "@/lib/config"
 
 const FRAMEWORK_COLORS: Record<string, string> = {
   express:  "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",

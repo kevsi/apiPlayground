@@ -14,18 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { methodSubtle, methodBadge, methodBg } from "@/lib/http-method-colors"
+import { getStatusBadgeClass, getStatusTextClass, getStatusLabel } from "@/lib/http-status-colors"
 import type { HistoryItem, HttpMethod } from "@/hooks/use-request-store"
-
-const methodColors: Record<HttpMethod, string> = {
-  GET: "bg-emerald-500/20 text-emerald-600 border-emerald-500/30",
-  POST: "bg-blue-500/20 text-blue-600 border-blue-500/30",
-  PUT: "bg-amber-500/20 text-amber-600 border-amber-500/30",
-  PATCH: "bg-purple-500/20 text-purple-600 border-purple-500/30",
-  DELETE: "bg-red-500/20 text-red-600 border-red-500/30",
-  HEAD: "bg-slate-500/20 text-slate-600 border-slate-500/30",
-  OPTIONS: "bg-slate-500/20 text-slate-600 border-slate-500/30",
-  GRAPHQL: "bg-pink-500/20 text-pink-600 border-pink-500/30",
-}
 
 interface HistoryPanelProps {
   history: HistoryItem[]
@@ -48,22 +39,6 @@ function formatTimeAgo(timestamp: number): string {
   if (hours > 0) return `${hours}h ago`
   if (minutes > 0) return `${minutes}m ago`
   return "Just now"
-}
-
-function getStatusIcon(status?: number) {
-  if (status == null) return <Clock className="size-3.5 text-muted-foreground" />
-  if (status >= 200 && status < 300) return <CheckCircle2 className="size-3.5 text-emerald-500" />
-  if (status >= 400 && status < 500) return <XCircle className="size-3.5 text-amber-500" />
-  if (status >= 500) return <AlertCircle className="size-3.5 text-red-500" />
-  return <Clock className="size-3.5 text-muted-foreground" />
-}
-
-function getStatusColor(status?: number) {
-  if (status == null) return "text-muted-foreground"
-  if (status >= 200 && status < 300) return "text-emerald-500"
-  if (status >= 400 && status < 500) return "text-amber-500"
-  if (status >= 500) return "text-red-500"
-  return "text-muted-foreground"
 }
 
 export function HistoryPanel({
@@ -184,7 +159,7 @@ export function HistoryPanel({
                 className={cn(
                   "h-6 rounded px-2 text-[10px] font-bold border transition-colors",
                   active
-                    ? methodColors[method]
+                    ? methodSubtle[method]
                     : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
                 )}
               >
@@ -249,7 +224,7 @@ export function HistoryPanel({
                       variant="outline"
                       className={cn(
                         "h-5 shrink-0 px-1.5 text-[10px] font-bold",
-                        methodColors[item.method]
+                        methodSubtle[item.method]
                       )}
                     >
                       {item.method}
@@ -263,8 +238,14 @@ export function HistoryPanel({
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      {getStatusIcon(item.responseStatus)}
-                      <span className={cn("text-xs font-medium", getStatusColor(item.responseStatus))}>
+                      {item.responseStatus != null && item.responseStatus >= 200 && item.responseStatus < 300
+  ? <CheckCircle2 className={cn("size-3.5", getStatusTextClass(item.responseStatus))} />
+  : item.responseStatus != null && item.responseStatus >= 400 && item.responseStatus < 500
+    ? <XCircle className={cn("size-3.5", getStatusTextClass(item.responseStatus))} />
+    : item.responseStatus != null && item.responseStatus >= 500
+      ? <AlertCircle className={cn("size-3.5", getStatusTextClass(item.responseStatus))} />
+      : <Clock className="size-3.5 text-muted-foreground" />}
+                      <span className={cn("text-xs font-medium", getStatusTextClass(item.responseStatus))}>
                         {item.responseStatus || "-"}
                       </span>
                       <span className="text-xs text-muted-foreground">

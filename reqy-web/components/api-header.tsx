@@ -295,11 +295,12 @@ function AiSidebarToggle() {
   return (
     <button
       onClick={() => setAiSidebarOpen(!aiSidebarOpen)}
-      className={`relative flex size-9 items-center justify-center rounded-lg border transition-all duration-200 ${
+      className={cn(
+        "relative flex size-9 items-center justify-center rounded-lg border transition-all duration-200",
         aiSidebarOpen
           ? "border-primary/40 bg-primary/10 text-primary shadow-[0_0_12px_-4px_hsl(var(--primary))]"
-          : "border-transparent text-muted-foreground/70 hover:bg-accent hover:text-foreground hover:border-border"
-      }`}
+          : "border-transparent text-muted-foreground/70 hover:bg-accent hover:text-foreground hover:border-border",
+      )}
       title={aiSidebarOpen ? "Fermer l'assistant IA" : "Ouvrir l'assistant IA (Cmd+I)"}
     >
       <Sparkles className="size-4" />

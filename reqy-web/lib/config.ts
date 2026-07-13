@@ -1,6 +1,9 @@
 import { secureKeys } from "@/lib/secure-storage"
 import { persistence } from "@/lib/persistence"
-import type { AIProvider, OllamaConfig, GithubConfig } from "@/lib/types"
+import type { AIProvider, OllamaConfig, GithubConfig, HttpMethod, AnalysisMode, SavedProject } from "@/lib/types"
+import type { DetectedRoute } from "@/lib/detect-shared"
+
+export type { AIProvider, HttpMethod, AnalysisMode, SavedProject, DetectedRoute }
 
 const API_KEYS_KEY = "probe_api_keys"
 const AI_PROVIDER_KEY = "probe_ai_provider"

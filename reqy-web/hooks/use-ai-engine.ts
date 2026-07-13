@@ -20,7 +20,7 @@ import {
   loadOllamaConfig,
   loadAiBaseUrl,
   loadAiModel,
-} from "@/lib/projects-store";
+} from "@/lib/config";
 import { useRequestStore } from "@/hooks/use-request-store";
 
 export interface AIConfig {

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Loader2, CheckCircle2, XCircle, Play, StopCircle, AlertCircle } from "lucide-react"
+import { methodBadge } from "@/lib/http-method-colors"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,17 +28,6 @@ interface RequestRunState {
   statusCode?: number
   timeMs?: number
   error?: string
-}
-
-const methodBadgeColors: Record<HttpMethod, string> = {
-  GET: "bg-emerald-500 text-white",
-  POST: "bg-blue-500 text-white",
-  PUT: "bg-amber-500 text-white",
-  PATCH: "bg-purple-500 text-white",
-  DELETE: "bg-red-500 text-white",
-  HEAD: "bg-slate-500 text-white",
-  OPTIONS: "bg-slate-500 text-white",
-  GRAPHQL: "bg-pink-500 text-white",
 }
 
 export function BatchRunProgress({
@@ -256,7 +246,7 @@ export function BatchRunProgress({
               <span
                 className={cn(
                   "inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-bold leading-none",
-                  methodBadgeColors[state.request.method]
+                  methodBadge[state.request.method]
                 )}
               >
                 {state.request.method}

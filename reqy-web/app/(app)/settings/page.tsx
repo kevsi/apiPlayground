@@ -11,7 +11,7 @@ import { proxyAuthHeaders } from "@/lib/proxy-auth"
 import { cn } from "@/lib/utils"
 import { useRequestStore } from "@/hooks/use-request-store"
 import { persistence } from "@/lib/persistence"
-import { AIProvider, loadAIProvider, loadApiKey, saveAIProvider, saveApiKey, loadOllamaConfig, saveOllamaConfig, loadAiBaseUrl, saveAiBaseUrl, loadAiModel, saveAiModel } from "@/lib/projects-store"
+import { AIProvider, loadAIProvider, loadApiKey, saveAIProvider, saveApiKey, loadOllamaConfig, saveOllamaConfig, loadAiBaseUrl, saveAiBaseUrl, loadAiModel, saveAiModel } from "@/lib/config"
 
 import { toast } from '@/hooks/use-toast'
 import { SettingsLayout } from "@/components/settings/settings-layout"

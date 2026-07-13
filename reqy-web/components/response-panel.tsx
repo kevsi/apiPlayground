@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { Play, Loader2, FlaskConical, CheckCircle, XCircle, Sparkles, Bot } from "lucide-react"
+import { Play, Loader2, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DiffDialog } from "@/components/diff-dialog"
 import { analyze } from "@/src/ai/local-engine/analyzer"
@@ -15,6 +15,7 @@ import { ResponseTimeline } from "@/components/response-timeline"
 import { ResponseAiSummary } from "@/components/response-ai-summary"
 import { ResponseHeadersTab } from "@/components/response-headers-tab"
 import { CodeSnippet } from "@/components/response-code-snippet"
+import { TestResultsSection } from "@/components/response-test-results"
 import dynamic from "next/dynamic"
 
 // Heavy dependencies — only loaded on demand (response received, AI opened).
@@ -32,6 +33,7 @@ const AIModal = dynamic(
 )
 import { type ResponseFormat, isJson, isXml, isHtml, isImage, isPdf, isAudio, isVideo, isBinary, extractVideoUrls, extractImageUrls, getContentType } from "@/components/response-utils"
 import type { HistoryItem, TestResult } from "@/lib/types"
+import { getStatusBorderAccentClass, getStatusWatermarkClass, getStatusGaugeClass, getStatusBadgeClass, getStatusTextClass } from "@/lib/http-status-colors"
 
 interface ResponsePanelProps {
   responseBody?: string
@@ -192,32 +194,6 @@ export function ResponsePanel({
     }
   }, [responseTime, hasResponse, isLoading])
 
-  // ── Visual helpers ─────────────────────────────────────────────
-  const getStatusAccentBorder = () => {
-    if (responseStatus == null) return ""
-    if (responseStatus >= 200 && responseStatus < 300) return "border-l-2 border-l-emerald-500"
-    if (responseStatus >= 300 && responseStatus < 400) return "border-l-2 border-l-blue-500"
-    if (responseStatus >= 400 && responseStatus < 500) return "border-l-2 border-l-amber-500"
-    if (responseStatus >= 500) return "border-l-2 border-l-red-500"
-    return ""
-  }
-
-  const getGiantCodeColor = () => {
-    if (responseStatus == null) return "text-muted-foreground/5"
-    if (responseStatus >= 200 && responseStatus < 300) return "text-emerald-500/5"
-    if (responseStatus >= 300 && responseStatus < 400) return "text-blue-500/5"
-    if (responseStatus >= 400 && responseStatus < 500) return "text-amber-500/5"
-    if (responseStatus >= 500) return "text-red-500/5"
-    return "text-muted-foreground/5"
-  }
-
-  const getGaugeColor = (time?: number) => {
-    if (time === undefined || time === null) return "bg-muted-foreground"
-    if (time < 300) return "bg-emerald-500"
-    if (time < 1000) return "bg-amber-500"
-    return "bg-red-500"
-  }
-
   // ── Auto-format ────────────────────────────────────────────────
   function getAutoFormat(): ResponseFormat {
     if (responseData instanceof Blob && responseData.type === "application/pdf") {
@@ -300,7 +276,7 @@ export function ResponsePanel({
       ref={responsePanelRef}
       className={cn(
         "flex h-full flex-col bg-muted/20",
-        getStatusAccentBorder(),
+        getStatusBorderAccentClass(responseStatus),
         flash && "response-flash"
       )}
     >
@@ -324,7 +300,7 @@ export function ResponsePanel({
           <div
             className={cn(
               "h-full transition-all duration-500 ease-out",
-              getGaugeColor(responseTime)
+              getStatusGaugeClass(responseTime)
             )}
             style={{ width: `${timingGaugeWidth}%` }}
           />
@@ -410,7 +386,7 @@ export function ResponsePanel({
           {/* Giant floating status code background */}
           {hasResponse && responseStatus != null && !isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-              <span className={cn("text-[140px] font-bold leading-none", getGiantCodeColor())}>
+              <span className={cn("text-[140px] font-bold leading-none", getStatusWatermarkClass(responseStatus))}>
                 {responseStatus}
               </span>
             </div>
@@ -487,52 +463,7 @@ export function ResponsePanel({
 
 
         <TabsContent value="tests" className="m-0 min-h-0 flex-1 animate-fade-in overflow-auto">
-          {testResults && testResults.length > 0 ? (
-            <div className="space-y-1 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <span className={cn(
-                  "text-xs font-semibold",
-                  testResults.every((r) => r.passed) ? "text-emerald-500" : "text-red-500"
-                )}>
-                  {testResults.filter((r) => r.passed).length}/{testResults.length} passed
-                </span>
-              </div>
-              {testResults.map((result) => (
-                <div
-                  key={result.assertionId}
-                  className={cn(
-                    "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs",
-                    result.passed
-                      ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600"
-                      : "border-red-500/20 bg-red-500/5 text-red-600"
-                  )}
-                >
-                  {result.passed ? (
-                    <CheckCircle className="size-3.5 shrink-0 mt-0.5" />
-                  ) : (
-                    <XCircle className="size-3.5 shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-medium truncate">
-                      {result.type}: {result.target}
-                      {result.expected ? ` = ${result.expected}` : ""}
-                    </span>
-                    <span className="text-muted-foreground/80">{result.message}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center text-center px-4">
-              <div className="rounded-2xl bg-muted/40 border border-border p-5 mb-4">
-                <FlaskConical className="size-10 text-muted-foreground/30" />
-              </div>
-              <p className="text-sm font-semibold text-foreground/80">No test results</p>
-              <p className="mt-1 text-xs text-muted-foreground/60 max-w-[200px]">
-                Add assertions in the Tests panel and send a request to see results
-              </p>
-            </div>
-          )}
+          <TestResultsSection testResults={testResults ?? []} />
         </TabsContent>
       </Tabs>
 

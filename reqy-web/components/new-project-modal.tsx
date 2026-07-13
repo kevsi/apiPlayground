@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { isTauriAvailable } from "@/lib/tauri";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { AnalysisMode, SavedProject } from "@/lib/projects-store";
-import { loadApiKey, loadAIProvider } from "@/lib/projects-store";
+import type { AnalysisMode, SavedProject } from "@/lib/config";
+import { loadApiKey, loadAIProvider } from "@/lib/config";
 import { analyzeProject } from "../lib/project-analyzer";
 import { toast } from "@/hooks/use-toast";
 

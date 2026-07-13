@@ -1,60 +1,21 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import {
   Sparkles,
   PanelRightClose,
-  Send,
-  Loader2,
-  RotateCcw,
-  Edit3,
   Clock,
-  Trash2,
-  Plus,
-  ChevronDown,
-  Copy,
-  Check,
+  Loader2,
+  GripVerticalIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRequestStore } from "@/hooks/use-request-store";
-import { useShallow } from "zustand/react/shallow";
-import { usePathname } from "next/navigation";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { persistence } from "@/lib/persistence";
-import { callAIText } from "@/lib/ai-engine/providers";
-import {
-  loadAIProvider,
-  loadApiKey,
-  loadAiBaseUrl,
-  loadAiModel,
-  loadOllamaConfig,
-} from "@/lib/projects-store";
-import type { AIContext } from "@/lib/ai-engine/types";
-
-// ── Constants ──────────────────────────────────────────────────────────────
-
-const STORAGE_WIDTH_KEY = "ai-sidebar-width";
-const HISTORY_KEY = "ai-sidebar-history";
-const DEFAULT_WIDTH = 400;
-const MIN_WIDTH = 300;
-const MAX_WIDTH = 600;
-const MAX_HISTORY = 50;
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-interface ConversationSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: string;
-  updatedAt: string;
-}
+import type { ConversationSession } from "@/components/ai-sidebar-types";
+import { AiHistoryPanel } from "@/components/ai-history-panel";
+import { AiChatMessage } from "@/components/ai-chat-message";
+import { AiChatInput } from "@/components/ai-chat-input";
+import { useAiSidebarWidth } from "@/hooks/use-ai-sidebar-width";
+import { useAiSidebarChat } from "@/hooks/use-ai-sidebar-chat";
+import { useAiSidebarHistory } from "@/hooks/use-ai-sidebar-history";
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -64,315 +25,41 @@ interface AiSidebarProps {
 }
 
 export function AiSidebar({ open, onClose }: AiSidebarProps) {
-  const pathname = usePathname();
-  const store = useRequestStore(
-    useShallow((s) => ({
-      currentRequest: s.currentRequest,
-      lastResponse: s.lastResponse,
-      environmentVariables: s.environmentVariables,
-      collectionHistory: s.collectionHistory,
-      activeCollection: s.activeCollection,
-      patchRequest: s.patchRequest,
-      addAssertions: s.addAssertions,
-      setVariable: s.setVariable,
-      setDoc: s.setDoc,
-      addNotification: s.addNotification,
-      executeRequest: s.executeRequest,
-      aiAutoApply: s.aiAutoApply,
-    })),
-  );
-
-  // Width
-  const [width, setWidth] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_WIDTH;
-    const saved = localStorage.getItem(STORAGE_WIDTH_KEY);
-    return saved ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Number(saved))) : DEFAULT_WIDTH;
-  });
-  const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
-  // Messages
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Editing
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingText, setEditingText] = useState("");
-
-  // History
-  const [sessions, setSessions] = useState<ConversationSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
-
-  // Refs
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Copy state
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-
-  // ── Persist width ────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_WIDTH_KEY, String(width));
-  }, [width]);
+  const { width, isResizing, sidebarRef, handleResizeStart } = useAiSidebarWidth();
+  const chat = useAiSidebarChat();
+  const history = useAiSidebarHistory(chat.messages);
 
   // ── Focus input when sidebar opens ───────────────────────────────────────
 
   useEffect(() => {
     if (open) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 100);
+      const timer = setTimeout(() => chat.inputRef.current?.focus(), 100);
       return () => clearTimeout(timer);
     }
-  }, [open]);
+  }, [open, chat.inputRef]);
 
-  // ── Auto-scroll ──────────────────────────────────────────────────────────
+  // ── Handlers combining chat + history ────────────────────────────────────
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
-
-  // ── Load/save sessions ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    try {
-      const raw = persistence.getItem<ConversationSession[]>(HISTORY_KEY);
-      if (raw && Array.isArray(raw)) setSessions(raw);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const saveSessions = useCallback((updated: ConversationSession[]) => {
-    setSessions(updated);
-    persistence.setItem(HISTORY_KEY, updated.slice(0, MAX_HISTORY));
-  }, []);
-
-  // Track current session automatically
-  useEffect(() => {
-    if (!currentSessionId && messages.length === 0) {
-      const id = crypto.randomUUID();
-      setCurrentSessionId(id);
-    }
-  }, [currentSessionId, messages.length]);
-
-  // Save messages to current session
-  useEffect(() => {
-    if (!currentSessionId || messages.length === 0) return;
-    setSessions((prev) => {
-      const existing = prev.find((s) => s.id === currentSessionId);
-      let updated: ConversationSession[];
-      if (existing) {
-        updated = prev.map((s) =>
-          s.id === currentSessionId ? { ...s, messages, updatedAt: new Date().toISOString() } : s,
-        );
-      } else {
-        const title =
-          messages.find((m) => m.role === "user")?.content.slice(0, 50) || "Nouvelle conversation";
-        updated = [
-          ...prev,
-          {
-            id: currentSessionId,
-            title: title.length > 40 ? title.slice(0, 37) + "..." : title,
-            messages,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-        ];
-      }
-      persistence.setItem(HISTORY_KEY, updated.slice(0, MAX_HISTORY));
-      return updated;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, currentSessionId]);
-
-  // ── Resize ───────────────────────────────────────────────────────────────
-
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isResizing) return;
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!sidebarRef.current) return;
-      const rect = sidebarRef.current.getBoundingClientRect();
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rect.right - e.clientX));
-      setWidth(newWidth);
-    };
-    const handleMouseUp = () => setIsResizing(false);
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isResizing]);
-
-  // ── Send ─────────────────────────────────────────────────────────────────
-
-  const sendMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || isLoading) return;
-      setError(null);
-      const userMsg: ChatMessage = { role: "user", content: content.trim() };
-      const updated = [...messages, userMsg];
-      setMessages(updated);
-      setInput("");
-      setIsLoading(true);
-
-      try {
-        // Build context
-        const ctx: AIContext = {
-          currentRequest: store.currentRequest ?? {
-            method: "GET",
-            url: "",
-            headers: {},
-            params: {},
-          },
-          lastResponse: store.lastResponse ?? null,
-          environmentVariables: store.environmentVariables ?? {},
-          collectionHistory: (store.collectionHistory ?? []).slice(0, 10),
-          activeCollection: store.activeCollection ?? null,
-        };
-
-        // Load AI config from settings
-        const provider = loadAIProvider();
-        const apiKey = loadApiKey(provider);
-        const aiModel = loadAiModel(provider);
-        const aiBaseUrl = loadAiBaseUrl(provider);
-        const ollamaConfig = loadOllamaConfig();
-
-        const aiConfig = {
-          provider,
-          apiKey,
-          model: aiModel || undefined,
-          openaiUrl:
-            provider === "openai" || provider === "custom" ? aiBaseUrl || undefined : undefined,
-          ollamaUrl:
-            provider === "ollama"
-              ? `http://${ollamaConfig.host || "127.0.0.1"}:${ollamaConfig.port ?? 11434}`
-              : undefined,
-        };
-
-        const systemContent = `Tu es un assistant IA intégré dans l'application Reqly (API Playground).
-Page : ${pathname}
-
-L'utilisateur te demande d'interagir avec l'application. Tu peux :
-- Modifier la requête courante (méthode, URL, headers, body, auth)
-- Ajouter des assertions de test
-- Définir des variables d'environnement
-- Exécuter des requêtes
-- Gérer les collections, projets et workspaces
-
-Contexte actuel de la requête :
-${JSON.stringify(ctx, null, 2)}
-
-Réponds en français de manière concise et utile.`;
-
-        // Use callAIText for conversational chat
-        const responseText = await callAIText(content, {
-          ...aiConfig,
-          system: systemContent,
-        });
-        setMessages((prev) => [...prev, { role: "assistant", content: responseText }]);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Erreur de communication avec l'IA";
-        setError(msg);
-        setMessages((prev) => [...prev, { role: "assistant", content: `❌ ${msg}` }]);
-      } finally {
-        setIsLoading(false);
-        setEditingIndex(null);
-        setEditingText("");
-      }
+  const handleSelectSession = useCallback(
+    (session: ConversationSession) => {
+      history.handleLoadSessionMessages(session, chat.handleNewMessages);
     },
-    [messages, isLoading, pathname, store],
+    [history, chat],
   );
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
-
-  const handleSend = useCallback(() => {
-    sendMessage(input);
-  }, [input, sendMessage]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend],
-  );
-
-  // Edit user message
-  const handleEditStart = useCallback((index: number, content: string) => {
-    setEditingIndex(index);
-    setEditingText(content);
-  }, []);
-
-  const handleEditCancel = useCallback(() => {
-    setEditingIndex(null);
-    setEditingText("");
-  }, []);
-
-  const handleEditConfirm = useCallback(() => {
-    if (editingIndex === null || !editingText.trim()) return;
-    // Truncate conversation at edit point, replace the user message
-    const truncated = messages.slice(0, editingIndex);
-    setMessages([...truncated, { role: "user", content: editingText.trim() }]);
-    sendMessage(editingText.trim());
-  }, [editingIndex, editingText, messages, sendMessage]);
-
-  // Retry: find last user message and re-send
-  const handleRetry = useCallback(() => {
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
-    if (lastUser) sendMessage(lastUser.content);
-  }, [messages, sendMessage]);
-
-  // Copy message content
-  const handleCopy = useCallback(async (content: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // History management
   const handleNewSession = useCallback(() => {
-    setMessages([]);
-    setCurrentSessionId(crypto.randomUUID());
-    setHistoryOpen(false);
-    setError(null);
-  }, []);
-
-  const handleSelectSession = useCallback((session: ConversationSession) => {
-    setMessages(session.messages);
-    setCurrentSessionId(session.id);
-    setHistoryOpen(false);
-    setError(null);
-  }, []);
+    history.handleNewSession();
+    chat.clearMessages();
+  }, [history, chat]);
 
   const handleDeleteSession = useCallback(
     (id: string) => {
-      const updated = sessions.filter((s) => s.id !== id);
-      saveSessions(updated);
-      if (currentSessionId === id) {
-        setMessages([]);
-        setCurrentSessionId(crypto.randomUUID());
+      if (id === history.currentSessionId) {
+        chat.clearMessages();
       }
+      history.handleDeleteSession(id);
     },
-    [sessions, currentSessionId, saveSessions],
+    [history, chat],
   );
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -381,18 +68,6 @@ Réponds en français de manière concise et utile.`;
     <>
       {/* Overlay for mobile */}
       {open && <div className="fixed inset-0 z-30 bg-black/20 md:hidden" onClick={onClose} />}
-
-      {/* Resize handle — only interactive when open */}
-      {open && (
-        <div
-          className={cn(
-            "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10",
-            "hover:bg-primary/30 hover:w-1.5 transition-all duration-150",
-            isResizing && "bg-primary/50 w-1.5",
-          )}
-          onMouseDown={handleResizeStart}
-        />
-      )}
 
       {/* Sidebar */}
       <div
@@ -405,6 +80,32 @@ Réponds en français de manière concise et utile.`;
         )}
         style={{ width: open ? width : 0 }}
       >
+        {/* Resize handle */}
+        {open && (
+          <div
+            className={cn(
+              "absolute left-0 inset-y-0 z-20",
+              "bg-border w-px transition-colors duration-150",
+              "hover:bg-primary/40",
+              isResizing && "bg-primary/60",
+              "cursor-col-resize select-none",
+              "flex items-center justify-center",
+              "after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2",
+            )}
+            onMouseDown={handleResizeStart}
+            onTouchStart={handleResizeStart}
+          >
+            <div
+              className={cn(
+                "flex h-4 w-3 items-center justify-center rounded-xs border border-border bg-border",
+                "opacity-0 hover:opacity-100 transition-opacity duration-150",
+                isResizing && "opacity-100",
+              )}
+            >
+              <GripVerticalIcon className="size-2.5" />
+            </div>
+          </div>
+        )}
         {/* ── Header ────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-border px-4 h-12 shrink-0">
           <div className="flex items-center gap-2">
@@ -412,12 +113,11 @@ Réponds en français de manière concise et utile.`;
             <span className="text-sm font-semibold">Assistant IA</span>
           </div>
           <div className="flex items-center gap-1">
-            {/* History toggle */}
             <button
-              onClick={() => setHistoryOpen(!historyOpen)}
+              onClick={() => history.setHistoryOpen(!history.historyOpen)}
               className={cn(
                 "flex size-7 items-center justify-center rounded-md transition-colors",
-                historyOpen
+                history.historyOpen
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent",
               )}
@@ -435,56 +135,20 @@ Réponds en français de manière concise et utile.`;
           </div>
         </div>
 
-        {/* ── History panel ──────────────────────────────────────────── */}
-        {historyOpen && (
-          <div className="border-b border-border bg-muted/20">
-            <div className="flex items-center justify-between px-4 py-2">
-              <span className="text-xs font-medium text-muted-foreground">Conversations</span>
-              <button
-                onClick={handleNewSession}
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                <Plus className="size-3" /> Nouvelle
-              </button>
-            </div>
-            <div className="max-h-48 overflow-y-auto px-2 pb-2 space-y-0.5">
-              {sessions.length === 0 && (
-                <p className="text-xs text-muted-foreground/60 px-2 py-2">
-                  Aucune conversation sauvegardée
-                </p>
-              )}
-              {sessions.map((s) => (
-                <div
-                  key={s.id}
-                  className={cn(
-                    "group flex items-center justify-between rounded-md px-2 py-1.5 cursor-pointer text-xs",
-                    s.id === currentSessionId
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-accent",
-                  )}
-                  onClick={() => handleSelectSession(s)}
-                >
-                  <span className="truncate flex-1">{s.title}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteSession(s.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+        {history.historyOpen && (
+          <AiHistoryPanel
+            sessions={history.sessions}
+            currentSessionId={history.currentSessionId}
+            onSelectSession={handleSelectSession}
+            onDeleteSession={handleDeleteSession}
+            onNewSession={handleNewSession}
+          />
         )}
 
         {/* ── Messages ───────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto" ref={messagesEndRef}>
+        <div className="flex-1 overflow-y-auto" ref={chat.messagesEndRef}>
           <div className="p-4 space-y-4">
-            {messages.length === 0 && (
+            {chat.messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-12">
                 <Sparkles className="size-10 mb-3 text-primary/40" />
                 <p className="text-sm font-medium">Assistant IA</p>
@@ -501,8 +165,8 @@ Réponds en français de manière concise et utile.`;
                     <button
                       key={hint}
                       onClick={() => {
-                        setInput(hint);
-                        inputRef.current?.focus();
+                        chat.setInput(hint);
+                        chat.inputRef.current?.focus();
                       }}
                       className="block w-full rounded-lg border border-border/50 bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-left"
                     >
@@ -513,132 +177,45 @@ Réponds en français de manière concise et utile.`;
               </div>
             )}
 
-            {messages.map((msg, i) => (
-              <div key={i} className="group relative">
-                <div
-                  className={cn(
-                    "rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap",
-                    msg.role === "user"
-                      ? "bg-primary/10 text-foreground ml-6"
-                      : "bg-muted/30 text-foreground mr-6 border border-border/50",
-                  )}
-                >
-                  {msg.content}
-                </div>
-
-                {/* Actions */}
-                <div
-                  className={cn(
-                    "absolute top-1 hidden group-hover:flex gap-0.5",
-                    msg.role === "user" ? "right-0" : "left-0",
-                  )}
-                >
-                  {msg.role === "user" ? (
-                    <button
-                      onClick={() => handleEditStart(i, msg.content)}
-                      className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                      title="Modifier"
-                    >
-                      <Edit3 className="size-3" />
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleCopy(msg.content, i)}
-                        className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                        title="Copier"
-                      >
-                        {copiedIndex === i ? (
-                          <Check className="size-3 text-green-500" />
-                        ) : (
-                          <Copy className="size-3" />
-                        )}
-                      </button>
-                      <button
-                        onClick={handleRetry}
-                        className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                        title="Re-essayer"
-                      >
-                        <RotateCcw className="size-3" />
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Editing overlay */}
-                {editingIndex === i && (
-                  <div className="mt-2 space-y-1.5">
-                    <textarea
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                      rows={3}
-                      autoFocus
-                    />
-                    <div className="flex gap-1.5 justify-end">
-                      <button
-                        onClick={handleEditCancel}
-                        className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        Annuler
-                      </button>
-                      <button
-                        onClick={handleEditConfirm}
-                        disabled={!editingText.trim()}
-                        className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                      >
-                        Envoyer
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {chat.messages.map((msg, i) => (
+              <AiChatMessage
+                key={i}
+                message={msg}
+                index={i}
+                editingIndex={chat.editingIndex}
+                editingText={chat.editingText}
+                copiedIndex={chat.copiedIndex}
+                onEditStart={chat.handleEditStart}
+                onCopy={chat.handleCopy}
+                onRetry={chat.handleRetry}
+                onEditCancel={chat.handleEditCancel}
+                onEditConfirm={chat.handleEditConfirm}
+                onEditingTextChange={chat.setEditingText}
+              />
             ))}
 
-            {isLoading && (
+            {chat.isLoading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mr-6">
                 <Loader2 className="size-3.5 animate-spin" />
                 Réflexion…
               </div>
             )}
 
-            {error && (
+            {chat.error && (
               <div className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive mr-6">
-                {error}
+                {chat.error}
               </div>
             )}
           </div>
         </div>
 
-        {/* ── Input ──────────────────────────────────────────────────── */}
-        <div className="border-t border-border p-3 shrink-0">
-          <div className="flex gap-2">
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Demande à l'assistant…"
-              disabled={isLoading}
-              className="flex-1 text-sm"
-            />
-            <Button
-              size="icon"
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              className="shrink-0"
-            >
-              {isLoading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Send className="size-4" />
-              )}
-            </Button>
-          </div>
-          <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
-            L'IA n'agit que sur demande explicite
-          </p>
-        </div>
+        <AiChatInput
+          value={chat.input}
+          onValueChange={chat.setInput}
+          onSend={chat.handleSend}
+          isLoading={chat.isLoading}
+          inputRef={chat.inputRef}
+        />
       </div>
     </>
   );

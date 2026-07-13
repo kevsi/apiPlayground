@@ -16,7 +16,9 @@ import { useRequestTabExecution } from "@/hooks/use-request-tab-execution"
 import { useRequestStore, type RequestItem } from "@/hooks/use-request-store"
 import { cn } from "@/lib/utils"
 import { useShallow } from "zustand/react/shallow"
-import { getMethodPanelClass } from "@/lib/request-tab-utils"
+import { getMethodPanelClass, recordToHeaderArray } from "@/lib/request-tab-utils"
+import { useEffect, useRef } from "react"
+import type { RequestTab } from "@/lib/request-executor"
 
 export function RequestTabsManager() {
   const tabState = useRequestTabsState()
@@ -131,6 +133,80 @@ export function RequestTabsManager() {
       removeVariableMapping: s.removeVariableMapping,
     })),
   )
+
+  // ── AI-sidebar → tab sync bridge ─────────────────────────────────────────
+  // When the AI sidebar (dispatchAIActions) updates store.currentRequest or
+  // store.lastResponse, the editor's tab-based state does not see those
+  // changes. These effects sync the store values back into the active tab
+  // so the user sees the AI-filled request and response in the editor.
+  //
+  // JSON-stringify guards prevent re-syncing when the store value hasn't
+  // actually changed (e.g. on tab switch or when the editor itself called
+  // setCurrentRequest after its own tab update).
+
+  const currentRequest = useRequestStore((s) => s.currentRequest)
+  const lastResponse = useRequestStore((s) => s.lastResponse)
+  const lastReqJson = useRef("")
+  const lastRespJson = useRef("")
+
+  useEffect(() => {
+    if (!currentRequest) return
+    const json = JSON.stringify({
+      m: currentRequest.method,
+      u: currentRequest.url,
+      h: currentRequest.headers,
+      p: currentRequest.params,
+      b: currentRequest.body,
+    })
+    if (json === lastReqJson.current) return
+    lastReqJson.current = json
+
+    const patch: Partial<RequestTab> = {}
+    if (currentRequest.method) {
+      patch.method = currentRequest.method as import("@/lib/request-executor").HttpMethod
+    }
+    if (currentRequest.url !== undefined) {
+      patch.url = currentRequest.url
+      patch.endpoint = currentRequest.url.replace(/^https?:\/\/[^/]+/, "") || "/"
+    }
+    if (currentRequest.headers) {
+      patch.headers = recordToHeaderArray(currentRequest.headers)
+    }
+    if (currentRequest.params) {
+      patch.queryParams = Object.entries(currentRequest.params).map(([key, value]) => ({
+        key,
+        value: String(value),
+        enabled: true,
+      }))
+    }
+    if (currentRequest.body !== undefined) {
+      patch.body = typeof currentRequest.body === "string"
+        ? currentRequest.body
+        : JSON.stringify(currentRequest.body)
+    }
+    if (Object.keys(patch).length > 0) {
+      updateTab(activeTab.id, patch)
+    }
+  }, [currentRequest, activeTab.id, updateTab])
+
+  useEffect(() => {
+    if (!lastResponse) return
+    const json = JSON.stringify({
+      s: lastResponse.status,
+      d: lastResponse.durationMs,
+      h: lastResponse.headers,
+    })
+    if (json === lastRespJson.current) return
+    lastRespJson.current = json
+
+    updateTab(activeTab.id, {
+      hasResponse: true,
+      responseStatus: lastResponse.status,
+      responseTime: lastResponse.durationMs,
+      responseHeaders: lastResponse.headers,
+      responseBody: lastResponse.body as string | undefined,
+    })
+  }, [lastResponse, activeTab.id, updateTab])
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

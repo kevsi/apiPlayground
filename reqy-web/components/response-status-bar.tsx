@@ -2,6 +2,7 @@
 
 import { memo, useState, useEffect } from "react"
 import { CheckCircle, Clock, FileText, Download, Play, Loader2, Sparkles, XCircle, AlertTriangle, ChevronDown, GitCompare } from "lucide-react"
+import { getStatusBadgeClass, getStatusTextClass, getStatusLabel } from "@/lib/http-status-colors"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,32 +44,6 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
   onExport,
   onDiff,
 }: ResponseStatusBarProps) {
-  const getStatusColor = (status?: number) => {
-    if (status == null) return "bg-muted text-muted-foreground"
-    if (status >= 200 && status < 300) return "bg-emerald-500/20 text-emerald-600 border-emerald-500/30"
-    if (status >= 300 && status < 400) return "bg-blue-500/20 text-blue-600 border-blue-500/30"
-    if (status >= 400 && status < 500) return "bg-amber-500/20 text-amber-600 border-amber-500/30"
-    if (status >= 500) return "bg-red-500/20 text-red-600 border-red-500/30"
-    return "bg-muted text-muted-foreground"
-  }
-
-  const getStatusIcon = (status?: number) => {
-    if (status == null) return null
-    if (status >= 200 && status < 300) return <CheckCircle className="size-3.5" />
-    if (status >= 300 && status < 400) return <AlertTriangle className="size-3.5" />
-    if (status >= 400) return <XCircle className="size-3.5" />
-    return null
-  }
-
-  const getStatusLabel = (status?: number) => {
-    if (status == null) return ""
-    if (status >= 200 && status < 300) return "OK"
-    if (status >= 300 && status < 400) return "Redirect"
-    if (status >= 400 && status < 500) return "Client Error"
-    if (status >= 500) return "Server Error"
-    return ""
-  }
-
   const handleRun = async () => {
     if (!onRun) return
     await onRun()
@@ -119,10 +94,16 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
               data-testid="response-status"
               className={cn(
                 "flex items-center gap-1.5 rounded-lg border px-2.5 py-1",
-                getStatusColor(responseStatus)
+                getStatusBadgeClass(responseStatus)
               )}
             >
-              {getStatusIcon(responseStatus)}
+              {responseStatus != null && responseStatus >= 200 && responseStatus < 300
+                ? <CheckCircle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
+                : responseStatus != null && responseStatus >= 300 && responseStatus < 400
+                  ? <AlertTriangle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
+                  : responseStatus != null && responseStatus >= 400
+                    ? <XCircle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
+                    : null}
               <span className="text-xs font-bold font-mono">{responseStatus ?? "-"}</span>
             </div>
 

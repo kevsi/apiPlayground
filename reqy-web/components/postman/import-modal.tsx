@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import {
@@ -70,7 +70,7 @@ export function PostmanImportModal({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Atomic + useShallow — we only need two actions; no need to subscribe to
+  // Atomic + useShallow ÔÇö we only need two actions; no need to subscribe to
   // the entire store (and the `as any` cast is no longer required).
   const { addCollection, addRequestToCollection, addFolder } = useRequestStore(
     useShallow((s) => ({
@@ -101,16 +101,16 @@ export function PostmanImportModal({
       .then((data) => {
         if (cancelled) return
         if (!data.requests) {
-          setError(data.message ?? "Réponse invalide")
+          setError(data.message ?? "R├®ponse invalide")
           return
         }
-        // Store ALL requests — preview only shows PREVIEW_LIMIT of them.
+        // Store ALL requests ÔÇö preview only shows PREVIEW_LIMIT of them.
         setRequests(data.requests)
         setFolders(data.folders ?? [])
         setCollectionIdReturned(data.collectionId ?? collectionId)
       })
       .catch(() => {
-        if (!cancelled) setError("Erreur réseau")
+        if (!cancelled) setError("Erreur r├®seau")
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -167,8 +167,8 @@ export function PostmanImportModal({
       }
 
       toast({
-        title: "Importé",
-        description: `${requests.length} route${requests.length > 1 ? "s" : ""} ajoutée${requests.length > 1 ? "s" : ""} à votre bibliothèque${
+        title: "Import├®",
+        description: `${requests.length} route${requests.length > 1 ? "s" : ""} ajout├®e${requests.length > 1 ? "s" : ""} ├á votre biblioth├¿que${
           folders.length > 0
             ? ` (${folders.length} dossier${folders.length > 1 ? "s" : ""})`
             : ""
@@ -180,7 +180,7 @@ export function PostmanImportModal({
     } catch (e) {
       toast({
         title: "Erreur",
-        description: e instanceof Error ? e.message : "Import échoué",
+        description: e instanceof Error ? e.message : "Import ├®chou├®",
         variant: "destructive",
         meta: { event: "importExport" },
       } as any)
@@ -199,7 +199,7 @@ export function PostmanImportModal({
           <DialogTitle>Importer "{collectionName}"</DialogTitle>
           <DialogDescription>
             {loading
-              ? "Chargement de l'aperçu…"
+              ? "Chargement de l'aper├ºuÔÇª"
               : error
               ? error
               : requests.length > 0
@@ -207,8 +207,8 @@ export function PostmanImportModal({
                   folders.length > 0
                     ? ` dans ${folders.length} dossier${folders.length > 1 ? "s" : ""}`
                     : ""
-                } (aperçu des ${PREVIEW_LIMIT} premières).`
-              : "Aucune route à importer."}
+                } (aper├ºu des ${PREVIEW_LIMIT} premi├¿res).`
+              : "Aucune route ├á importer."}
           </DialogDescription>
         </DialogHeader>
 
@@ -238,7 +238,7 @@ export function PostmanImportModal({
             ))}
             {hiddenCount > 0 && (
               <p className="pt-1 text-center text-xs text-muted-foreground">
-                …et {hiddenCount} autre{hiddenCount > 1 ? "s" : ""} route
+                ÔÇªet {hiddenCount} autre{hiddenCount > 1 ? "s" : ""} route
                 {hiddenCount > 1 ? "s" : ""}
               </p>
             )}
@@ -260,7 +260,7 @@ export function PostmanImportModal({
             disabled={loading || saving || requests.length === 0}
           >
             {saving
-              ? "Importation…"
+              ? "ImportationÔÇª"
               : `Confirmer l'import${
                   requests.length > 0 ? ` (${requests.length})` : ""
                 }`}

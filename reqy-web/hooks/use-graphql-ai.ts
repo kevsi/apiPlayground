@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react"
 import { callAIText, PROMPTS } from "@/lib/ai-engine"
 import { extractGraphqlReply } from "@/lib/graphql/extract-reply"
-import { loadAIProvider, loadApiKey, loadOllamaConfig, loadAiBaseUrl, loadAiModel } from "@/lib/projects-store"
+import { loadAIProvider, loadApiKey, loadOllamaConfig, loadAiBaseUrl, loadAiModel } from "@/lib/config"
 import { toast } from "@/hooks/use-toast"
 
 export interface GraphqlAIConfig {

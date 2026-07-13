@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { getStatusBadgeClass } from "@/lib/http-status-colors"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Copy, Check } from "lucide-react"
@@ -119,14 +120,6 @@ export function DiffViewer({
     ? Math.round(((diff.addedLines + diff.removedLines) / diff.lines.length) * 100)
     : 0
 
-  const statusColor = (status?: number) => {
-    if (status == null) return "bg-muted text-muted-foreground"
-    if (status < 300) return "bg-emerald-500/15 text-emerald-600"
-    if (status < 400) return "bg-blue-500/15 text-blue-600"
-    if (status < 500) return "bg-amber-500/15 text-amber-600"
-    return "bg-red-500/15 text-red-600"
-  }
-
   return (
     <div className={cn("flex flex-col h-full bg-background", className)}>
       {/* ── Stats bar ─────────────────────────────────────────── */}
@@ -168,7 +161,7 @@ export function DiffViewer({
               <div className="flex items-center gap-2 min-w-0">
                 <span className="flex size-5 items-center justify-center rounded-full bg-red-500/15 text-[10px] font-bold text-red-500">L</span>
                 {leftStatus != null && (
-                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", statusColor(leftStatus))}>
+                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", getStatusBadgeClass(leftStatus))}>
                     {leftStatus}
                   </span>
                 )}
@@ -212,7 +205,7 @@ export function DiffViewer({
               <div className="flex items-center gap-2 min-w-0">
                 <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">R</span>
                 {rightStatus != null && (
-                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", statusColor(rightStatus))}>
+                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", getStatusBadgeClass(rightStatus))}>
                     {rightStatus}
                   </span>
                 )}
@@ -259,7 +252,7 @@ export function DiffViewer({
               <div className="flex items-center gap-2">
                 <span className="flex size-5 items-center justify-center rounded-full bg-red-500/15 text-[10px] font-bold text-red-500">L</span>
                 {leftStatus && (
-                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", statusColor(leftStatus))}>{leftStatus}</span>
+                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", getStatusBadgeClass(leftStatus))}>{leftStatus}</span>
                 )}
                 <span className="font-medium text-muted-foreground truncate">{leftLabel}</span>
               </div>
@@ -274,7 +267,7 @@ export function DiffViewer({
               <div className="flex items-center gap-2">
                 <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">R</span>
                 {rightStatus && (
-                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", statusColor(rightStatus))}>{rightStatus}</span>
+                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", getStatusBadgeClass(rightStatus))}>{rightStatus}</span>
                 )}
                 <span className="font-medium text-muted-foreground truncate">{rightLabel}</span>
               </div>

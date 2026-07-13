@@ -20,7 +20,7 @@ import {
   loadAIProvider,
   loadOllamaConfig,
   type AIProvider,
-} from "@/lib/projects-store";
+} from "@/lib/config";
 import { isAiConfigured } from "@/lib/ai-config";
 import { useAIEngine } from "@/hooks/use-ai-engine";
 import { toast } from "@/hooks/use-toast";

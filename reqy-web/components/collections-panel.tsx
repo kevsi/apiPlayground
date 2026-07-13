@@ -24,6 +24,7 @@ import {
   SlidersHorizontal,
   ArrowUpDown,
 } from "lucide-react"
+import { methodSubtle, methodBadge, methodBg } from "@/lib/http-method-colors"
 import { cn, downloadJson } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -47,6 +48,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { Collection, CollectionFolder, RequestItem, HttpMethod } from "@/hooks/use-request-store"
 import { requestItemSchema } from "@/lib/import-schemas"
+import { collectionColors, collectionIcons, safeColor } from "@/lib/collection-utils"
+import { DeleteConfirmDialog, type PendingDelete } from "@/components/collections-delete-dialog"
+import { CollectionsEmptyState } from "@/components/collections-empty-state"
+import { SearchFilterBar } from "@/components/collections-search-bar"
+import { SelectionToolbar } from "@/components/collections-selection-toolbar"
+import { CollectionRow } from "@/components/collection-row"
 
 export type NewCollectionInput = {
   name?: string
@@ -55,66 +62,6 @@ export type NewCollectionInput = {
 }
 
 export type NewRequestInput = Omit<RequestItem, "id" | "createdAt" | "updatedAt">
-
-// Pending delete confirmation state
-interface PendingDelete {
-  label: string
-  onConfirm: () => void
-}
-
-const methodColors: Record<HttpMethod, string> = {
-  GET: "bg-emerald-500/20 text-emerald-600 border-emerald-500/30",
-  POST: "bg-blue-500/20 text-blue-600 border-blue-500/30",
-  PUT: "bg-amber-500/20 text-amber-600 border-amber-500/30",
-  PATCH: "bg-purple-500/20 text-purple-600 border-purple-500/30",
-  DELETE: "bg-red-500/20 text-red-600 border-red-500/30",
-  HEAD: "bg-slate-500/20 text-slate-600 border-slate-500/30",
-  OPTIONS: "bg-slate-500/20 text-slate-600 border-slate-500/30",
-  GRAPHQL: "bg-pink-500/20 text-pink-600 border-pink-500/30",
-}
-
-const methodBadgeColors: Record<HttpMethod, string> = {
-  GET: "bg-emerald-500 text-white",
-  POST: "bg-blue-500 text-white",
-  PUT: "bg-amber-500 text-white",
-  PATCH: "bg-purple-500 text-white",
-  DELETE: "bg-red-500 text-white",
-  HEAD: "bg-slate-500 text-white",
-  OPTIONS: "bg-slate-500 text-white",
-  GRAPHQL: "bg-pink-500 text-white",
-}
-
-const collectionColors: Record<string, string> = {
-  emerald: "bg-emerald-500",
-  blue: "bg-blue-500",
-  amber: "bg-amber-500",
-  purple: "bg-purple-500",
-  red: "bg-red-500",
-  pink: "bg-pink-500",
-  slate: "bg-slate-500",
-  indigo: "bg-indigo-500",
-  violet: "bg-violet-500",
-  orange: "bg-orange-500",
-}
-
-const VALID_COLORS = new Set(Object.keys(collectionColors))
-const DEFAULT_COLOR = "emerald"
-const DEFAULT_ICON = "package"
-
-function safeColor(color: string): string {
-  return VALID_COLORS.has(color) ? color : DEFAULT_COLOR
-}
-
-const collectionIcons: Record<string, React.ReactNode> = {
-  lock: <Lock className="size-3 text-white" />,
-  users: <Users className="size-3 text-white" />,
-  package: <Package className="size-3 text-white" />,
-  folder: <Package className="size-3 text-white" />,
-}
-
-
-
-
 
 interface CollectionsPanelProps {
   collections: Collection[]
@@ -161,9 +108,7 @@ export function CollectionsPanel({
   onRunCollection,
 }: CollectionsPanelProps) {
 
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
-    new Set()
-  )
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set())
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
@@ -198,7 +143,6 @@ export function CollectionsPanel({
             if (onAddRequestToCollection) {
               const parsed = requestItemSchema.safeParse(req)
               if (parsed.success) {
-                // Strip any persisted metadata so store generates ids/timestamps consistently.
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = parsed.data
                 onAddRequestToCollection(colId, rest)
@@ -213,11 +157,9 @@ export function CollectionsPanel({
       if (dataObj.type === "collection" || dataObj.requests) {
         processCollection(dataObj as Parameters<typeof processCollection>[0])
         toast({ title: `Collection importée`, meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
-        // (reverted) previously forced reload here; UI should update reactively
       } else if (dataObj.collections && Array.isArray(dataObj.collections)) {
         dataObj.collections.forEach((c) => processCollection(c as Parameters<typeof processCollection>[0]))
         toast({ title: `${dataObj.collections.length} collections importées`, meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
-        // (reverted) previously forced reload here; UI should update reactively
       } else {
          toast({ title: "Format non reconnu", variant: "destructive", meta: { event: "importExport" } } as unknown as Parameters<typeof toast>[0])
       }
@@ -295,10 +237,8 @@ export function CollectionsPanel({
     setExporting(true)
     const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ || !!(window as unknown as Record<string, unknown>).__TAURI__
 
-    // Gather selected collections
     const cols = collections.filter((c) => selectedCollectionIds.has(c.id))
 
-    // Gather selected requests (grouped by collection)
     const reqsByCol: Record<string, RequestItem[]> = {}
     selectedRequestIds.forEach((key) => {
       const [colId, reqId] = key.split("::")
@@ -434,24 +374,15 @@ export function CollectionsPanel({
     .filter(
       (collection) => {
         if (!searchQuery && methodFilter.size === 0) return true
-
-        // Collection name matches search
         if (searchQuery && collection.name.toLowerCase().includes(searchLower)) return true
-
-        // Collection has matching requests after filtering
         if (collection.requests.length > 0) return true
-
-        // Collection has folder matching search
         if (searchQuery && collection.folders?.some((f) =>
           f.name.toLowerCase().includes(searchLower)
         )) return true
-
-        // Show collections that have matching method in original requests
         if (methodFilter.size > 0) {
           const originalCollection = collections.find((c) => c.id === collection.id)
           if (originalCollection?.requests.some((r) => methodFilter.has(r.method))) return true
         }
-
         return false
       }
     )
@@ -460,6 +391,7 @@ export function CollectionsPanel({
     <div className="flex h-full flex-col">
       {/* Ambient top highlight */}
       <div className="ambient-bar shrink-0" />
+      
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-2.5 shrink-0">
         <div className="flex items-center gap-2.5">
@@ -472,7 +404,6 @@ export function CollectionsPanel({
           </div>
         </div>
         <div className="flex items-center gap-0.5">
-
           <input 
             type="file" 
             accept=".json" 
@@ -505,329 +436,74 @@ export function CollectionsPanel({
       </div>
 
       {/* Search + Filters */}
-      <div className="border-b border-border/60 px-3 py-2 shrink-0 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60 pointer-events-none" />
-            <Input
-              placeholder="Search collections & requests..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9 pr-9 text-sm bg-muted/30 border-border/50 focus-visible:bg-background transition-colors"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors"
-              >
-                <X className="size-4" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleSelectAll}
-              className={cn(
-                "h-9 w-9 p-0",
-                allSelected && "text-primary"
-              )}
-              title={allSelected ? "Tout désélectionner" : "Tout sélectionner"}
-            >
-              {allSelected ? <CheckSquare className="size-4.5" /> : <Square className="size-4.5" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(
-                "h-9 w-9 p-0",
-                (methodFilter.size > 0 || sortBy !== "name") && "text-primary"
-              )}
-              title="Filtres & tri"
-            >
-              <SlidersHorizontal className="size-4.5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Method filter pills + sort */}
-        {showFilters && (
-          <div className="flex items-center gap-3 pt-1.5 pb-0.5">
-            <div className="flex items-center gap-1 flex-wrap">
-              {(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "GRAPHQL"] as HttpMethod[]).map((method) => {
-                const active = methodFilter.has(method)
-                return (
-                  <button
-                    key={method}
-                    onClick={() => toggleMethodFilter(method)}
-                    className={cn(
-                      "px-3 py-1 text-xs font-bold rounded-md border transition-colors",
-                      active
-                        ? `${methodBadgeColors[method]} border-transparent`
-                        : "text-muted-foreground/60 border-border/50 hover:border-border hover:text-foreground"
-                    )}
-                  >
-                    {method}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="ml-auto flex items-center gap-1">
-              <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="h-7 text-xs bg-transparent border-0 text-muted-foreground/70 hover:text-foreground cursor-pointer outline-none font-medium"
-              >
-                <option value="name">Name</option>
-                <option value="updated">Recent</option>
-                <option value="requests">Requests</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
+      <SearchFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        allSelected={allSelected}
+        onToggleSelectAll={toggleSelectAll}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        methodFilter={methodFilter}
+        onToggleMethodFilter={toggleMethodFilter}
+        sortBy={sortBy}
+        onSortChange={(sort) => setSortBy(sort)}
+      />
 
       {/* Selection toolbar */}
-      {(selectedCollectionIds.size > 0 || selectedRequestIds.size > 0) && (
-        <div className="flex items-center justify-between border-b border-border/60 px-3 py-1.5 shrink-0 bg-primary/5 border-t-0">
-          <span className="text-sm font-medium text-foreground/70">
-            {selectedCollectionIds.size > 0 && `${selectedCollectionIds.size} collection${selectedCollectionIds.size > 1 ? "s" : ""}`}
-            {selectedCollectionIds.size > 0 && selectedRequestIds.size > 0 && " + "}
-            {selectedRequestIds.size > 0 && `${selectedRequestIds.size} requête${selectedRequestIds.size > 1 ? "s" : ""}`}
-            {" sélectionné"}
-          </span>
-          <div className="flex items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearSelection}
-              className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5 mr-1.5" />
-              Clear
-            </Button>
-            <div className="w-px h-4 bg-border/40 mx-0.5" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={bulkExport}
-              disabled={exporting}
-              className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              {exporting ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Download className="size-3.5 mr-1.5" />}
-              Export
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={bulkDelete}
-              className="h-8 px-3 text-xs font-medium text-red-600 hover:text-red-600 hover:bg-red-500/10"
-            >
-              <Trash2 className="size-3.5 mr-1.5" />
-              Delete
-            </Button>
-          </div>
-        </div>
-      )}
+      <SelectionToolbar
+        selectedCollectionCount={selectedCollectionIds.size}
+        selectedRequestCount={selectedRequestIds.size}
+        exporting={exporting}
+        onClear={clearSelection}
+        onBulkExport={bulkExport}
+        onBulkDelete={bulkDelete}
+      />
 
       {/* Collections content */}
       <div data-testid="collection-list" className="flex-1 overflow-y-auto">
         <div className="divide-y divide-border/40">
-          {filteredCollections.map((collection) => {
-            const isExpanded = expandedCollections.has(collection.id)
-            const isSelected = selectedCollectionIds.has(collection.id)
-            return (
-              <div key={collection.id}>
-                <div className={cn(
-                  "flex items-center gap-3 px-3 py-2.5",
-                  isSelected && "bg-primary/[0.03]"
-                )}>
-                  <button
-                    onClick={() => toggleSelectCollection(collection.id)}
-                    className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground/60"
-                  >
-                    {isSelected ? (
-                      <CheckSquare className="size-3.5 text-primary" />
-                    ) : (
-                      <Square className="size-3.5" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => toggleCollection(collection.id)}
-                    className="shrink-0 text-muted-foreground/50"
-                  >
-                    {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                  </button>
-                  <span className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded",
-                    collectionColors[safeColor(collection.color)]
-                  )}>
-                    {collectionIcons[collection.icon] ?? <Package className="size-2.5 text-white" />}
-                  </span>
-                  {editingCollectionId === collection.id ? (
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Input
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { onRenameCollection(collection.id, renameValue.trim() || collection.name); setEditingCollectionId(null) }
-                          if (e.key === "Escape") setEditingCollectionId(null)
-                        }}
-                        autoFocus
-                        className="h-7 text-sm w-48"
-                      />
-                      <Button variant="ghost" size="sm" onClick={() => { onRenameCollection(collection.id, renameValue.trim() || collection.name); setEditingCollectionId(null) }} className="h-7 px-2 text-xs font-medium text-primary">OK</Button>
-                    </div>
-                  ) : (
-                    <span
-                      className="flex-1 min-w-0 truncate text-sm font-medium text-foreground/90 cursor-pointer"
-                      onClick={() => toggleCollection(collection.id)}
-                    >
-                      {collection.name}
-                    </span>
-                  )}
-                  <span className="shrink-0 text-xs text-muted-foreground/50 font-mono">{collection.requests.length} req</span>
-                  <div className="flex items-center gap-0.5">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="size-6 flex items-center justify-center rounded text-muted-foreground/30 hover:text-foreground hover:bg-accent">
-                          <MoreHorizontal className="size-3.5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onClick={() => onAddRequestToCollection(collection.id)}><Plus className="mr-2 size-3.5" /> Add request</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setEditingCollectionId(collection.id); setRenameValue(collection.name) }}><Edit2 className="mr-2 size-3.5" /> Rename</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => exportCollection(collection)}><Download className="mr-2 size-3.5" /> Export</DropdownMenuItem>
-                        {onDuplicateCollection && <DropdownMenuItem onClick={() => onDuplicateCollection(collection.id)}><Copy className="mr-2 size-3.5" /> Duplicate</DropdownMenuItem>}
-                        {onRunCollection && <DropdownMenuItem onClick={() => onRunCollection(collection)}><Play className="mr-2 size-3.5" /> Run all</DropdownMenuItem>}
-                        <DropdownMenuItem onClick={() => confirmDelete(`Delete "${collection.name}"?`, () => onDeleteCollection(collection.id))} className="text-destructive"><Trash2 className="mr-2 size-3.5" /> Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-                {isExpanded && collection.requests.length > 0 && (
-                  <div className="border-t border-border/20">
-                    {collection.requests.map((req) => {
-                      const reqKey = `${collection.id}::${req.id}`
-                      const isReqSelected = selectedRequestIds.has(reqKey)
-                      return (
-                        <div
-                          key={req.id}
-                          className={cn(
-                            "flex items-center gap-3 py-1.5 px-3 pl-14 text-sm",
-                            isReqSelected && "bg-primary/[0.03]",
-                            "hover:bg-muted/20"
-                          )}
-                        >
-                          <button
-                            onClick={() => toggleSelectRequest(collection.id, req.id)}
-                            className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground/60"
-                          >
-                            {isReqSelected ? (
-                              <CheckSquare className="size-3 text-primary" />
-                            ) : (
-                              <Square className="size-3" />
-                            )}
-                          </button>
-                          <span className={cn("shrink-0 rounded px-1 py-0.5 text-[10px] font-bold text-white", methodBadgeColors[req.method])}>
-                            {req.method}
-                          </span>
-                          <button
-                            className="flex-1 min-w-0 text-left truncate text-foreground/80 hover:text-foreground"
-                            onClick={() => onSelectRequest(req)}
-                          >
-                            {req.name}
-                          </button>
-                          {req.endpoint && (
-                            <span className="shrink-0 text-xs text-muted-foreground/40 font-mono truncate max-w-[200px]">{req.endpoint}</span>
-                          )}
-                          {onSelectAndSendRequest && (
-                            <button
-                              className="shrink-0 size-5 flex items-center justify-center rounded text-emerald-500/50 hover:text-emerald-500 hover:bg-emerald-500/10"
-                              onClick={() => onSelectAndSendRequest(req)}
-                              title="Load & send"
-                            >
-                              <Play className="size-3" />
-                            </button>
-                          )}
-                          <button
-                            className="shrink-0 size-5 flex items-center justify-center rounded text-muted-foreground/30 hover:text-destructive"
-                            onClick={() => confirmDelete(`Remove "${req.name}"?`, () => onRemoveRequestFromCollection(collection.id, req.id))}
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {filteredCollections.map((collection) => (
+            <CollectionRow
+              key={collection.id}
+              collection={collection}
+              isExpanded={expandedCollections.has(collection.id)}
+              isSelected={selectedCollectionIds.has(collection.id)}
+              editingCollectionId={editingCollectionId}
+              renameValue={renameValue}
+              selectedRequestIds={selectedRequestIds}
+              onToggleExpand={toggleCollection}
+              onToggleSelect={toggleSelectCollection}
+              onToggleSelectRequest={toggleSelectRequest}
+              onSelectRequest={onSelectRequest}
+              onSelectAndSendRequest={onSelectAndSendRequest}
+              onRenameStart={(id, name) => { setEditingCollectionId(id); setRenameValue(name) }}
+              onRenameConfirm={(id) => { onRenameCollection(id, renameValue.trim() || collections.find(c => c.id === id)?.name || ""); setEditingCollectionId(null) }}
+              onRenameChange={setRenameValue}
+              onRenameCancel={() => setEditingCollectionId(null)}
+              onAddRequest={onAddRequestToCollection}
+              onExportCollection={exportCollection}
+              onDuplicateCollection={onDuplicateCollection}
+              onRunCollection={onRunCollection}
+              onConfirmDelete={confirmDelete}
+              onDeleteCollection={onDeleteCollection}
+              onRemoveRequest={onRemoveRequestFromCollection}
+            />
+          ))}
         </div>
 
         {filteredCollections.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center px-6 animate-fade-in">
-            <div className="rounded-2xl bg-muted/20 p-5 mb-4 ring-1 ring-border/40">
-              <Package className="size-10 text-muted-foreground/20" />
-            </div>
-            <p className="text-sm font-semibold text-foreground/80">
-              {searchQuery ? "No collections match your search" : "No collections yet"}
-            </p>
-            <p className="text-xs text-muted-foreground/60 mt-1.5 max-w-[240px] leading-relaxed">
-              {searchQuery
-                ? "Try a different search term or clear the filter"
-                : "Create a collection to organize your API requests"
-              }
-            </p>
-            {!searchQuery && (
-              <Button
-                variant="default"
-                size="sm"
-                data-testid="new-collection-button"
-                onClick={() => onAddCollection()}
-                className="mt-5 h-8 gap-1.5 text-xs font-medium shadow-xs"
-              >
-                <Plus className="size-3.5" />
-                Create Collection
-              </Button>
-            )}
-          </div>
+          <CollectionsEmptyState
+            searchQuery={searchQuery}
+            onCreateCollection={() => onAddCollection()}
+          />
         )}
       </div>
 
-      {/* ── Delete confirmation modal ── */}
-      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-destructive/10">
-                <Trash2 className="size-4 text-destructive" />
-              </span>
-              Confirm deletion
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>{pendingDelete?.label}</p>
-              <p className="font-medium text-destructive/80 text-sm">This action cannot be undone.</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xs"
-              onClick={() => {
-                pendingDelete?.onConfirm()
-                setPendingDelete(null)
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete confirmation modal */}
+      <DeleteConfirmDialog
+        pendingDelete={pendingDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

@@ -8,7 +8,7 @@
  *
  * Replaces the previous multi-tab AI layout (Chat + ReqlyAI).
  */
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import {
   Bot,
   Loader2,
@@ -49,7 +49,7 @@ import {
   summarizeAnnotated,
 } from "@/src/ai/cloud-engine/explain";
 import { buildNaturalLanguagePrompt } from "@/src/ai/cloud-engine/generate";
-import { streamLLM, type StreamLLMOptions } from "@/src/ai/cloud-engine/llm";
+import { streamLLM, type StreamLLMOptions, type LLMToken, type LLMTextEvent, type LLMToolCallEvent } from "@/src/ai/cloud-engine/llm";
 import { extractCitations } from "@/src/ai/cloud-engine/citations";
 import { detectLanguage } from "@/src/ai/cloud-engine/language";
 import { cn } from "@/lib/utils";
@@ -63,7 +63,10 @@ import {
   loadOllamaConfig,
   saveAIProvider,
   saveApiKey,
-} from "@/lib/projects-store";
+} from "@/lib/config";
+import { REQLY_TOOLS, executeToolCall, maskSensitiveObject } from "@/lib/llm-tools";
+import type { ToolCall, ToolResult } from "@/lib/llm-tools";
+import { AssistantStepsRenderer, buildStep, type AssistantStep } from "@/components/assistant-steps-renderer";
 
 type AiTab = "analyse" | "assistant" | "explain";
 
@@ -95,7 +98,25 @@ export function AIModal(props: AIModalProps) {
   const [llmOutput, setLlmOutput] = useState("");
   const [llmLoading, setLlmLoading] = useState(false);
   const [llmError, setLlmError] = useState<string | null>(null);
+  const [steps, setSteps] = useState<AssistantStep[]>([]);
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    stepId: string;
+    toolCall: { callId: string; name: string; arguments: string };
+    toolCallsThisTurn: Array<{ callId: string; name: string; arguments: string }>;
+    results: ToolResult[];
+    turnSteps: AssistantStep[];
+  } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Refs pour la boucle multi-turn — persistentes entre handleRunLLM et handleConfirmToolCall
+  const accRef = useRef("");
+  const previousTurnsRef = useRef<Array<{
+    assistantToolCalls: ToolCall[];
+    toolResults: ToolResult[];
+  }>>([]);
+  const turnCountRef = useRef(0);
+  const baseOptsRef = useRef<Omit<StreamLLMOptions, "previousTurns"> | null>(null);
+  const MAX_TOOL_TURNS = 5;
 
   // Inline AI config state (shown when no API key is set)
   const [showConfig, setShowConfig] = useState(false);
@@ -188,6 +209,173 @@ export function AIModal(props: AIModalProps) {
     setShowConfig(false);
   }, [configProvider, configApiKey]);
 
+  async function runOneTurn() {
+    if (!baseOptsRef.current) return;
+    const turnNum = turnCountRef.current;
+    if (turnNum >= MAX_TOOL_TURNS) {
+      setLlmError("L'assistant a atteint la limite de 5 tours d'outils. Certaines actions peuvent être incomplètes.");
+      setLlmLoading(false);
+      return;
+    }
+
+    const opts: StreamLLMOptions = {
+      ...baseOptsRef.current,
+      previousTurns: previousTurnsRef.current.length > 0 ? [...previousTurnsRef.current] : undefined,
+    };
+
+    const stream = streamLLM(opts);
+    const toolCallsThisTurn: Array<{ callId: string; name: string; arguments: string }> = [];
+
+    try {
+      for await (const token of stream) {
+        if (token.type === "text") {
+          accRef.current += token.value;
+          setLlmOutput(accRef.current);
+        } else if (token.type === "tool_calls") {
+          toolCallsThisTurn.push(
+            ...token.calls.map((c) => ({ callId: c.id, name: c.name, arguments: c.arguments })),
+          );
+        }
+      }
+    } catch (e: any) {
+      setLlmError(e?.message ?? "Erreur de communication avec l'IA");
+      setLlmLoading(false);
+      return;
+    }
+
+    // Plus d'outils → terminé
+    if (toolCallsThisTurn.length === 0) {
+      setLlmLoading(false);
+      return;
+    }
+
+    // Créer les étapes "en attente"
+    const turnSteps: AssistantStep[] = toolCallsThisTurn.map((tc) => {
+      let safeArgs: Record<string, unknown> = {};
+      try { safeArgs = JSON.parse(tc.arguments); } catch { /* ignore */ }
+      const masked = maskSensitiveObject(safeArgs);
+      return buildStep({ kind: "tool_call", label: `${tc.name}(${JSON.stringify(masked)})`, status: "pending" });
+    });
+    setSteps((prev) => [...prev, ...turnSteps]);
+
+    // Exécuter les tools séquentiellement
+    const results: ToolResult[] = [];
+    for (let i = 0; i < toolCallsThisTurn.length; i++) {
+      const tc = toolCallsThisTurn[i];
+      try {
+        const result = await executeToolCall({ id: tc.callId, name: tc.name, arguments: tc.arguments });
+        results.push(result);
+        setSteps((prev) =>
+          prev.map((s) => (s.id === turnSteps[i]?.id ? { ...s, status: result.error ? ("error" as const) : ("done" as const) } : s)),
+        );
+      } catch (e: any) {
+        results.push({ callId: tc.callId, name: tc.name, content: "", error: e?.message ?? "Erreur inconnue" });
+        setSteps((prev) =>
+          prev.map((s) => (s.id === turnSteps[i]?.id ? { ...s, status: "error" as const } : s)),
+        );
+      }
+    }
+
+    // requireConfirmation → suspendre
+    const confirmIdx = results.findIndex((r) => r.requireConfirmation);
+    if (confirmIdx !== -1 && confirmIdx < toolCallsThisTurn.length) {
+      const targetStepId = turnSteps[confirmIdx]?.id;
+      const targetTc = toolCallsThisTurn[confirmIdx];
+      setSteps((prev) =>
+        prev.map((s) =>
+          s.id === targetStepId
+            ? { ...s, status: "awaiting_confirmation" as const, label: `⚠ ${targetTc.name} — confirmation requise` }
+            : s,
+        ),
+      );
+      setPendingConfirmation({
+        stepId: targetStepId,
+        toolCall: { callId: targetTc.callId, name: targetTc.name, arguments: targetTc.arguments },
+        toolCallsThisTurn,
+        results,
+        turnSteps,
+      });
+      setLlmLoading(false);
+      return;
+    }
+
+    // Stocker ce tour et continuer
+    previousTurnsRef.current = [
+      ...previousTurnsRef.current,
+      {
+        assistantToolCalls: toolCallsThisTurn.map((tc) => ({ id: tc.callId, name: tc.name, arguments: tc.arguments })),
+        toolResults: results,
+      },
+    ];
+    turnCountRef.current = turnNum + 1;
+
+    // Prochain tour
+    runOneTurn();
+  }
+
+  const handleConfirmToolCall = useCallback(async (stepId: string, confirmed: boolean) => {
+    const pending = pendingConfirmation;
+    if (!pending || pending.stepId !== stepId) return;
+
+    const { toolCall, toolCallsThisTurn, results, turnSteps } = pending;
+    setPendingConfirmation(null);
+
+    // Marquer l'étape "en cours" pendant la ré-exécution
+    setSteps((prev) =>
+      prev.map((s) => (s.id === stepId ? { ...s, status: "pending" as const } : s)),
+    );
+
+    try {
+      const result = await executeToolCall(
+        { id: toolCall.callId, name: toolCall.name, arguments: toolCall.arguments },
+        confirmed,
+      );
+
+      // Vérifier result.error après exécution confirmée
+      const hasError = !confirmed ? false : !!result.error;
+      setSteps((prev) =>
+        prev.map((s) =>
+          s.id === stepId
+            ? {
+                ...s,
+                status: hasError ? ("error" as const) : ("done" as const),
+                label: confirmed
+                  ? hasError
+                    ? `❌ ${toolCall.name} : ${result.error}`
+                    : `✅ ${toolCall.name}`
+                  : `⛔ ${toolCall.name} (annulé)`,
+              }
+            : s,
+        ),
+      );
+
+      // Si annulé, propager error: "Action annulée par l'utilisateur"
+      const finalResult: ToolResult = confirmed
+        ? result
+        : { callId: toolCall.callId, name: toolCall.name, content: "", error: "Action annulée par l'utilisateur" };
+
+      // Remplacer le placeholder requireConfirmation par le vrai résultat
+      const updatedResults = results.map((r) => (r.requireConfirmation ? finalResult : r));
+
+      // Pousser ce tour dans l'historique
+      previousTurnsRef.current = [
+        ...previousTurnsRef.current,
+        {
+          assistantToolCalls: toolCallsThisTurn.map((tc) => ({ id: tc.callId, name: tc.name, arguments: tc.arguments })),
+          toolResults: updatedResults,
+        },
+      ];
+      turnCountRef.current += 1;
+
+      // Reprendre la boucle multi-turn
+      runOneTurn();
+    } catch (e: any) {
+      setSteps((prev) => prev.map((s) => (s.id === stepId ? { ...s, status: "error" as const } : s)));
+      setLlmError(e?.message ?? "Erreur lors de la confirmation");
+      setLlmLoading(false);
+    }
+  }, [pendingConfirmation]);
+
   async function handleRunLLM() {
     if (!prompt) return;
 
@@ -201,36 +389,39 @@ export function AIModal(props: AIModalProps) {
       return;
     }
 
+    const model = loadAiModel(provider);
+    const openaiUrl = loadAiBaseUrl(provider);
+    const ollamaConfig = loadOllamaConfig();
+
+    // Initialiser les refs
+    accRef.current = "";
+    previousTurnsRef.current = [];
+    turnCountRef.current = 0;
+    baseOptsRef.current = {
+      provider: provider as any,
+      apiKey: apiKey || "",
+      model: model,
+      openaiUrl: openaiUrl,
+      host: ollamaConfig?.host,
+      port: ollamaConfig?.port,
+      question: userPrompt || prompt,
+      ctx,
+      diagnostics,
+      signal: undefined,
+      tools: REQLY_TOOLS,
+      tool_choice: "auto",
+    };
+
     setLlmLoading(true);
     setLlmError(null);
     setLlmOutput("");
+    setSteps([]);
+    setPendingConfirmation(null);
+
     try {
-      const model = loadAiModel(provider);
-      const openaiUrl = loadAiBaseUrl(provider);
-      const ollamaConfig = loadOllamaConfig();
-
-      const streamOpts: StreamLLMOptions = {
-        provider: provider as any,
-        apiKey: apiKey || "",
-        model: model,
-        openaiUrl: openaiUrl,
-        host: ollamaConfig?.host,
-        port: ollamaConfig?.port,
-        question: userPrompt || prompt,
-        ctx,
-        diagnostics,
-        signal: undefined,
-      };
-
-      let acc = "";
-      const stream = streamLLM(streamOpts);
-      for await (const token of stream) {
-        acc += token;
-        setLlmOutput(acc);
-      }
+      await runOneTurn();
     } catch (e: any) {
       setLlmError(e?.message ?? "Erreur inconnue");
-    } finally {
       setLlmLoading(false);
     }
   }
@@ -389,38 +580,40 @@ export function AIModal(props: AIModalProps) {
               )}
 
               {/* Prompt + user input */}
-              <Textarea
-                value={userPrompt}
-                onChange={(e) => setUserPrompt(e.target.value)}
-                placeholder={props.responseStatus != null && props.responseStatus >= 400
-                  ? "Explique l'erreur et propose un correctif..."
-                  : "Génère des assertions de test, optimise la requête, ou pose une question..."
-                }
-                rows={3}
-                className="resize-none text-sm"
-                data-testid="ai-assistant-input"
-              />
-
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleRunLLM}
-                disabled={llmLoading}
-                data-testid="ai-run-llm"
-              >
-                {llmLoading ? (
-                  <>
-                    <Loader2 className="size-3 mr-1 animate-spin" />
-                    Génération...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="size-3 mr-1" />
-                    {showConfig ? "Configurer d'abord" : "Lancer l'assistant"}
-                  </>
-                )}
-              </Button>
+              <div className="flex items-start gap-2">
+                <Textarea
+                  value={userPrompt}
+                  onChange={(e) => setUserPrompt(e.target.value)}
+                  placeholder={props.responseStatus != null && props.responseStatus >= 400
+                    ? "Explique l'erreur et propose un correctif..."
+                    : "Génère des assertions de test, optimise la requête, ou pose une question..."
+                  }
+                  rows={3}
+                  className="resize-none text-sm flex-1 [field-sizing:fixed]"
+                  data-testid="ai-assistant-input"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRunLLM}
+                  disabled={llmLoading}
+                  className="shrink-0 mt-[5px]"
+                  data-testid="ai-run-llm"
+                >
+                  {llmLoading ? (
+                    <>
+                      <Loader2 className="size-3 mr-1 animate-spin pointer-events-none" />
+                      Génération...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-3 mr-1 pointer-events-none" />
+                      {showConfig ? "Configurer d'abord" : "Lancer l'assistant"}
+                    </>
+                  )}
+                </Button>
+              </div>
 
               {llmError && (
                 <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-2 text-xs text-red-600">
@@ -428,9 +621,19 @@ export function AIModal(props: AIModalProps) {
                 </div>
               )}
 
-              {llmOutput && (
+              {llmOutput && steps.length === 0 && (
                 <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs font-mono whitespace-pre-wrap max-h-60 overflow-y-auto">
                   {llmOutput}
+                </div>
+              )}
+              {steps.length > 0 && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 max-h-60 overflow-y-auto">
+                  <AssistantStepsRenderer
+                    steps={steps}
+                    finalText={llmOutput}
+                    mode="sequential"
+                    onConfirm={handleConfirmToolCall}
+                  />
                 </div>
               )}
             </div>

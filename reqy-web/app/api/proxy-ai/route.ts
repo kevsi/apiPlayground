@@ -22,6 +22,13 @@ type ProviderBody = {
   system?: string;
   message?: string;
   stream?: boolean;
+  tools?: Record<string, unknown>[];
+  tool_choice?: string | Record<string, unknown>;
+};
+
+type PreviousTurn = {
+  assistantToolCalls: Array<{ id: string; name: string; arguments: string }>;
+  toolResults: Array<{ callId: string; name: string; content: string; error?: string }>;
 };
 
 interface OllamaBody extends ProviderBody {
@@ -87,6 +94,70 @@ function getCustomUrl(body: Record<string, unknown>): string {
   return raw.replace(/\/+$/, "") + "/chat/completions";
 }
 
+function buildOpenAIToolHistory(prev?: PreviousTurn[]): Record<string, unknown>[] {
+  if (!prev || prev.length === 0) return [];
+  const msgs: Record<string, unknown>[] = [];
+  for (const turn of prev) {
+    msgs.push({
+      role: "assistant",
+      content: null,
+      tool_calls: turn.assistantToolCalls.map((tc) => ({
+        id: tc.id,
+        type: "function",
+        function: { name: tc.name, arguments: tc.arguments },
+      })),
+    });
+    for (const r of turn.toolResults) {
+      msgs.push({ role: "tool", tool_call_id: r.callId, content: r.error ?? r.content });
+    }
+  }
+  return msgs;
+}
+
+function buildAnthropicToolHistory(prev?: PreviousTurn[]): Record<string, unknown>[] {
+  if (!prev || prev.length === 0) return [];
+  const msgs: Record<string, unknown>[] = [];
+  for (const turn of prev) {
+    msgs.push({
+      role: "assistant",
+      content: turn.assistantToolCalls.map((tc) => {
+        let input: Record<string, unknown> = {};
+        try { input = JSON.parse(tc.arguments); } catch { /* ignore */ }
+        return { type: "tool_use", id: tc.id, name: tc.name, input };
+      }),
+    });
+    msgs.push({
+      role: "user",
+      content: turn.toolResults.map((r) => ({
+        type: "tool_result", tool_use_id: r.callId, content: r.error ?? r.content,
+      })),
+    });
+  }
+  return msgs;
+}
+
+function buildGeminiToolHistory(prev?: PreviousTurn[]): Record<string, unknown>[] {
+  if (!prev || prev.length === 0) return [];
+  const contents: Record<string, unknown>[] = [];
+  for (const turn of prev) {
+    contents.push({
+      role: "model",
+      parts: turn.assistantToolCalls.map((tc) => {
+        let args: Record<string, unknown> = {};
+        try { args = JSON.parse(tc.arguments); } catch { /* ignore */ }
+        return { functionCall: { name: tc.name, args } };
+      }),
+    });
+    for (const r of turn.toolResults) {
+      contents.push({
+        role: "function",
+        parts: [{ functionResponse: { name: r.name, response: { content: r.error ?? r.content } } }],
+      });
+    }
+  }
+  return contents;
+}
+
 export async function POST(req: NextRequest) {
   const rateKey = getRateLimitKey(req);
   const rateResult = await rateLimiter.check(rateKey);
@@ -113,6 +184,9 @@ export async function POST(req: NextRequest) {
   const system = typeof body.system === "string" ? body.system : "";
   const rawHost = typeof body.host === "string" ? body.host.trim() : "";
   const host = rawHost || "127.0.0.1";
+  const tools = Array.isArray(body.tools) ? (body.tools as Record<string, unknown>[]) : undefined;
+  const toolChoice = body.tool_choice as string | Record<string, unknown> | undefined;
+  const previousTurns = body.previousTurns as PreviousTurn[] | undefined;
 
   function isOllamaHostAllowed(host: string): boolean {
     const lower = host.toLowerCase();
@@ -158,6 +232,15 @@ export async function POST(req: NextRequest) {
       fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timeout));
 
     if (provider === "anthropic") {
+      const anthropicTools = tools?.map((t) => {
+        const fn = (t as any).function ?? t;
+        return {
+          name: fn.name,
+          description: fn.description,
+          input_schema: fn.parameters ?? fn.input_schema ?? {},
+        };
+      });
+
       const res = await abortableFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -169,7 +252,11 @@ export async function POST(req: NextRequest) {
           model: model || "claude-sonnet-4-20250514",
           max_tokens: 4096,
           system,
-          messages: [{ role: "user", content: message }],
+          messages: [
+            { role: "user", content: message },
+            ...buildAnthropicToolHistory(previousTurns),
+          ],
+          ...(anthropicTools?.length ? { tools: anthropicTools } : {}),
         }),
       });
       const data: unknown = await res.json();
@@ -188,15 +275,40 @@ export async function POST(req: NextRequest) {
           { status: res.status },
         );
       }
+
+      // Format unifié : on extrait le texte et les tool_use pour le client
       const contentData =
         data && typeof data === "object" ? (data as Record<string, unknown>).content : undefined;
-      const content = (Array.isArray(contentData) ? contentData : [])
+      const contentArray = Array.isArray(contentData) ? contentData : [];
+      const textContent = contentArray
         .filter(
           (item: unknown): item is { type?: string; text?: string } =>
             typeof item === "object" && item !== null,
         )
         .reduce((acc: string, item) => (item.type === "text" ? acc + (item.text || "") : acc), "");
-      return NextResponse.json({ content });
+
+      const toolUses = contentArray
+        .filter(
+          (item: unknown): item is { type?: string; id?: string; name?: string; input?: Record<string, unknown> } =>
+            typeof item === "object" && item !== null && (item as any).type === "tool_use",
+        )
+        .map((item) => ({
+          id: (item as any).id,
+          name: (item as any).name,
+          arguments: JSON.stringify((item as any).input ?? {}),
+        }));
+
+      if (toolUses.length > 0) {
+        // Pour Anthropic, on renvoie les tool_calls au client pour exécution + boucle multi-turn côté frontend
+        return NextResponse.json({
+          content: textContent,
+          tool_calls: toolUses,
+          provider_tool_format: "anthropic",
+          stop_reason: (data as Record<string, unknown>).stop_reason,
+        });
+      }
+
+      return NextResponse.json({ content: textContent });
     }
 
     if (
@@ -236,6 +348,8 @@ export async function POST(req: NextRequest) {
                   ? "grok-2"
                   : "gpt-4o-mini"),
           stream: Boolean(body.stream),
+          ...(tools?.length ? { tools } : {}),
+          ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
           messages: [
             { role: "system", content: system },
             { role: "user", content: message },
@@ -265,7 +379,8 @@ export async function POST(req: NextRequest) {
         );
       }
       // Phase 2.5: stream passthrough
-      if (body.stream && res.body) return passthroughSSE(res);
+      // Désactivé si des tools sont présents : on doit parser tool_calls.
+      if (body.stream && res.body && !tools?.length) return passthroughSSE(res);
 
       const rawText = await res.text();
       let data: unknown;
@@ -282,6 +397,17 @@ export async function POST(req: NextRequest) {
           : undefined;
       const msg = firstChoice?.message as Record<string, unknown> | undefined;
       const firstText = firstChoice?.text;
+
+      // Extraction des tool_calls pour le mode non-streamé
+      const rawToolCalls = msg?.tool_calls;
+      const toolCalls = Array.isArray(rawToolCalls)
+        ? rawToolCalls.map((tc: any) => ({
+            id: typeof tc?.id === "string" ? tc.id : `call_${Math.random().toString(36).slice(2)}`,
+            name: typeof tc?.function?.name === "string" ? tc.function.name : "",
+            arguments: typeof tc?.function?.arguments === "string" ? tc.function.arguments : "{}",
+          }))
+        : [];
+
       return NextResponse.json({
         content:
           typeof msg?.content === "string"
@@ -289,6 +415,7 @@ export async function POST(req: NextRequest) {
             : typeof firstText === "string"
               ? firstText
               : "",
+        ...(toolCalls.length > 0 ? { tool_calls: toolCalls, provider_tool_format: "openai" } : {}),
       });
     }
 
@@ -301,9 +428,13 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           model: model || "deepseek-chat",
+          stream: Boolean(body.stream),
+          ...(tools?.length ? { tools } : {}),
+          ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
           messages: [
             { role: "system", content: system },
             { role: "user", content: message },
+            ...buildOpenAIToolHistory(previousTurns),
           ],
         }),
       });
@@ -330,7 +461,8 @@ export async function POST(req: NextRequest) {
         );
       }
       // Phase 2.5: stream passthrough
-      if (body.stream && res.body) return passthroughSSE(res);
+      // Désactivé si des tools sont présents.
+      if (body.stream && res.body && !tools?.length) return passthroughSSE(res);
 
       const rawText = await res.text();
       let data: unknown;
@@ -347,6 +479,17 @@ export async function POST(req: NextRequest) {
           : undefined;
       const msg = firstChoice?.message as Record<string, unknown> | undefined;
       const firstText = firstChoice?.text;
+
+      // Extraction des tool_calls pour le mode non-streamé
+      const rawToolCalls = msg?.tool_calls;
+      const toolCalls = Array.isArray(rawToolCalls)
+        ? rawToolCalls.map((tc: any) => ({
+            id: typeof tc?.id === "string" ? tc.id : `call_${Math.random().toString(36).slice(2)}`,
+            name: typeof tc?.function?.name === "string" ? tc.function.name : "",
+            arguments: typeof tc?.function?.arguments === "string" ? tc.function.arguments : "{}",
+          }))
+        : [];
+
       return NextResponse.json({
         content:
           typeof msg?.content === "string"
@@ -354,17 +497,37 @@ export async function POST(req: NextRequest) {
             : typeof firstText === "string"
               ? firstText
               : "",
+        ...(toolCalls.length > 0 ? { tool_calls: toolCalls, provider_tool_format: "openai" } : {}),
       });
     }
 
     if (provider === "gemini") {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.0-flash"}:generateContent`;
+      const geminiTools = tools?.length
+        ? [
+            {
+              functionDeclarations: tools.map((t) => {
+                const fn = (t as any).function ?? t;
+                return {
+                  name: fn.name,
+                  description: fn.description,
+                  parameters: fn.parameters ?? {},
+                };
+              }),
+            },
+          ]
+        : undefined;
+
       const res = await abortableFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: system }] },
-          contents: [{ parts: [{ text: message }] }],
+          contents: [
+            { parts: [{ text: message }] },
+            ...buildGeminiToolHistory(previousTurns),
+          ],
+          ...(geminiTools?.length ? { tools: geminiTools } : {}),
         }),
       });
 
@@ -373,27 +536,46 @@ export async function POST(req: NextRequest) {
       if (contentType.includes("text/event-stream")) {
         const rawText = await res.text();
         let combined = "";
+        let functionCallCalls: Array<{ id?: string; name?: string; arguments: string }> = [];
         for (const line of rawText.split("\n")) {
           if (line.startsWith("data: ")) {
             const jsonStr = line.slice(6).trim();
             if (!jsonStr || jsonStr === "[DONE]") continue;
             try {
-              const chunk: GeminiChunk = JSON.parse(jsonStr);
+              const chunk: GeminiChunk & { candidates?: Array<{ functionCall?: { name?: string; args?: Record<string, unknown>; id?: string } }> } = JSON.parse(jsonStr);
               const text =
                 chunk.candidates?.[0]?.content?.parts?.[0]?.text ||
                 chunk.candidates?.[0]?.content?.text ||
                 chunk.text ||
                 "";
-              combined += text;
+              if (text) combined += text;
+
+              const fc = chunk.candidates?.[0]?.functionCall;
+              if (fc?.name) {
+                functionCallCalls.push({
+                  id: fc.id,
+                  name: fc.name,
+                  arguments: JSON.stringify(fc.args ?? {}),
+                });
+              }
             } catch {
               // skip malformed chunks
             }
           }
         }
-        if (!res.ok && !combined) {
+        if (!res.ok && !combined && functionCallCalls.length === 0) {
           const errData = tryParseGeminiError(rawText);
           return NextResponse.json({ error: errData }, { status: res.status });
         }
+
+        if (functionCallCalls.length > 0) {
+          return NextResponse.json({
+            content: combined,
+            tool_calls: functionCallCalls,
+            provider_tool_format: "gemini",
+          });
+        }
+
         return NextResponse.json({ content: combined });
       }
 
@@ -433,6 +615,23 @@ export async function POST(req: NextRequest) {
       const parts = candidateContent?.parts as Array<Record<string, unknown>> | undefined;
       const firstPart = Array.isArray(parts) && parts.length > 0 ? parts[0] : undefined;
       const content = (firstPart?.text as string) ?? (candidateContent?.text as string) ?? "";
+
+      // Détecter functionCall dans la réponse non-streamée
+      const functionCall = firstCandidate?.functionCall as { name?: string; args?: Record<string, unknown>; id?: string } | undefined;
+      if (functionCall?.name) {
+        return NextResponse.json({
+          content,
+          tool_calls: [
+            {
+              id: functionCall.id,
+              name: functionCall.name,
+              arguments: JSON.stringify(functionCall.args ?? {}),
+            },
+          ],
+          provider_tool_format: "gemini",
+        });
+      }
+
       return NextResponse.json({ content });
     }
 
@@ -450,9 +649,13 @@ export async function POST(req: NextRequest) {
         redirect: "manual",
         body: JSON.stringify({
           model: model || "llama2",
+          stream: Boolean(body.stream),
+          ...(tools?.length ? { tools } : {}),
+          ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
           messages: [
-            ...(system ? [{ role: "system", content: system }] : []),
+            { role: "system", content: system },
             { role: "user", content: message },
+            ...buildOpenAIToolHistory(previousTurns),
           ],
         }),
       });

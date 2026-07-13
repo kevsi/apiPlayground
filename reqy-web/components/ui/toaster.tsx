@@ -30,7 +30,7 @@ export function Toaster() {
 
   return createPortal(
     <div
-      className="fixed bottom-5 right-5 z-[100] flex w-full max-w-xs flex-col items-end"
+      className="fixed bottom-5 right-5 z-[100] flex w-full max-w-xs flex-col items-end pointer-events-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
@@ -63,7 +63,7 @@ export function PostmanManageModal({
       setCollections(data.collections ?? [])
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return
-      setError("Erreur réseau")
+      setError("Erreur r├®seau")
     } finally {
       if (abortRef.current === controller) {
         setLoading(false)
@@ -98,10 +98,10 @@ export function PostmanManageModal({
           </DialogTitle>
           <DialogDescription>
             {!isConnected
-              ? "Postman n'est pas connecté."
+              ? "Postman n'est pas connect├®."
               : collections.length > 0
-              ? `${collections.length} collection${collections.length > 1 ? "s" : ""} trouvée${collections.length > 1 ? "s" : ""} dans votre compte Postman.`
-              : "Chargement des collections…"}
+              ? `${collections.length} collection${collections.length > 1 ? "s" : ""} trouv├®e${collections.length > 1 ? "s" : ""} dans votre compte Postman.`
+              : "Chargement des collectionsÔÇª"}
           </DialogDescription>
         </DialogHeader>
 
@@ -109,11 +109,11 @@ export function PostmanManageModal({
           {!isConnected ? (
             <div className="rounded-lg border border-amber-500/30 bg-amber-50 p-4 text-sm dark:bg-amber-950/20">
               <p className="mb-3 text-amber-900 dark:text-amber-200">
-                Connectez-vous à Postman dans les paramètres pour importer vos collections.
+                Connectez-vous ├á Postman dans les param├¿tres pour importer vos collections.
               </p>
               {onGoToSettings && (
                 <Button size="sm" variant="outline" onClick={onGoToSettings}>
-                  Aller aux paramètres
+                  Aller aux param├¿tres
                 </Button>
               )}
             </div>
@@ -127,7 +127,7 @@ export function PostmanManageModal({
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
               <p className="text-destructive">{error}</p>
               <Button size="sm" variant="outline" className="mt-2" onClick={fetchCollections}>
-                Réessayer
+                R├®essayer
               </Button>
             </div>
           ) : collections.length === 0 ? (
@@ -146,7 +146,7 @@ export function PostmanManageModal({
                       {col.name}
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      · {col.requests} requête{col.requests > 1 ? "s" : ""}
+                      ┬À {col.requests} requ├¬te{col.requests > 1 ? "s" : ""}
                     </span>
                   </div>
                   <Button

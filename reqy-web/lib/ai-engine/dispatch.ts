@@ -10,6 +10,15 @@
 
 import type { AIAction, AIContext, CurrentRequest, TestAssertion } from "./types";
 
+export interface DispatchBlockedAction {
+  type: string;
+  reason: string;
+}
+
+export interface DispatchResult {
+  blocked: DispatchBlockedAction[];
+}
+
 /**
  * Walk a `$.foo.bar`-style path against an object and stringify the result.
  * Returns `undefined` if any segment is missing.
@@ -47,7 +56,8 @@ export async function dispatchAIActions(
   },
   ctx?: AIContext,
   options?: { allowAutoApply?: boolean },
-): Promise<void> {
+): Promise<DispatchResult> {
+  const blocked: DispatchBlockedAction[] = [];
   for (const action of actions) {
     switch (action.type) {
       case "FILL_REQUEST": {
@@ -145,8 +155,9 @@ export async function dispatchAIActions(
           // SECURITY FIX C1: Only execute requests when autoApply is explicitly true AND allowed by options
           if (action.payload.reason && !options?.allowAutoApply) {
             await handlers.notify?.(
-              `Request execution blocked: autoApply not enabled. Please review the suggested request and execute manually.`,
+              `Exécution de la requête bloquée : l'application automatique n'est pas activée. Vérifie et exécute manuellement.`,
             );
+            blocked.push({ type: "EXECUTE_REQUEST", reason: "allowAutoApply désactivé" });
             break;
           }
           await handlers.setRequest?.(action.payload, action.payload.reason);
@@ -167,8 +178,9 @@ export async function dispatchAIActions(
           // SECURITY FIX C1: Only execute batches when autoApply is explicitly allowed
           if (!options?.allowAutoApply) {
             await handlers.notify?.(
-              `Batch execution blocked: autoApply not enabled. Please review requests manually.`,
+              `Exécution par lots bloquée : l'application automatique n'est pas activée. Vérifie les requêtes manuellement.`,
             );
+            blocked.push({ type: "RUN_BATCH", reason: "allowAutoApply désactivé" });
             break;
           }
           const results: any[] = [];
@@ -194,4 +206,6 @@ export async function dispatchAIActions(
       }
     }
   }
+
+  return { blocked };
 }
