@@ -1,24 +1,24 @@
-'use client'
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import { Loader2, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { SdkDownloadButton } from "@/components/sdk-download-button"
-import type { Collection } from "@/hooks/use-request-store"
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { SdkDownloadButton } from "@/components/sdk-download-button";
+import type { Collection } from "@/hooks/use-request-store";
 
 interface HistoryLikeItem {
-  requestId: string
-  responseBody?: unknown
+  requestId: string;
+  responseBody?: unknown;
 }
 
 interface OpenApiExportModalProps {
-  open: boolean
-  onClose: () => void
-  collections: Collection[]
-  historyItems?: HistoryLikeItem[]
-  onExport: (options: { inferFromHistory: boolean }) => Promise<void> | void
+  open: boolean;
+  onClose: () => void;
+  collections: Collection[];
+  historyItems?: HistoryLikeItem[];
+  onExport: (options: { inferFromHistory: boolean }) => Promise<void> | void;
 }
 
 export function OpenApiExportModal({
@@ -28,35 +28,35 @@ export function OpenApiExportModal({
   historyItems,
   onExport,
 }: OpenApiExportModalProps) {
-  const [inferFromHistory, setInferFromHistory] = useState(true)
-  const [isExporting, setIsExporting] = useState(false)
+  const [inferFromHistory, setInferFromHistory] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   const totalRequests = useMemo(
     () => collections.reduce((sum, c) => sum + c.requests.length, 0),
     [collections],
-  )
+  );
 
   const hasInferableHistory = useMemo(() => {
-    if (!historyItems || historyItems.length === 0) return false
-    return historyItems.some((h) => h.responseBody !== undefined && h.responseBody !== null)
-  }, [historyItems])
+    if (!historyItems || historyItems.length === 0) return false;
+    return historyItems.some((h) => h.responseBody !== undefined && h.responseBody !== null);
+  }, [historyItems]);
 
   useEffect(() => {
-    if (!open) return
-    setIsExporting(false)
-  }, [open])
+    if (!open) return;
+    setIsExporting(false);
+  }, [open]);
 
   const handleExportClick = async () => {
-    setIsExporting(true)
+    setIsExporting(true);
     try {
-      await onExport({ inferFromHistory: inferFromHistory && hasInferableHistory })
-      onClose()
+      await onExport({ inferFromHistory: inferFromHistory && hasInferableHistory });
+      onClose();
     } finally {
-      setIsExporting(false)
+      setIsExporting(false);
     }
-  }
+  };
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -89,7 +89,7 @@ export function OpenApiExportModal({
             </p>
           </div>
 
-          <div className="flex items-start gap-2 rounded-md border border-border px-3 py-2">
+          <Field orientation="horizontal" className="rounded-md border border-border px-3 py-2">
             <Checkbox
               id="infer-from-history"
               checked={inferFromHistory}
@@ -97,16 +97,16 @@ export function OpenApiExportModal({
               disabled={!hasInferableHistory}
             />
             <div className="flex-1">
-              <Label htmlFor="infer-from-history" className="text-xs">
+              <FieldLabel htmlFor="infer-from-history" className="text-xs">
                 Infer schemas from history (merge with generic via allOf)
-              </Label>
+              </FieldLabel>
               <p className="text-[11px] text-muted-foreground mt-1">
                 {hasInferableHistory
                   ? "Les schémas de réponse seront enrichis à partir du dernier historique disponible pour chaque requête."
                   : "Aucun historique disponible. Les schémas resteront génériques."}
               </p>
             </div>
-          </div>
+          </Field>
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose} disabled={isExporting}>
@@ -136,5 +136,5 @@ export function OpenApiExportModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
