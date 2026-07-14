@@ -1,0 +1,17 @@
+name: "Reqly Run"
+description: "Run a Reqly collection and fail the build on test failure (JUnit)"
+inputs:
+  collection:
+    description: "Path to the Reqly collection file"
+    required: true
+  format:
+    description: "Report format (junit, cli, json, html)"
+    default: "junit"
+runs:
+  using: "composite"
+  steps:
+    # NOTE: recli's `run` command takes the collection as a positional argument
+    # and selects the reporter via `--reporter <format>` (NOT `--format`/`--input`,
+    # which do not exist). See recli/src/commands/run.ts and recli/src/index.ts.
+    - run: npx recli run "${{ inputs.collection }}" --reporter "${{ inputs.format }}"
+      shell: bash
