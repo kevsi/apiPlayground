@@ -4,10 +4,12 @@ import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 
 export interface KeyValuePair {
   key: string;
   value: string;
+  enabled?: boolean;
 }
 
 interface KeyValueEditorProps {
@@ -17,6 +19,7 @@ interface KeyValueEditorProps {
   valuePlaceholder?: string;
   addLabel?: string;
   emptyLabel?: string;
+  showToggle?: boolean;
 }
 
 export function KeyValueEditor({
@@ -26,17 +29,20 @@ export function KeyValueEditor({
   valuePlaceholder = "Value",
   addLabel = "Add",
   emptyLabel = "No items added yet",
+  showToggle = false,
 }: KeyValueEditorProps) {
-  const add = () => onChange([...pairs, { key: "", value: "" }]);
+  const add = () => onChange([...pairs, { key: "", value: "", enabled: true }]);
 
   const remove = (index: number) => {
     onChange(pairs.filter((_, i) => i !== index));
   };
 
   const update = (index: number, field: "key" | "value", value: string) => {
-    onChange(
-      pairs.map((pair, i) => (i === index ? { ...pair, [field]: value } : pair)),
-    );
+    onChange(pairs.map((pair, i) => (i === index ? { ...pair, [field]: value } : pair)));
+  };
+
+  const toggle = (index: number, enabled: boolean) => {
+    onChange(pairs.map((pair, i) => (i === index ? { ...pair, enabled } : pair)));
   };
 
   return (
@@ -50,8 +56,19 @@ export function KeyValueEditor({
           {pairs.map((pair, index) => (
             <div
               key={index}
-              className="group/row flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
+              className={cn(
+                "group/row flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1",
+                showToggle && pair.enabled === false && "opacity-50",
+              )}
             >
+              {showToggle && (
+                <Switch
+                  checked={pair.enabled !== false}
+                  onCheckedChange={(checked) => toggle(index, checked)}
+                  aria-label={pair.enabled !== false ? "Disable" : "Enable"}
+                  className="shrink-0"
+                />
+              )}
               <Input
                 type="text"
                 value={pair.key}

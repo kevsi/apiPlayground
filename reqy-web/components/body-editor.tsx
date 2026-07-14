@@ -5,6 +5,7 @@ import { Plus, Trash2, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -12,11 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
+import { AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import type { BodyType } from "@/lib/request-executor";
 import { createJsonKeyDownHandler } from "@/lib/json-textarea-utils";
 
@@ -49,12 +46,7 @@ interface BodyEditorProps {
   onBodyTypeChange: (bodyType: BodyType) => void;
 }
 
-export function BodyEditor({
-  body,
-  bodyType,
-  onBodyChange,
-  onBodyTypeChange,
-}: BodyEditorProps) {
+export function BodyEditor({ body, bodyType, onBodyChange, onBodyTypeChange }: BodyEditorProps) {
   const [showRawBody, setShowRawBody] = useState(false);
   const [formPairs, setFormPairs] = useState<Array<{ key: string; value: string }>>(() =>
     parseFormBody(body),
@@ -121,10 +113,7 @@ export function BodyEditor({
       </AccordionTrigger>
       <AccordionContent>
         <div className="flex items-center gap-3 mb-3">
-          <Select
-            value={bodyType}
-            onValueChange={(value) => onBodyTypeChange(value as BodyType)}
-          >
+          <Select value={bodyType} onValueChange={(value) => onBodyTypeChange(value as BodyType)}>
             <SelectTrigger className="w-32 h-9 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
@@ -135,7 +124,6 @@ export function BodyEditor({
               <SelectItem value="form-data">Form Data</SelectItem>
               <SelectItem value="x-www-form">x-www-form</SelectItem>
               <SelectItem value="raw">Raw</SelectItem>
-              <SelectItem value="binary">Binary</SelectItem>
             </SelectContent>
           </Select>
           {bodyType === "json" && (
@@ -154,7 +142,7 @@ export function BodyEditor({
             <span
               className={cn(
                 "text-[11px] font-mono font-medium transition-colors duration-200",
-                isValidJson ? "text-emerald-500" : "text-red-500",
+                isValidJson ? "text-success" : "text-destructive",
               )}
             >
               {isValidJson ? "Valid" : "Invalid"}
@@ -222,25 +210,23 @@ export function BodyEditor({
           <div className="h-48 overflow-auto rounded-lg border border-border bg-code-bg flex flex-col transition-all duration-200 focus-within:border-primary/30 focus-within:shadow-[0_0_0_2px] focus-within:shadow-primary/10">
             <div className="flex items-center justify-between bg-code-header-bg px-4 py-1.5 border-b border-border/50">
               <div className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-full bg-red-500/70" />
-                <span className="size-2.5 rounded-full bg-yellow-500/70" />
-                <span className="size-2.5 rounded-full bg-emerald-500/70" />
+                <span className="size-2.5 rounded-full bg-destructive/70" />
+                <span className="size-2.5 rounded-full bg-warning/70" />
+                <span className="size-2.5 rounded-full bg-success/70" />
               </div>
               <span className="text-[10px] font-mono text-muted-foreground/50">
                 {bodyType.toUpperCase()}
               </span>
             </div>
-            <textarea
+            <Textarea
               value={body}
               onChange={(e) => onBodyChange(e.target.value)}
               onKeyDown={
                 bodyType === "json" ? createJsonKeyDownHandler(body, onBodyChange) : undefined
               }
-              className="h-full w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text outline-none resize-none placeholder:text-muted-foreground/30"
+              className="h-full w-full rounded-none border-0 bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text resize-none placeholder:text-muted-foreground/30"
               spellCheck={false}
-              placeholder={
-                bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."
-              }
+              placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
               data-testid="request-body-textarea"
             />
           </div>

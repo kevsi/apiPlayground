@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Wifi, WifiOff, Loader2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,25 +19,28 @@ interface ConnectionBarProps {
   onSave: () => void;
 }
 
-const STATUS_CONFIG: Record<WsStatus, { label: string; className: string }> = {
-  idle: { label: "Disconnected", className: "bg-slate-500/10 text-slate-500 border-slate-500/20" },
+const STATUS_CONFIG: Record<WsStatus, { label: string; badgeClassName: string }> = {
+  idle: { label: "Disconnected", badgeClassName: "bg-muted text-muted-foreground" },
   connecting: {
     label: "Connecting",
-    className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    badgeClassName: "bg-warning/10 text-warning border-warning/20",
   },
   connected: {
     label: "Connected",
-    className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+    badgeClassName: "bg-success/10 text-success border-success/20",
   },
   disconnecting: {
     label: "Disconnecting",
-    className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    badgeClassName: "bg-warning/10 text-warning border-warning/20",
   },
   disconnected: {
     label: "Disconnected",
-    className: "bg-slate-500/10 text-slate-500 border-slate-500/20",
+    badgeClassName: "bg-muted text-muted-foreground",
   },
-  error: { label: "Error", className: "bg-red-500/10 text-red-500 border-red-500/20" },
+  error: {
+    label: "Error",
+    badgeClassName: "bg-destructive/10 text-destructive border-destructive/20",
+  },
 };
 
 function formatDuration(ms: number): string {
@@ -92,21 +96,20 @@ export function ConnectionBar({
       <div className="flex items-center gap-2 rounded-lg border border-input/50 px-3 py-1.5 transition-all duration-200">
         <Badge
           variant="outline"
-          className={cn("shrink-0 gap-1.5 py-0.5 px-2 text-sm font-semibold", cfg.className)}
+          className={cn("shrink-0 gap-1.5 py-0.5 px-2 text-sm font-semibold", cfg.badgeClassName)}
         >
           {status === "connecting" || status === "disconnecting" ? (
-            <Loader2 className="size-3 animate-spin" />
+            <Loader2 className="animate-spin" />
           ) : status === "connected" ? (
-            <Wifi className="size-3" />
+            <Wifi />
           ) : (
-            <WifiOff className="size-3" />
+            <WifiOff />
           )}
           {status === "connected" && connectedAt ? formatDuration(now - connectedAt) : cfg.label}
         </Badge>
 
         <div className="relative flex-1">
-          <input
-            type="text"
+          <Input
             value={url}
             onChange={(e) => {
               onUrlChange(e.target.value);
@@ -114,7 +117,7 @@ export function ConnectionBar({
             }}
             placeholder="wss://echo.websocket.org"
             disabled={status === "connected" || isBusy}
-            className="w-full bg-transparent px-1 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/40 outline-none disabled:opacity-50"
+            className="font-mono text-sm"
           />
         </div>
 
@@ -124,9 +127,9 @@ export function ConnectionBar({
             size="sm"
             disabled={isBusy}
             onClick={onDisconnect}
-            className="h-7 gap-1.5 px-3 text-sm font-semibold shrink-0 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
+            className="shrink-0"
           >
-            <WifiOff className="size-3.5" />
+            <WifiOff />
             Disconnect
           </Button>
         ) : (
@@ -135,9 +138,9 @@ export function ConnectionBar({
             size="sm"
             onClick={handleConnect}
             disabled={!url.trim()}
-            className="h-7 gap-1.5 px-3 text-sm font-semibold shrink-0 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/50"
+            className="shrink-0"
           >
-            <Wifi className="size-3.5" />
+            <Wifi />
             Connect
           </Button>
         )}
@@ -149,9 +152,9 @@ export function ConnectionBar({
               size="sm"
               onClick={onSave}
               aria-label="Save connection"
-              className="h-7 gap-1.5 px-2 text-sm font-medium text-muted-foreground/40 hover:text-foreground"
+              className="shrink-0"
             >
-              <Save className="size-3.5" />
+              <Save />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
@@ -159,7 +162,7 @@ export function ConnectionBar({
           </TooltipContent>
         </Tooltip>
       </div>
-      {urlError && <p className="mt-1.5 text-sm font-medium text-red-500 px-1">{urlError}</p>}
+      {urlError && <p className="mt-1.5 text-sm font-medium text-destructive px-1">{urlError}</p>}
     </div>
   );
 }

@@ -83,7 +83,7 @@ export function MessageComposer({ disabled, onSend }: MessageComposerProps) {
               "hover:text-foreground transition-colors",
             )}
           >
-            <Braces className="size-3" />
+            <Braces />
             Format
           </Button>
           <Button
@@ -92,7 +92,7 @@ export function MessageComposer({ disabled, onSend }: MessageComposerProps) {
             onClick={handleSend}
             className="h-7 gap-1.5 px-3 text-sm font-medium"
           >
-            <Send className="size-3.5" />
+            <Send />
             Send
           </Button>
         </div>

@@ -1,50 +1,72 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { GitBranch, GitCommit, GitCommitHorizontal, Loader2, Plus, FileText, AlertCircle, Diff, CheckCircle2, Circle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
-import { useGit, type GitCommit as GitCommitType, type FileStatus, type DiffEntry } from "@/hooks/use-git"
-import type { Collection } from "@/hooks/use-request-store"
+import { useState } from "react";
+import {
+  GitBranch,
+  GitCommit,
+  GitCommitHorizontal,
+  Loader2,
+  Plus,
+  FileText,
+  AlertCircle,
+  Diff,
+  CheckCircle2,
+  Circle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import {
+  useGit,
+  type GitCommit as GitCommitType,
+  type FileStatus,
+  type DiffEntry,
+} from "@/hooks/use-git";
+import type { Collection } from "@/hooks/use-request-store";
 
 interface GitPanelProps {
-  collections: Collection[]
+  collections: Collection[];
 }
 
 export function GitPanel({ collections }: GitPanelProps) {
-  const git = useGit(collections)
-  const [commitMessage, setCommitMessage] = useState("")
-  const [commitDialogOpen, setCommitDialogOpen] = useState(false)
-  const [diffOids, setDiffOids] = useState<[string, string] | null>(null)
-  const [diffResult, setDiffResult] = useState<DiffEntry[] | null>(null)
-  const [diffLoading, setDiffLoading] = useState(false)
+  const git = useGit(collections);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [commitDialogOpen, setCommitDialogOpen] = useState(false);
+  const [diffOids, setDiffOids] = useState<[string, string] | null>(null);
+  const [diffResult, setDiffResult] = useState<DiffEntry[] | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
 
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return
-    await git.commit(commitMessage.trim())
-    setCommitMessage("")
-    setCommitDialogOpen(false)
-  }
+    if (!commitMessage.trim()) return;
+    await git.commit(commitMessage.trim());
+    setCommitMessage("");
+    setCommitDialogOpen(false);
+  };
 
   const handleDiff = async (oidA: string, oidB: string) => {
-    setDiffLoading(true)
-    setDiffOids([oidA, oidB])
+    setDiffLoading(true);
+    setDiffOids([oidA, oidB]);
     try {
-      const result = await git.diff(oidA, oidB)
-      setDiffResult(result)
+      const result = await git.diff(oidA, oidB);
+      setDiffResult(result);
     } catch {
-      setDiffResult(null)
+      setDiffResult(null);
     } finally {
-      setDiffLoading(false)
+      setDiffLoading(false);
     }
-  }
+  };
 
-  const statusFiles = git.status.filter((s) => s.workdir !== 1 || s.head !== 1)
+  const statusFiles = git.status.filter((s) => s.workdir !== 1 || s.head !== 1);
 
   return (
     <div className="flex h-full flex-col">
@@ -55,7 +77,9 @@ export function GitPanel({ collections }: GitPanelProps) {
             <GitBranch className="size-3.5 text-primary" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground tracking-tight leading-none">Git</h3>
+            <h3 className="text-sm font-semibold text-foreground tracking-tight leading-none">
+              Git
+            </h3>
             <p className="text-[10px] text-muted-foreground/40 leading-none mt-1">
               {git.isInitialized ? `Branch: ${git.currentBranch}` : "Repository not initialized"}
             </p>
@@ -68,7 +92,11 @@ export function GitPanel({ collections }: GitPanelProps) {
               Init repo
             </Button>
           ) : (
-            <Button size="sm" onClick={() => setCommitDialogOpen(true)} className="h-7 gap-1.5 text-xs font-medium">
+            <Button
+              size="sm"
+              onClick={() => setCommitDialogOpen(true)}
+              className="h-7 gap-1.5 text-xs font-medium"
+            >
               <GitCommit className="size-3.5" />
               Commit
             </Button>
@@ -88,10 +116,16 @@ export function GitPanel({ collections }: GitPanelProps) {
       {git.isInitialized ? (
         <Tabs defaultValue="history" className="flex-1 flex flex-col min-h-0">
           <TabsList className="mx-4 mt-3 mb-2 h-7 w-auto self-start rounded-lg border border-border/40 bg-muted/30 p-0.5">
-            <TabsTrigger value="history" className="h-6 px-3 text-[11px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs">
+            <TabsTrigger
+              value="history"
+              className="h-6 px-3 text-[11px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
+            >
               History
             </TabsTrigger>
-            <TabsTrigger value="status" className="h-6 px-3 text-[11px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs">
+            <TabsTrigger
+              value="status"
+              className="h-6 px-3 text-[11px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
+            >
               Status
               {statusFiles.length > 0 && (
                 <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 px-1 text-[9px]">
@@ -99,7 +133,10 @@ export function GitPanel({ collections }: GitPanelProps) {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="diff" className="h-6 px-3 text-[11px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs">
+            <TabsTrigger
+              value="diff"
+              className="h-6 px-3 text-[11px] font-medium data-[state=active]:bg-background data-[state=active]:shadow-xs"
+            >
               Diff
             </TabsTrigger>
           </TabsList>
@@ -113,7 +150,9 @@ export function GitPanel({ collections }: GitPanelProps) {
                       <GitCommitHorizontal className="size-8 text-muted-foreground/20" />
                     </div>
                     <p className="text-sm font-medium text-foreground/80">No commits yet</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">Make your first commit to track changes</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">
+                      Make your first commit to track changes
+                    </p>
                   </div>
                 ) : (
                   git.commits.map((c) => (
@@ -129,7 +168,7 @@ export function GitPanel({ collections }: GitPanelProps) {
               <div className="space-y-1">
                 {statusFiles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <CheckCircle2 className="size-8 text-emerald-500/40 mb-3" />
+                    <CheckCircle2 className="size-8 text-success/40 mb-3" />
                     <p className="text-sm font-medium text-foreground/80">Working tree clean</p>
                     <p className="text-xs text-muted-foreground/60 mt-1">No changes to commit</p>
                   </div>
@@ -147,8 +186,8 @@ export function GitPanel({ collections }: GitPanelProps) {
                   <select
                     className="h-7 rounded-md border border-border bg-muted/30 px-2 text-xs"
                     onChange={(e) => {
-                      const [a, b] = e.target.value.split("..")
-                      if (a && b) handleDiff(a, b)
+                      const [a, b] = e.target.value.split("..");
+                      if (a && b) handleDiff(a, b);
                     }}
                   >
                     <option value="">Select commits to compare</option>
@@ -157,7 +196,7 @@ export function GitPanel({ collections }: GitPanelProps) {
                         <option key={`${d.oid}..${c.oid}`} value={`${d.oid}..${c.oid}`}>
                           {d.message.slice(0, 30)}... → {c.message.slice(0, 30)}...
                         </option>
-                      ))
+                      )),
                     )}
                   </select>
                 </div>
@@ -175,7 +214,10 @@ export function GitPanel({ collections }: GitPanelProps) {
 
                 {!diffLoading &&
                   diffResult?.map((entry) => (
-                    <div key={entry.filepath} className="rounded-lg border border-border/60 overflow-hidden">
+                    <div
+                      key={entry.filepath}
+                      className="rounded-lg border border-border/60 overflow-hidden"
+                    >
                       <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 border-b border-border/40">
                         <FileText className="size-3.5 text-muted-foreground" />
                         {entry.filepath}
@@ -186,9 +228,9 @@ export function GitPanel({ collections }: GitPanelProps) {
                             key={idx}
                             className={cn(
                               "text-[11px] font-mono px-1.5 py-0.5 rounded",
-                              line.type === "add" && "bg-emerald-500/10 text-emerald-700",
-                              line.type === "remove" && "bg-red-500/10 text-red-700",
-                              line.type === "context" && "text-muted-foreground"
+                              line.type === "add" && "bg-success/10 text-success",
+                              line.type === "remove" && "bg-destructive/10 text-destructive",
+                              line.type === "context" && "text-muted-foreground",
                             )}
                           >
                             {line.type === "add" ? "+ " : line.type === "remove" ? "- " : "  "}
@@ -239,21 +281,31 @@ export function GitPanel({ collections }: GitPanelProps) {
             className="min-h-[80px] text-sm resize-none"
           />
           <DialogFooter>
-            <Button size="sm" variant="ghost" onClick={() => setCommitDialogOpen(false)} className="text-xs">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setCommitDialogOpen(false)}
+              className="text-xs"
+            >
               Cancel
             </Button>
-            <Button size="sm" onClick={handleCommit} disabled={!commitMessage.trim()} className="text-xs">
+            <Button
+              size="sm"
+              onClick={handleCommit}
+              disabled={!commitMessage.trim()}
+              className="text-xs"
+            >
               Commit
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
 
 function CommitRow({ commit, onDiff }: { commit: GitCommitType; onDiff: (oid: string) => void }) {
-  const date = new Date(commit.author.timestamp * 1000).toLocaleString()
+  const date = new Date(commit.author.timestamp * 1000).toLocaleString();
   return (
     <div className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-accent/50 transition-colors">
       <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
@@ -278,18 +330,18 @@ function CommitRow({ commit, onDiff }: { commit: GitCommitType; onDiff: (oid: st
         <Diff className="size-3" />
       </Button>
     </div>
-  )
+  );
 }
 
 function StatusRow({ status }: { status: FileStatus }) {
-  let label = "modified"
-  let icon = <Circle className="size-3 text-amber-500" />
+  let label = "modified";
+  let icon = <Circle className="size-3 text-warning" />;
   if (status.head === 0 && status.workdir === 1) {
-    label = "new"
-    icon = <Plus className="size-3 text-emerald-500" />
+    label = "new";
+    icon = <Plus className="size-3 text-success" />;
   } else if (status.head === 1 && status.workdir === 0) {
-    label = "deleted"
-    icon = <FileText className="size-3 text-red-500" />
+    label = "deleted";
+    icon = <FileText className="size-3 text-destructive" />;
   }
 
   return (
@@ -300,5 +352,5 @@ function StatusRow({ status }: { status: FileStatus }) {
         {label}
       </Badge>
     </div>
-  )
+  );
 }

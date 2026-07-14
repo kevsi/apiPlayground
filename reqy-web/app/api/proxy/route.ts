@@ -1,16 +1,21 @@
-export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from "next/server"
-import { validateProxyPayload } from "@/lib/schemas/proxy"
-import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils"
-import { isBoolean, isHttpMethod } from "@/lib/type-guards"
-import { InMemoryRateLimiter, UpstashRateLimiter, type DistributedRateLimiter, type RateLimitResult } from "@/lib/rate-limiter"
-import { getServerEnv } from "@/lib/env"
-import { isPrivateHost, isBlockedIp } from "@/lib/security/ssrf"
-import { readWithCap } from "@/lib/security/streaming"
-import { resolveCached } from "@/lib/security/dns-cache"
-import { isIP } from "node:net"
+export const dynamic = "force-dynamic";
+import { NextRequest, NextResponse } from "next/server";
+import { validateProxyPayload } from "@/lib/schemas/proxy";
+import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils";
+import { isBoolean, isHttpMethod } from "@/lib/type-guards";
+import {
+  InMemoryRateLimiter,
+  UpstashRateLimiter,
+  type DistributedRateLimiter,
+  type RateLimitResult,
+} from "@/lib/rate-limiter";
+import { getServerEnv } from "@/lib/env";
+import { isPrivateHost, isBlockedIp } from "@/lib/security/ssrf";
+import { readWithCap } from "@/lib/security/streaming";
+import { resolveCached } from "@/lib/security/dns-cache";
+import net, { isIP } from "node:net";
 
-const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
+const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
 
 const rateLimiter: DistributedRateLimiter = (() => {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -19,142 +24,136 @@ const rateLimiter: DistributedRateLimiter = (() => {
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
       windowMs: 60_000,
       maxRequests: 100,
-    })
+    });
   }
   if (process.env.NODE_ENV === "production") {
     console.warn(
       "[proxy] UPSTASH_REDIS_REST_URL not set — falling back to in-memory rate limiter. " +
         "On serverless/Edge this is per-instance and effectively ineffective.",
-    )
+    );
   }
-  const inner = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 100 })
+  const inner = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 100 });
   return {
     async check(key: string): Promise<RateLimitResult> {
-      return inner.check(key)
+      return inner.check(key);
     },
-  }
-})()
+  };
+})();
 
 function getRateLimitKey(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for")
-  const ip = forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1"
-  return ip
+  const forwarded = request.headers.get("x-forwarded-for");
+  const ip = forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1";
+  return ip;
 }
 
 function validateUrl(rawUrl: string): { valid: boolean; parsed?: URL; error?: string } {
   if (!rawUrl || typeof rawUrl !== "string") {
-    return { valid: false, error: "Missing or invalid URL" }
+    return { valid: false, error: "Missing or invalid URL" };
   }
-  const trimmed = rawUrl.trim()
+  const trimmed = rawUrl.trim();
   if (!trimmed) {
-    return { valid: false, error: "Missing or invalid URL" }
+    return { valid: false, error: "Missing or invalid URL" };
   }
 
-  let parsed: URL
+  let parsed: URL;
   try {
-    parsed = new URL(trimmed)
+    parsed = new URL(trimmed);
   } catch {
-    return { valid: false, error: "Invalid URL format" }
+    return { valid: false, error: "Invalid URL format" };
   }
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    return { valid: false, error: "Only HTTP and HTTPS protocols are allowed" }
+    return { valid: false, error: "Only HTTP and HTTPS protocols are allowed" };
   }
 
   if (!parsed.hostname) {
-    return { valid: false, error: "URL must include a hostname" }
+    return { valid: false, error: "URL must include a hostname" };
   }
 
-  return { valid: true, parsed }
+  return { valid: true, parsed };
 }
 
 function structuredError(message: string, code: string, status: number): NextResponse {
-  return NextResponse.json({ error: message, code }, { status })
+  return NextResponse.json({ error: message, code }, { status });
 }
 
 function isFetchNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return /failed to fetch|networkerror|enotfound|econnrefused|econntreset|etimedout|socket hang up|connect.*refused/.test(message)
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return /failed to fetch|networkerror|enotfound|econnrefused|econntreset|etimedout|socket hang up|connect.*refused/.test(
+    message,
+  );
 }
 
 export async function POST(request: NextRequest) {
   // Declare these in outer scope so the catch block can reference them for
   // useful debug output when things fail.
-  let parsedUrl: URL | undefined = undefined
-  let targetUrl = ""
-  let debugMode = false
-  let hostOverride: string | undefined
+  let parsedUrl: URL | undefined = undefined;
+  let targetUrl = "";
+  let debugMode = false;
+  let hostOverride: string | undefined;
 
   // ── Timing metrics ────────────────────────────────────────────────────
-  const timings = { dnsMs: 0, connectMs: 0, ttfbMs: 0 }
+  const timings = { dnsMs: 0, connectMs: 0, ttfbMs: 0 };
 
   try {
-    const rateKey = getRateLimitKey(request)
-    const rateResult = await rateLimiter.check(rateKey)
+    const rateKey = getRateLimitKey(request);
+    const rateResult = await rateLimiter.check(rateKey);
     if (!rateResult.allowed) {
-      return structuredError(
-        "Rate limit exceeded. Try again later.",
-        "RATE_LIMIT_EXCEEDED",
-        429,
-      )
+      return structuredError("Rate limit exceeded. Try again later.", "RATE_LIMIT_EXCEEDED", 429);
     }
 
     // ── Body size check ─────────────────────────────────────────────────
-    const contentLength = request.headers.get("content-length")
+    const contentLength = request.headers.get("content-length");
     if (contentLength) {
-      const size = parseInt(contentLength, 10)
+      const size = parseInt(contentLength, 10);
       if (!isNaN(size) && size > MAX_BODY_SIZE) {
         return structuredError(
           "Request body exceeds the maximum allowed size of 10 MB",
           "BODY_TOO_LARGE",
           413,
-        )
+        );
       }
     }
 
     // ── Parse body ───────────────────────────────────────────────────────
-    let payload: Record<string, unknown>
+    let payload: Record<string, unknown>;
     try {
-      payload = await request.json()
+      payload = await request.json();
     } catch {
-      return structuredError(
-        "Invalid JSON in request body",
-        "INVALID_JSON",
-        400,
-      )
+      return structuredError("Invalid JSON in request body", "INVALID_JSON", 400);
     }
 
     // Validate payload against schema
-    const validPayload = validateProxyPayload(payload)
+    const validPayload = validateProxyPayload(payload);
     if (!validPayload) {
       return structuredError(
         "Invalid request payload. Check URL, method, and headers.",
         "INVALID_PAYLOAD",
         400,
-      )
+      );
     }
 
-    const rawUrl = validPayload.url
-    const method = validPayload.method.toUpperCase() as typeof validPayload.method
-    const headers = validPayload.headers || {}
-    const payloadBody = validPayload.body
-    debugMode = validPayload.debug || String(request.headers.get("x-proxy-debug") || "").trim() === "1"
+    const rawUrl = validPayload.url;
+    const method = validPayload.method.toUpperCase() as typeof validPayload.method;
+    const headers = validPayload.headers || {};
+    const payloadBody = validPayload.body;
+    debugMode =
+      validPayload.debug || String(request.headers.get("x-proxy-debug") || "").trim() === "1";
 
     // ── Validate URL ─────────────────────────────────────────────────────
-    const urlValidation = validateUrl(rawUrl)
+    const urlValidation = validateUrl(rawUrl);
     if (!urlValidation.valid) {
-      return structuredError(urlValidation.error!, "INVALID_URL", 400)
+      return structuredError(urlValidation.error!, "INVALID_URL", 400);
     }
     // expose these to the outer scope so catch-blocks can reference them for debug
-    parsedUrl = urlValidation.parsed!
-    targetUrl = parsedUrl.href
+    parsedUrl = urlValidation.parsed!;
+    targetUrl = parsedUrl.href;
 
     // ── SSRF protection ──────────────────────────────────────────────────
     // Allow local testing in development mode or if explicitly enabled
-    const env = getServerEnv()
-    const allowLocal =
-      process.env.NODE_ENV === "development" || env.ALLOW_LOCAL_HOSTS === "true"
+    const env = getServerEnv();
+    const allowLocal = process.env.NODE_ENV === "development" || env.ALLOW_LOCAL_HOSTS === "true";
 
     if (!allowLocal) {
       // 1) Reject bare IP literals that are themselves private.
@@ -163,7 +162,7 @@ export async function POST(request: NextRequest) {
           "Requests to private/internal hosts are not allowed",
           "SSRF_BLOCKED",
           403,
-        )
+        );
       }
 
       // 2) Resolve DNS once (cached), check the resolved address, and PIN it in the
@@ -171,71 +170,96 @@ export async function POST(request: NextRequest) {
       //    redirect to a private IP. The cache is per-instance — on serverless
       //    each cold start pays the lookup cost; on self-hosted Node the cache
       //    absorbs bursts to the same host.
-      let resolvedIp: string
-      const dnsStart = Date.now()
-      const address = await resolveCached(parsedUrl.hostname)
-      timings.dnsMs = Date.now() - dnsStart
+      const dnsStart = Date.now();
+      const address = await resolveCached(parsedUrl.hostname);
+      timings.dnsMs = Date.now() - dnsStart;
       if (!address) {
-        return structuredError("DNS resolution failed", "DNS_ERROR", 400)
+        return structuredError("DNS resolution failed", "DNS_ERROR", 400);
       }
-      resolvedIp = address
+      const resolvedIp = address;
 
       if (isBlockedIp(resolvedIp)) {
         return structuredError(
           "Requests to private/internal hosts are not allowed (DNS rebinding prevention)",
           "SSRF_BLOCKED",
           403,
-        )
+        );
       }
 
       // 3) Rewrite the target URL to use the literal IP, but keep the
       //    original `Host` header so virtualhosts / SNI still match.
-      const portPart = parsedUrl.port ? `:${parsedUrl.port}` : ""
-      const hostLiteral = isIP(resolvedIp) === 6 ? `[${resolvedIp}]` : resolvedIp
-      targetUrl = `${parsedUrl.protocol}//${hostLiteral}${portPart}${parsedUrl.pathname}${parsedUrl.search}`
+      const portPart = parsedUrl.port ? `:${parsedUrl.port}` : "";
+      const hostLiteral = isIP(resolvedIp) === 6 ? `[${resolvedIp}]` : resolvedIp;
+      targetUrl = `${parsedUrl.protocol}//${hostLiteral}${portPart}${parsedUrl.pathname}${parsedUrl.search}`;
       // Capture the original Host to apply after `finalHeaders` is created.
-      hostOverride = parsedUrl.host
+      hostOverride = parsedUrl.host;
     }
 
     // ── Prepare headers and body ─────────────────────────────────────────
     const finalHeaders: Record<string, string> = Object.fromEntries(
       Object.entries(headers).map(([key, value]) => [key, String(value)]),
-    )
+    );
 
     // SSRF protection: pin Host header to original hostname when IP was rewritten.
     if (hostOverride) {
-      finalHeaders["Host"] = hostOverride
+      finalHeaders["Host"] = hostOverride;
     }
 
     // debug mode can be requested either via header `x-proxy-debug: 1` or via
     // a `debug: true` boolean in the JSON payload.
-    debugMode = String(request.headers.get("x-proxy-debug") || "").trim() === "1"
+    debugMode = String(request.headers.get("x-proxy-debug") || "").trim() === "1";
     if (!debugMode && payload && typeof payload.debug === "boolean") {
-      debugMode = Boolean(payload.debug)
+      debugMode = Boolean(payload.debug);
     }
 
-    let bodyToSend: string | undefined
+    let bodyToSend: string | undefined;
     if (method !== "GET" && payloadBody !== undefined && payloadBody !== null) {
-      bodyToSend = typeof payloadBody === "string" ? payloadBody : JSON.stringify(payloadBody)
+      bodyToSend = typeof payloadBody === "string" ? payloadBody : JSON.stringify(payloadBody);
     }
 
     if (bodyToSend) {
       const hasContentType = Object.keys(finalHeaders).some(
         (key) => key.toLowerCase() === "content-type",
-      )
+      );
       if (!hasContentType) {
-        finalHeaders["Content-Type"] = "application/json"
+        finalHeaders["Content-Type"] = "application/json";
       }
     }
 
     // ── Execute fetch with timeout ───────────────────────────────────────
-    const customTimeoutMs = parseInt(request.headers.get("x-proxy-timeout") || "30000", 10)
-    const finalTimeoutMs = Math.min(Math.max(customTimeoutMs, 1000), 120000)
+    const customTimeoutMs = parseInt(request.headers.get("x-proxy-timeout") || "30000", 10);
+    const finalTimeoutMs = Math.min(Math.max(customTimeoutMs, 1000), 120000);
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), finalTimeoutMs)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), finalTimeoutMs);
 
-    const startTime = Date.now()
+    // ── TCP connect probe ───────────────────────────────────────────────
+    // Open a throwaway socket to the target host/port in parallel with the
+    // fetch so we can surface a real connectMs without adding latency. The
+    // probe resolves as soon as TCP connect completes (TLS handshake is part
+    // of ttfbMs, not connectMs). On error we fall back to 0.
+    const connectHost = new URL(targetUrl).hostname;
+    const connectPort = parsedUrl!.port
+      ? Number(parsedUrl!.port)
+      : parsedUrl!.protocol === "https:"
+        ? 443
+        : 80;
+    const connectProbe = new Promise<number>((resolve) => {
+      const probeStart = Date.now();
+      const socket = net.connect({ host: connectHost, port: connectPort });
+      const done = (ms: number) => {
+        try {
+          socket.destroy();
+        } catch {
+          /* noop */
+        }
+        resolve(ms);
+      };
+      socket.once("connect", () => done(Math.max(0, Date.now() - probeStart)));
+      socket.once("error", () => done(0));
+    });
+
+    const startTime = Date.now();
     const response = await fetch(targetUrl, {
       method,
       headers: finalHeaders,
@@ -247,7 +271,10 @@ export async function POST(request: NextRequest) {
       // 'manual' we surface the 3xx to the caller, who can decide to
       // re-validate the Location against the SSRF guard before following.
       redirect: "manual",
-    }).finally(() => clearTimeout(timeout))
+    }).finally(() => clearTimeout(timeout));
+
+    // Real TCP connect time (probe ran concurrently with the fetch above).
+    timings.connectMs = await connectProbe;
 
     // TTFB approximation: time from request start until response headers
     // were received. fetch resolves when headers arrive, which for non-
@@ -255,43 +282,49 @@ export async function POST(request: NextRequest) {
     // We deliberately do NOT read the body stream here because doing so
     // would corrupt it: subsequent response.text()/arrayBuffer() would
     // miss the consumed chunk, truncating the response body.
-    timings.ttfbMs = Math.max(0, Date.now() - startTime)
+    timings.ttfbMs = Math.max(0, Date.now() - startTime);
 
-    const durationMs = Date.now() - startTime
-    const responseHeaders: Record<string, string> = {}
+    const durationMs = Date.now() - startTime;
+    const responseHeaders: Record<string, string> = {};
     response.headers.forEach((value, key) => {
-      responseHeaders[key] = value
-    })
+      responseHeaders[key] = value;
+    });
 
-    const contentType = response.headers.get("content-type")?.split(";")[0].toLowerCase() || ""
-    const isBinary = /^(image\/|video\/|audio\/|application\/pdf|application\/octet-stream)/.test(contentType)
-    let body: string
-    let encoding = "utf8"
-    let size = 0
+    const contentType = response.headers.get("content-type")?.split(";")[0].toLowerCase() || "";
+    const isBinary = /^(image\/|video\/|audio\/|application\/pdf|application\/octet-stream)/.test(
+      contentType,
+    );
+    let body: string;
+    let encoding = "utf8";
+    let size = 0;
 
-    const MAX_RESPONSE_BODY_SIZE = 5 * 1024 * 1024 // 5 MB
-    const truncationSuffix = "\n\n...<Response truncated>"
+    const MAX_RESPONSE_BODY_SIZE = 5 * 1024 * 1024; // 5 MB
+    const truncationSuffix = "\n\n...<Response truncated>";
 
     // Stream the response body and cancel as soon as the cap is reached,
     // so we don't waste memory buffering a multi-GB payload just to throw
     // 99% of it away. See `lib/security/streaming.ts` for the unit tests.
-    const reader = response.body?.getReader()
+    const reader = response.body?.getReader();
     if (!reader) {
-      body = ""
-      size = 0
+      body = "";
+      size = 0;
     } else {
-      const { body: buf, size: bytesRead, truncated } = await readWithCap(reader, MAX_RESPONSE_BODY_SIZE)
-      size = bytesRead
+      const {
+        body: buf,
+        size: bytesRead,
+        truncated,
+      } = await readWithCap(reader, MAX_RESPONSE_BODY_SIZE);
+      size = bytesRead;
       if (isBinary) {
-        body = buf.toString("base64")
-        encoding = "base64"
+        body = buf.toString("base64");
+        encoding = "base64";
       } else {
-        let text = buf.toString("utf8")
-        if (truncated) text += truncationSuffix
-        body = text
+        let text = buf.toString("utf8");
+        if (truncated) text += truncationSuffix;
+        body = text;
       }
       if (truncated) {
-        responseHeaders["x-proxy-truncated"] = "1"
+        responseHeaders["x-proxy-truncated"] = "1";
       }
     }
 
@@ -304,36 +337,48 @@ export async function POST(request: NextRequest) {
       durationMs,
       size,
       timings,
-    }
+    };
 
     if (debugMode) {
       successPayload._debug = {
         requestedUrl: targetUrl,
         hostname: parsedUrl.hostname,
         isPrivateHost: isPrivateHost(parsedUrl.hostname),
-      }
+      };
     }
 
-    return NextResponse.json(successPayload)
+    return NextResponse.json(successPayload);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      return structuredError("Request timed out", "TIMEOUT", 504)
+      return structuredError("Request timed out", "TIMEOUT", 504);
     }
 
-    const message = error instanceof Error ? error.message : String(error)
+    const message = error instanceof Error ? error.message : String(error);
     if (isFetchNetworkError(error)) {
-      const resp = structuredError(message, "BAD_GATEWAY", 502)
+      const resp = structuredError(message, "BAD_GATEWAY", 502);
       if (debugMode) {
         // attach debug info when requested
-        return NextResponse.json({ ...(await resp.json()), _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null } }, { status: 502 })
+        return NextResponse.json(
+          {
+            ...(await resp.json()),
+            _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null },
+          },
+          { status: 502 },
+        );
       }
-      return resp
+      return resp;
     }
 
-    const resp = structuredError(message, "INTERNAL_ERROR", 500)
+    const resp = structuredError(message, "INTERNAL_ERROR", 500);
     if (debugMode) {
-      return NextResponse.json({ ...(await resp.json()), _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null } }, { status: 500 })
+      return NextResponse.json(
+        {
+          ...(await resp.json()),
+          _debug: { requestedUrl: targetUrl, hostname: parsedUrl?.hostname ?? null },
+        },
+        { status: 500 },
+      );
     }
-    return resp
+    return resp;
   }
 }

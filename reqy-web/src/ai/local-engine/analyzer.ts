@@ -16,7 +16,7 @@ export function analyze(ctx: RequestContext): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const rule of allRules) {
-    let matches = false;
+    let matches: boolean;
     try {
       matches = rule.match(ctx);
     } catch {

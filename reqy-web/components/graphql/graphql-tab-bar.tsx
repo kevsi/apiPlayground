@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import { X, Plus } from "lucide-react"
-import { cn } from "@/lib/utils"
-import type { GraphqlTab } from "@/lib/types"
+import { X, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { GraphqlTab } from "@/lib/types";
 
 interface Props {
-  tabs: GraphqlTab[]
-  activeTabId: string
-  onSelect: (id: string) => void
-  onAdd: () => void
-  onClose: (id: string) => void
+  tabs: GraphqlTab[];
+  activeTabId: string;
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+  onClose: (id: string) => void;
 }
 
 export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose }: Props) {
@@ -19,7 +19,7 @@ export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose }: P
       data-testid="graphql-tab-bar"
     >
       {tabs.map((tab) => {
-        const isActive = activeTabId === tab.id
+        const isActive = activeTabId === tab.id;
         return (
           <button
             key={tab.id}
@@ -33,27 +33,25 @@ export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose }: P
             data-testid={`graphql-tab-${tab.id}`}
             data-active={isActive}
           >
-            <span className="text-[10px] font-bold text-pink-500/80 shrink-0">GQL</span>
+            <span className="text-[10px] font-bold text-primary/80 shrink-0">GQL</span>
             <span className="truncate flex-1 text-left">
               {tab.name}
-              {tab.dirty && !tab.saved && (
-                <span className="ml-1 text-amber-500">●</span>
-              )}
+              {tab.dirty && !tab.saved && <span className="ml-1 text-warning">●</span>}
             </span>
             <button
               type="button"
               aria-label={`Close ${tab.name}`}
               onClick={(e) => {
-                e.stopPropagation()
-                onClose(tab.id)
+                e.stopPropagation();
+                onClose(tab.id);
               }}
-              className="shrink-0 opacity-60 hover:opacity-100 hover:text-red-500 cursor-pointer"
+              className="shrink-0 opacity-60 hover:opacity-100 hover:text-destructive cursor-pointer"
               data-testid={`graphql-tab-close-${tab.id}`}
             >
               <X className="w-3 h-3" />
             </button>
           </button>
-        )
+        );
       })}
       <button
         onClick={onAdd}
@@ -63,5 +61,5 @@ export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose }: P
         <Plus className="w-3 h-3" /> New
       </button>
     </div>
-  )
+  );
 }

@@ -92,7 +92,7 @@ export function RequestPanel({
   variableNames,
 }: RequestPanelProps) {
   const [exportFormat, setExportFormat] = useState<"curl" | "fetch">("curl");
-  
+
   const [exportCopied, setExportCopied] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
@@ -204,12 +204,7 @@ ${bodyPart}})
               {(["GET", "POST", "PUT", "PATCH", "DELETE"] as const).map((m) => (
                 <SelectItem key={m} value={m}>
                   <span className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full shrink-0",
-                        methodDot[m],
-                      )}
-                    />
+                    <span className={cn("size-1.5 rounded-full shrink-0", methodDot[m])} />
                     {m}
                   </span>
                 </SelectItem>
@@ -219,14 +214,13 @@ ${bodyPart}})
 
           {/* URL Input — studio style */}
           <div className="relative flex-1">
-            <input
+            <Input
               ref={urlInputRef}
-              type="text"
               data-testid="url-input"
               value={url}
               onChange={(e) => onUrlChange(e.target.value)}
               placeholder="https://api.example.com/endpoint"
-              className="w-full bg-transparent px-1 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/40 outline-none"
+              className="font-mono text-sm"
             />
           </div>
 
@@ -303,7 +297,7 @@ ${bodyPart}})
               );
             })}
             {url.match(/\{\{[^}]+\}\}/g)?.some((m) => !m.match(/^\{\{\s*\w+\s*\}\}$/)) && (
-              <span className="text-[11px] font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md">
+              <span className="text-[11px] font-medium text-warning bg-warning/10 px-2 py-0.5 rounded-md">
                 Invalid variable syntax
               </span>
             )}
@@ -336,7 +330,7 @@ ${bodyPart}})
               onClick={handleCopyExport}
               className={cn(
                 "h-8 gap-1.5 text-xs font-medium transition-all duration-200",
-                exportCopied ? "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" : "",
+                exportCopied ? "border-success/30 text-success bg-success/10" : "",
               )}
             >
               {exportCopied ? (
@@ -378,6 +372,7 @@ ${bodyPart}})
                 valuePlaceholder="Value"
                 addLabel="Add Parameter"
                 emptyLabel="No parameters added yet"
+                showToggle
               />
             </AccordionContent>
           </AccordionItem>
@@ -398,10 +393,11 @@ ${bodyPart}})
               <KeyValueEditor
                 pairs={headers}
                 onChange={onHeadersChange}
-                keyPlaceholder="Header Name"
+                keyPlaceholder="Key"
                 valuePlaceholder="Value"
                 addLabel="Add Header"
                 emptyLabel="No headers added yet"
+                showToggle
               />
             </AccordionContent>
           </AccordionItem>
@@ -413,11 +409,7 @@ ${bodyPart}})
             onBodyTypeChange={onBodyTypeChange}
           />
 
-          <AuthSection
-            authType={authType}
-            authToken={authToken}
-            onAuthChange={onAuthChange}
-          />
+          <AuthSection authType={authType} authToken={authToken} onAuthChange={onAuthChange} />
 
           {/* Tests */}
           <AccordionItem value="tests" className="border border-border rounded-lg px-4">
@@ -555,7 +547,7 @@ function TestAssertionPanel({
               <Switch
                 checked={assertion.enabled}
                 onCheckedChange={(checked) => updateAssertion(index, { enabled: checked })}
-                className="data-[state=checked]:bg-emerald-500"
+                className="data-[state=checked]:bg-success"
               />
             </div>
             <div className="flex items-center gap-2 flex-wrap">

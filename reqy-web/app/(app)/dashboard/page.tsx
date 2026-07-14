@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import dynamic from "next/dynamic"
+import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Activity,
   ArrowUpRight,
@@ -15,13 +15,13 @@ import {
   Globe,
   ListFilter,
   BarChart2,
-} from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
-import { useRequestStore, type HistoryItem } from "@/hooks/use-request-store"
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { useRequestStore, type HistoryItem } from "@/hooks/use-request-store";
 
-const ChartsContent = dynamic(() => import("./charts-content"), { ssr: false })
+const ChartsContent = dynamic(() => import("./charts-content"), { ssr: false });
 
 const METHOD_COLORS: Record<string, string> = {
   GET: "#22c55e",
@@ -31,39 +31,45 @@ const METHOD_COLORS: Record<string, string> = {
   PATCH: "#8b5cf6",
   OPTIONS: "#6b7280",
   HEAD: "#06b6d4",
-}
+};
 
 const METHOD_BADGE: Record<string, string> = {
-  GET: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400",
+  GET: "bg-success/10 text-success",
   POST: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
-  PUT: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
-  DELETE: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
+  PUT: "bg-warning/10 text-warning",
+  DELETE: "bg-destructive/10 text-destructive",
   PATCH: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400",
   OPTIONS: "bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-400",
   HEAD: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-400",
-}
+};
 
 const STATUS_COLOR = (status: number) => {
-  if (status >= 500) return "text-red-500"
-  if (status >= 400) return "text-amber-500"
-  if (status >= 300) return "text-sky-500"
-  return "text-emerald-500"
-}
+  if (status >= 500) return "text-destructive";
+  if (status >= 400) return "text-warning";
+  if (status >= 300) return "text-sky-500";
+  return "text-success";
+};
 
-const formatDayLabel = (date: Date) => `${date.getDate()}/${date.getMonth() + 1}`
+const formatDayLabel = (date: Date) => `${date.getDate()}/${date.getMonth() + 1}`;
 
 const buildLastSevenDays = () => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(today)
-    date.setDate(today.getDate() - (6 - index))
-    const yyyy = date.getFullYear()
-    const mm = String(date.getMonth() + 1).padStart(2, "0")
-    const dd = String(date.getDate()).padStart(2, "0")
-    return { key: `${yyyy}-${mm}-${dd}`, label: formatDayLabel(date), count: 0, errors: 0, avgTime: 0 }
-  })
-}
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return {
+      key: `${yyyy}-${mm}-${dd}`,
+      label: formatDayLabel(date),
+      count: 0,
+      errors: 0,
+      avgTime: 0,
+    };
+  });
+};
 
 const buildRecentRequests = (history: HistoryItem[]) =>
   [...history]
@@ -74,20 +80,24 @@ const buildRecentRequests = (history: HistoryItem[]) =>
       endpoint: request.endpoint || request.url,
       status: request.responseStatus ?? 0,
       time: request.responseTime != null ? `${request.responseTime}ms` : "-",
-      timestamp: request.executedAt ? `${Math.round((Date.now() - request.executedAt) / 60000)}m ago` : "-",
-    }))
+      timestamp: request.executedAt
+        ? `${Math.round((Date.now() - request.executedAt) / 60000)}m ago`
+        : "-",
+    }));
 
 const buildTopSlowEndpoints = (history: HistoryItem[]) => {
-  const stats = history.reduce<Record<string, { totalTime: number; count: number; lastStatus: number }>>((acc, item) => {
-    const endpoint = item.endpoint || item.url || "Unknown"
-    if (item.responseTime == null) return acc
-    const existing = acc[endpoint] ?? { totalTime: 0, count: 0, lastStatus: 0 }
-    existing.totalTime += item.responseTime
-    existing.count += 1
-    existing.lastStatus = item.responseStatus ?? existing.lastStatus
-    acc[endpoint] = existing
-    return acc
-  }, {})
+  const stats = history.reduce<
+    Record<string, { totalTime: number; count: number; lastStatus: number }>
+  >((acc, item) => {
+    const endpoint = item.endpoint || item.url || "Unknown";
+    if (item.responseTime == null) return acc;
+    const existing = acc[endpoint] ?? { totalTime: 0, count: 0, lastStatus: 0 };
+    existing.totalTime += item.responseTime;
+    existing.count += 1;
+    existing.lastStatus = item.responseStatus ?? existing.lastStatus;
+    acc[endpoint] = existing;
+    return acc;
+  }, {});
 
   return Object.entries(stats)
     .map(([endpoint, data]) => ({
@@ -97,58 +107,66 @@ const buildTopSlowEndpoints = (history: HistoryItem[]) => {
       status: data.lastStatus >= 500 ? "critical" : data.lastStatus >= 400 ? "warning" : "healthy",
     }))
     .sort((a, b) => b.avgTime - a.avgTime)
-    .slice(0, 8)
-}
+    .slice(0, 8);
+};
 
 const buildMethodData = (history: HistoryItem[]) => {
-  const counts: Record<string, number> = {}
+  const counts: Record<string, number> = {};
   history.forEach((item) => {
-    const m = item.method || "GET"
-    counts[m] = (counts[m] ?? 0) + 1
-  })
+    const m = item.method || "GET";
+    counts[m] = (counts[m] ?? 0) + 1;
+  });
   return Object.entries(counts)
     .map(([method, count]) => ({ method, count, color: METHOD_COLORS[method] ?? "#6b7280" }))
-    .sort((a, b) => b.count - a.count)
-}
+    .sort((a, b) => b.count - a.count);
+};
 
 const buildStatusData = (history: HistoryItem[]) => {
-  const buckets: Record<string, number> = { "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0, "Other": 0 }
+  const buckets: Record<string, number> = { "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0, Other: 0 };
   history.forEach((item) => {
-    const s = item.responseStatus ?? 0
-    if (s >= 200 && s < 300) buckets["2xx"]++
-    else if (s >= 300 && s < 400) buckets["3xx"]++
-    else if (s >= 400 && s < 500) buckets["4xx"]++
-    else if (s >= 500) buckets["5xx"]++
-    else if (s > 0) buckets["Other"]++
-  })
+    const s = item.responseStatus ?? 0;
+    if (s >= 200 && s < 300) buckets["2xx"]++;
+    else if (s >= 300 && s < 400) buckets["3xx"]++;
+    else if (s >= 400 && s < 500) buckets["4xx"]++;
+    else if (s >= 500) buckets["5xx"]++;
+    else if (s > 0) buckets["Other"]++;
+  });
   const colors: Record<string, string> = {
     "2xx": "#22c55e",
     "3xx": "#06b6d4",
     "4xx": "#f59e0b",
     "5xx": "#ef4444",
-    "Other": "#6b7280",
-  }
+    Other: "#6b7280",
+  };
   return Object.entries(buckets)
     .filter(([, v]) => v > 0)
-    .map(([range, count]) => ({ range, count, color: colors[range] }))
-}
+    .map(([range, count]) => ({ range, count, color: colors[range] }));
+};
 
 export default function DashboardPage() {
-  const { history } = useRequestStore()
-  const [isSlowEndpointsOpen, setIsSlowEndpointsOpen] = useState(false)
-  const [isRecentRequestsOpen, setIsRecentRequestsOpen] = useState(false)
+  const { history } = useRequestStore();
+  const [isSlowEndpointsOpen, setIsSlowEndpointsOpen] = useState(false);
+  const [isRecentRequestsOpen, setIsRecentRequestsOpen] = useState(false);
 
-  const recentRequests = useMemo(() => buildRecentRequests(history), [history])
+  const recentRequests = useMemo(() => buildRecentRequests(history), [history]);
 
   const stats = useMemo(() => {
-    const totalRequests = history.length
-    const successfulRequests = history.filter((item) => item.responseStatus != null && item.responseStatus < 400).length
+    const totalRequests = history.length;
+    const successfulRequests = history.filter(
+      (item) => item.responseStatus != null && item.responseStatus < 400,
+    ).length;
     const avgResponseTime = history.length
-      ? Math.round(history.reduce((sum, item) => sum + (item.responseTime ?? 0), 0) / history.length)
-      : 0
-    const activeEndpoints = new Set(history.map((item) => item.endpoint || item.url)).size
-    const successRate = totalRequests ? +((successfulRequests / totalRequests) * 100).toFixed(1) : 0
-    const errorCount = history.filter((item) => item.responseStatus != null && item.responseStatus >= 400).length
+      ? Math.round(
+          history.reduce((sum, item) => sum + (item.responseTime ?? 0), 0) / history.length,
+        )
+      : 0;
+    const activeEndpoints = new Set(history.map((item) => item.endpoint || item.url)).size;
+    const successRate = totalRequests
+      ? +((successfulRequests / totalRequests) * 100).toFixed(1)
+      : 0;
+    const errorCount = history.filter(
+      (item) => item.responseStatus != null && item.responseStatus >= 400,
+    ).length;
 
     return [
       {
@@ -157,9 +175,9 @@ export default function DashboardPage() {
         sub: `${errorCount} error${errorCount !== 1 ? "s" : ""}`,
         trend: "up",
         icon: Activity,
-        accent: "from-emerald-500/15 to-transparent",
-        iconColor: "text-emerald-500",
-        iconBg: "bg-emerald-500/10",
+        accent: "from-success/15 to-transparent",
+        iconColor: "text-success",
+        iconBg: "bg-success/10",
       },
       {
         title: "Avg Response Time",
@@ -187,325 +205,381 @@ export default function DashboardPage() {
         sub: "unique URLs called",
         trend: "up",
         icon: Globe,
-        accent: "from-amber-500/15 to-transparent",
-        iconColor: "text-amber-500",
-        iconBg: "bg-amber-500/10",
+        accent: "from-warning/15 to-transparent",
+        iconColor: "text-warning",
+        iconBg: "bg-warning/10",
       },
-    ]
-  }, [history])
+    ];
+  }, [history]);
 
   const requestsByDay = useMemo(() => {
-    const buckets = buildLastSevenDays()
-    const indexByKey = Object.fromEntries(buckets.map((bucket, index) => [bucket.key, index]))
+    const buckets = buildLastSevenDays();
+    const indexByKey = Object.fromEntries(buckets.map((bucket, index) => [bucket.key, index]));
     history.forEach((item) => {
-      const executed = new Date(item.executedAt || item.createdAt || 0)
-      const yyyy = executed.getFullYear()
-      const mm = String(executed.getMonth() + 1).padStart(2, "0")
-      const dd = String(executed.getDate()).padStart(2, "0")
-      const key = `${yyyy}-${mm}-${dd}`
-      const bucketIndex = indexByKey[key]
-      if (bucketIndex === undefined) return
-      buckets[bucketIndex].count += 1
+      const executed = new Date(item.executedAt || item.createdAt || 0);
+      const yyyy = executed.getFullYear();
+      const mm = String(executed.getMonth() + 1).padStart(2, "0");
+      const dd = String(executed.getDate()).padStart(2, "0");
+      const key = `${yyyy}-${mm}-${dd}`;
+      const bucketIndex = indexByKey[key];
+      if (bucketIndex === undefined) return;
+      buckets[bucketIndex].count += 1;
       if (item.responseStatus != null && item.responseStatus >= 400) {
-        buckets[bucketIndex].errors += 1
+        buckets[bucketIndex].errors += 1;
       }
-      buckets[bucketIndex].avgTime += item.responseTime ?? 0
-    })
+      buckets[bucketIndex].avgTime += item.responseTime ?? 0;
+    });
     return buckets.map((bucket) => ({
       label: bucket.label,
       requests: bucket.count,
       errorRate: bucket.count ? +((bucket.errors / bucket.count) * 100).toFixed(1) : 0,
       avgTime: bucket.count ? Math.round(bucket.avgTime / bucket.count) : 0,
-    }))
-  }, [history])
+    }));
+  }, [history]);
 
-  const topSlowEndpoints = useMemo(() => buildTopSlowEndpoints(history), [history])
-  const methodData = useMemo(() => buildMethodData(history), [history])
-  const statusData = useMemo(() => buildStatusData(history), [history])
+  const topSlowEndpoints = useMemo(() => buildTopSlowEndpoints(history), [history]);
+  const methodData = useMemo(() => buildMethodData(history), [history]);
+  const statusData = useMemo(() => buildStatusData(history), [history]);
 
   const healthCounts = useMemo(() => {
-    const latestByEndpoint = new Map<string, HistoryItem>()
+    const latestByEndpoint = new Map<string, HistoryItem>();
     history.forEach((item) => {
-      const key = item.endpoint || item.url || "Unknown"
-      const existing = latestByEndpoint.get(key)
-      if (!existing || item.executedAt > existing.executedAt) latestByEndpoint.set(key, item)
-    })
-    let healthy = 0, warning = 0, critical = 0
+      const key = item.endpoint || item.url || "Unknown";
+      const existing = latestByEndpoint.get(key);
+      if (!existing || item.executedAt > existing.executedAt) latestByEndpoint.set(key, item);
+    });
+    let healthy = 0,
+      warning = 0,
+      critical = 0;
     latestByEndpoint.forEach((item) => {
-      if (item.responseStatus == null || item.responseStatus < 400) healthy += 1
-      else if (item.responseStatus < 500) warning += 1
-      else critical += 1
-    })
-    return { healthy, warning, critical }
-  }, [history])
+      if (item.responseStatus == null || item.responseStatus < 400) healthy += 1;
+      else if (item.responseStatus < 500) warning += 1;
+      else critical += 1;
+    });
+    return { healthy, warning, critical };
+  }, [history]);
 
-  const totalEndpoints = healthCounts.healthy + healthCounts.warning + healthCounts.critical || 1
-  const isEmpty = history.length === 0
+  const totalEndpoints = healthCounts.healthy + healthCounts.warning + healthCounts.critical || 1;
+  const isEmpty = history.length === 0;
 
   return (
     <>
-<main className="flex-1 overflow-auto p-6 hide-scrollbar">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              {isEmpty ? "Start sending requests to see your metrics" : `Monitoring ${history.length} request${history.length !== 1 ? "s" : ""} across ${new Set(history.map(h => h.endpoint || h.url)).size} endpoint${new Set(history.map(h => h.endpoint || h.url)).size !== 1 ? "s" : ""}`}
-            </p>
-          </div>
+      <main className="flex-1 overflow-auto p-6 hide-scrollbar">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {isEmpty
+              ? "Start sending requests to see your metrics"
+              : `Monitoring ${history.length} request${history.length !== 1 ? "s" : ""} across ${new Set(history.map((h) => h.endpoint || h.url)).size} endpoint${new Set(history.map((h) => h.endpoint || h.url)).size !== 1 ? "s" : ""}`}
+          </p>
+        </div>
 
-          {isEmpty ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-muted">
-                <Activity className="size-10 text-muted-foreground/40" />
-              </div>
-              <h2 className="text-xl font-semibold text-foreground">No data yet</h2>
-              <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                Start sending API requests to see your dashboard metrics, charts, and endpoint performance.
-              </p>
-              <a
-                href="/"
-                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
-              >
-                <Play className="size-4" />
-                Go to API Endpoints
-              </a>
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-muted">
+              <Activity className="size-10 text-muted-foreground/40" />
             </div>
-          ) : (
-            <div className="space-y-6">
-
-              {/* ── Row 1: Stat cards ── */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {stats.map((stat) => (
-                  <Card key={stat.title} className="bg-card overflow-hidden relative">
-                    {/* accent gradient */}
-                    <div className={`absolute inset-x-0 top-0 h-16 bg-gradient-to-b ${stat.accent} pointer-events-none`} />
-                    <CardHeader className="flex flex-row items-center justify-between pb-1 relative">
-                      <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        {stat.title}
-                      </CardTitle>
-                      <div className={`flex size-8 items-center justify-center rounded-lg ${stat.iconBg}`}>
-                        <stat.icon className={`size-4 ${stat.iconColor}`} />
-                      </div>
-                    </CardHeader>
-                    <CardContent className="relative">
-                      <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                        {stat.trend === "up" ? (
-                          <ArrowUpRight className="size-3 text-emerald-500 shrink-0" />
-                        ) : (
-                          <ArrowDownRight className="size-3 text-red-500 shrink-0" />
-                        )}
-                        <span>{stat.sub}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* ── Row 2: Charts ── */}
-              <ChartsContent data={requestsByDay} methodData={methodData} statusData={statusData} />
-
-              {/* ── Row 3: Recent Requests + Slowest Endpoints ── */}
-              <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-                {/* Recent Requests */}
-                <Card className="bg-card">
-                  <CardHeader className="flex flex-row items-center justify-between pb-3">
-                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <ListFilter className="size-4 text-muted-foreground" />
-                      Recent Requests
+            <h2 className="text-xl font-semibold text-foreground">No data yet</h2>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
+              Start sending API requests to see your dashboard metrics, charts, and endpoint
+              performance.
+            </p>
+            <a
+              href="/"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              <Play className="size-4" />
+              Go to API Endpoints
+            </a>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* ── Row 1: Stat cards ── */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {stats.map((stat) => (
+                <Card key={stat.title} className="bg-card overflow-hidden relative">
+                  {/* accent gradient */}
+                  <div
+                    className={`absolute inset-x-0 top-0 h-16 bg-gradient-to-b ${stat.accent} pointer-events-none`}
+                  />
+                  <CardHeader className="flex flex-row items-center justify-between pb-1 relative">
+                    <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {stat.title}
                     </CardTitle>
-                    <button
-                      className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-                      onClick={() => setIsRecentRequestsOpen(true)}
+                    <div
+                      className={`flex size-8 items-center justify-center rounded-lg ${stat.iconBg}`}
                     >
-                      View all
-                    </button>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {/* Table header */}
-                    <div className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-2 border-b border-border bg-muted/30">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Method</span>
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endpoint</span>
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">Status</span>
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">Time</span>
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">When</span>
+                      <stat.icon className={`size-4 ${stat.iconColor}`} />
                     </div>
-                    <div className="divide-y divide-border">
-                      {recentRequests.map((request) => (
-                        <div key={request.endpoint + request.timestamp} className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors">
-                          <span className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}>
-                            {request.method}
-                          </span>
-                          <span className="font-mono text-xs text-foreground truncate">{request.endpoint}</span>
-                          <span className={`text-xs font-semibold text-center ${STATUS_COLOR(request.status)}`}>
-                            {request.status || "—"}
-                          </span>
-                          <span className="text-xs text-muted-foreground text-right">{request.time}</span>
-                          <span className="text-xs text-muted-foreground text-right">{request.timestamp}</span>
-                        </div>
-                      ))}
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <div className="text-2xl font-bold text-foreground">{stat.value}</div>
+                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                      {stat.trend === "up" ? (
+                        <ArrowUpRight className="size-3 text-success shrink-0" />
+                      ) : (
+                        <ArrowDownRight className="size-3 text-destructive shrink-0" />
+                      )}
+                      <span>{stat.sub}</span>
                     </div>
                   </CardContent>
                 </Card>
+              ))}
+            </div>
 
-                {/* Slowest Endpoints */}
-                <Card className="bg-card">
-                  <CardHeader className="flex flex-row items-center justify-between pb-3">
-                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <Zap className="size-4 text-amber-500" />
-                      Slowest Endpoints
-                    </CardTitle>
-                    <button
-                      className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-                      onClick={() => setIsSlowEndpointsOpen(true)}
-                    >
-                      View all
-                    </button>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {topSlowEndpoints.map((endpoint, index) => {
-                      const maxTime = topSlowEndpoints[0]?.avgTime || 1
-                      const pct = Math.round((endpoint.avgTime / maxTime) * 100)
-                      return (
-                        <div key={endpoint.endpoint} className="space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-xs text-muted-foreground font-mono shrink-0 w-5 text-right">{index + 1}.</span>
-                              <p className="text-xs font-medium text-foreground truncate">{endpoint.endpoint}</p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${endpoint.status === "healthy" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : endpoint.status === "warning" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400" : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"}`}>
-                                {endpoint.status}
-                              </span>
-                              <span className="text-xs font-bold text-foreground w-16 text-right">{endpoint.avgTime}ms</span>
-                            </div>
-                          </div>
-                          <div className="metric-bar ml-7">
-                            <div
-                              className="metric-bar-fill"
-                              style={{
-                                width: `${pct}%`,
-                                background: endpoint.status === "healthy" ? "#22c55e" : endpoint.status === "warning" ? "#f59e0b" : "#ef4444",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </CardContent>
-                </Card>
-              </div>
+            {/* ── Row 2: Charts ── */}
+            <ChartsContent data={requestsByDay} methodData={methodData} statusData={statusData} />
 
-              {/* ── Row 4: Health Overview ── */}
+            {/* ── Row 3: Recent Requests + Slowest Endpoints ── */}
+            <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+              {/* Recent Requests */}
               <Card className="bg-card">
-                <CardHeader className="pb-3">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
                   <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <BarChart2 className="size-4 text-muted-foreground" />
-                    API Health Overview
+                    <ListFilter className="size-4 text-muted-foreground" />
+                    Recent Requests
                   </CardTitle>
+                  <button
+                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    onClick={() => setIsRecentRequestsOpen(true)}
+                  >
+                    View all
+                  </button>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    {/* Healthy */}
-                    <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-emerald-500/10 to-transparent p-5">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-3xl font-bold text-foreground">{healthCounts.healthy}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Healthy endpoints</p>
-                        </div>
-                        <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500/15">
-                          <CheckCircle2 className="size-5 text-emerald-500" />
-                        </div>
+                <CardContent className="p-0">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-2 border-b border-border bg-muted/30">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Method
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Endpoint
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">
+                      Status
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">
+                      Time
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">
+                      When
+                    </span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {recentRequests.map((request) => (
+                      <div
+                        key={request.endpoint + request.timestamp}
+                        className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors"
+                      >
+                        <span
+                          className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}
+                        >
+                          {request.method}
+                        </span>
+                        <span className="font-mono text-xs text-foreground truncate">
+                          {request.endpoint}
+                        </span>
+                        <span
+                          className={`text-xs font-semibold text-center ${STATUS_COLOR(request.status)}`}
+                        >
+                          {request.status || "—"}
+                        </span>
+                        <span className="text-xs text-muted-foreground text-right">
+                          {request.time}
+                        </span>
+                        <span className="text-xs text-muted-foreground text-right">
+                          {request.timestamp}
+                        </span>
                       </div>
-                      {/* Progress bar */}
-                      <div className="mt-4 h-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-emerald-500 transition-all duration-700"
-                          style={{ width: `${(healthCounts.healthy / totalEndpoints) * 100}%` }}
-                        />
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground text-right">
-                        {Math.round((healthCounts.healthy / totalEndpoints) * 100)}% of endpoints
-                      </p>
-                    </div>
-
-                    {/* Warning */}
-                    <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-amber-500/10 to-transparent p-5">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-3xl font-bold text-foreground">{healthCounts.warning}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Warning endpoints</p>
-                        </div>
-                        <div className="flex size-10 items-center justify-center rounded-full bg-amber-500/15">
-                          <AlertTriangle className="size-5 text-amber-500" />
-                        </div>
-                      </div>
-                      <div className="mt-4 h-1.5 rounded-full bg-amber-100 dark:bg-amber-950/50 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-amber-500 transition-all duration-700"
-                          style={{ width: `${(healthCounts.warning / totalEndpoints) * 100}%` }}
-                        />
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground text-right">
-                        {Math.round((healthCounts.warning / totalEndpoints) * 100)}% of endpoints
-                      </p>
-                    </div>
-
-                    {/* Critical */}
-                    <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-red-500/10 to-transparent p-5">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-3xl font-bold text-foreground">{healthCounts.critical}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Critical endpoints</p>
-                        </div>
-                        <div className="flex size-10 items-center justify-center rounded-full bg-red-500/15">
-                          <TrendingUp className="size-5 text-red-500" />
-                        </div>
-                      </div>
-                      <div className="mt-4 h-1.5 rounded-full bg-red-100 dark:bg-red-950/50 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-red-500 transition-all duration-700"
-                          style={{ width: `${(healthCounts.critical / totalEndpoints) * 100}%` }}
-                        />
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground text-right">
-                        {Math.round((healthCounts.critical / totalEndpoints) * 100)}% of endpoints
-                      </p>
-                    </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Slowest Endpoints */}
+              <Card className="bg-card">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Zap className="size-4 text-warning" />
+                    Slowest Endpoints
+                  </CardTitle>
+                  <button
+                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    onClick={() => setIsSlowEndpointsOpen(true)}
+                  >
+                    View all
+                  </button>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {topSlowEndpoints.map((endpoint, index) => {
+                    const maxTime = topSlowEndpoints[0]?.avgTime || 1;
+                    const pct = Math.round((endpoint.avgTime / maxTime) * 100);
+                    return (
+                      <div key={endpoint.endpoint} className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs text-muted-foreground font-mono shrink-0 w-5 text-right">
+                              {index + 1}.
+                            </span>
+                            <p className="text-xs font-medium text-foreground truncate">
+                              {endpoint.endpoint}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${endpoint.status === "healthy" ? "bg-success/10 text-success" : endpoint.status === "warning" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"}`}
+                            >
+                              {endpoint.status}
+                            </span>
+                            <span className="text-xs font-bold text-foreground w-16 text-right">
+                              {endpoint.avgTime}ms
+                            </span>
+                          </div>
+                        </div>
+                        <div className="metric-bar ml-7">
+                          <div
+                            className="metric-bar-fill"
+                            style={{
+                              width: `${pct}%`,
+                              background:
+                                endpoint.status === "healthy"
+                                  ? "#22c55e"
+                                  : endpoint.status === "warning"
+                                    ? "#f59e0b"
+                                    : "#ef4444",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
             </div>
-          )}
-        </main>
+
+            {/* ── Row 4: Health Overview ── */}
+            <Card className="bg-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <BarChart2 className="size-4 text-muted-foreground" />
+                  API Health Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {/* Healthy */}
+                  <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-success/15 to-transparent p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-foreground">{healthCounts.healthy}</p>
+                        <p className="text-sm text-muted-foreground mt-1">Healthy endpoints</p>
+                      </div>
+                      <div className="flex size-10 items-center justify-center rounded-full bg-success/15">
+                        <CheckCircle2 className="size-5 text-success" />
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="mt-4 h-1.5 rounded-full bg-success/20 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-success transition-all duration-700"
+                        style={{ width: `${(healthCounts.healthy / totalEndpoints) * 100}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground text-right">
+                      {Math.round((healthCounts.healthy / totalEndpoints) * 100)}% of endpoints
+                    </p>
+                  </div>
+
+                  {/* Warning */}
+                  <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-warning/15 to-transparent p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-foreground">{healthCounts.warning}</p>
+                        <p className="text-sm text-muted-foreground mt-1">Warning endpoints</p>
+                      </div>
+                      <div className="flex size-10 items-center justify-center rounded-full bg-warning/15">
+                        <AlertTriangle className="size-5 text-warning" />
+                      </div>
+                    </div>
+                    <div className="mt-4 h-1.5 rounded-full bg-warning/20 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-warning transition-all duration-700"
+                        style={{ width: `${(healthCounts.warning / totalEndpoints) * 100}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground text-right">
+                      {Math.round((healthCounts.warning / totalEndpoints) * 100)}% of endpoints
+                    </p>
+                  </div>
+
+                  {/* Critical */}
+                  <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-destructive/15 to-transparent p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-foreground">
+                          {healthCounts.critical}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">Critical endpoints</p>
+                      </div>
+                      <div className="flex size-10 items-center justify-center rounded-full bg-destructive/15">
+                        <TrendingUp className="size-5 text-destructive" />
+                      </div>
+                    </div>
+                    <div className="mt-4 h-1.5 rounded-full bg-destructive/20 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-destructive transition-all duration-700"
+                        style={{ width: `${(healthCounts.critical / totalEndpoints) * 100}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground text-right">
+                      {Math.round((healthCounts.critical / totalEndpoints) * 100)}% of endpoints
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </main>
 
       {/* Modals */}
       <Dialog open={isSlowEndpointsOpen} onOpenChange={setIsSlowEndpointsOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-0 p-0">
           <DialogHeader className="border-b px-6 py-4 shrink-0">
             <DialogTitle className="flex items-center gap-2">
-              <Zap className="size-4 text-amber-500" />
+              <Zap className="size-4 text-warning" />
               Slowest Endpoints
             </DialogTitle>
           </DialogHeader>
           <div className="overflow-auto p-6 space-y-3">
             {topSlowEndpoints.map((endpoint, index) => {
-              const maxTime = topSlowEndpoints[0]?.avgTime || 1
-              const pct = Math.round((endpoint.avgTime / maxTime) * 100)
+              const maxTime = topSlowEndpoints[0]?.avgTime || 1;
+              const pct = Math.round((endpoint.avgTime / maxTime) * 100);
               return (
-                <div key={endpoint.endpoint} className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                <div
+                  key={endpoint.endpoint}
+                  className="rounded-lg border border-border bg-muted/30 p-4 space-y-2"
+                >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-sm text-muted-foreground font-mono shrink-0">{index + 1}.</span>
+                      <span className="text-sm text-muted-foreground font-mono shrink-0">
+                        {index + 1}.
+                      </span>
                       <div className="min-w-0">
-                        <p className="font-medium text-foreground text-sm truncate">{endpoint.endpoint}</p>
-                        <p className="text-xs text-muted-foreground">{endpoint.requests} request{endpoint.requests !== 1 ? "s" : ""}</p>
+                        <p className="font-medium text-foreground text-sm truncate">
+                          {endpoint.endpoint}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {endpoint.requests} request{endpoint.requests !== 1 ? "s" : ""}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-base font-bold text-foreground">{endpoint.avgTime}ms</p>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${endpoint.status === "healthy" ? "bg-emerald-100 text-emerald-700" : endpoint.status === "warning" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${endpoint.status === "healthy" ? "bg-success/10 text-success" : endpoint.status === "warning" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"}`}
+                      >
                         {endpoint.status}
                       </span>
                     </div>
@@ -515,12 +589,17 @@ export default function DashboardPage() {
                       className="metric-bar-fill"
                       style={{
                         width: `${pct}%`,
-                        background: endpoint.status === "healthy" ? "#22c55e" : endpoint.status === "warning" ? "#f59e0b" : "#ef4444",
+                        background:
+                          endpoint.status === "healthy"
+                            ? "#22c55e"
+                            : endpoint.status === "warning"
+                              ? "#f59e0b"
+                              : "#ef4444",
                       }}
                     />
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         </DialogContent>
@@ -536,22 +615,45 @@ export default function DashboardPage() {
           </DialogHeader>
           <div className="overflow-auto">
             <div className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-2 border-b border-border bg-muted/30 sticky top-0">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Method</span>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endpoint</span>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">Status</span>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">Time</span>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">When</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Method
+              </span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Endpoint
+              </span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">
+                Status
+              </span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">
+                Time
+              </span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">
+                When
+              </span>
             </div>
             <div className="divide-y divide-border">
               {recentRequests.map((request) => (
-                <div key={request.endpoint + request.timestamp} className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors">
-                  <span className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}>
+                <div
+                  key={request.endpoint + request.timestamp}
+                  className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors"
+                >
+                  <span
+                    className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}
+                  >
                     {request.method}
                   </span>
-                  <span className="font-mono text-xs text-foreground truncate">{request.endpoint}</span>
-                  <span className={`text-xs font-semibold text-center ${STATUS_COLOR(request.status)}`}>{request.status || "—"}</span>
+                  <span className="font-mono text-xs text-foreground truncate">
+                    {request.endpoint}
+                  </span>
+                  <span
+                    className={`text-xs font-semibold text-center ${STATUS_COLOR(request.status)}`}
+                  >
+                    {request.status || "—"}
+                  </span>
                   <span className="text-xs text-muted-foreground text-right">{request.time}</span>
-                  <span className="text-xs text-muted-foreground text-right">{request.timestamp}</span>
+                  <span className="text-xs text-muted-foreground text-right">
+                    {request.timestamp}
+                  </span>
                 </div>
               ))}
             </div>
@@ -559,5 +661,5 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

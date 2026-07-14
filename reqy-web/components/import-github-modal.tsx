@@ -1,99 +1,120 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useState } from "react"
-import { Github, Loader2, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/hooks/use-toast"
-import type { SavedProject, AnalysisMode } from "@/lib/types"
+import { useCallback, useEffect, useState } from "react";
+import { Github, Loader2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
+import type { SavedProject, AnalysisMode } from "@/lib/types";
 
 interface ImportGithubModalProps {
-  open: boolean
-  onClose: () => void
-  onImport: (project: SavedProject) => void
+  open: boolean;
+  onClose: () => void;
+  onImport: (project: SavedProject) => void;
 }
 
 export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModalProps) {
-  const [repoUrl, setRepoUrl] = useState("")
-  const [isImporting, setIsImporting] = useState(false)
-  const [importStatus, setImportStatus] = useState<string | null>(null)
-  const [projectPreview, setProjectPreview] = useState<{ framework: string; language?: string; port?: number; routes: any[] } | null>(null)
-  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("static")
-  const [githubRepos, setGithubRepos] = useState<Array<{ id: number; full_name: string; name: string; owner: { login: string }; html_url: string; description?: string; default_branch: string }> | null>(null)
-  const [reposLoading, setReposLoading] = useState(false)
-  const [reposError, setReposError] = useState<string | null>(null)
+  const [repoUrl, setRepoUrl] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [projectPreview, setProjectPreview] = useState<{
+    framework: string;
+    language?: string;
+    port?: number;
+    routes: any[];
+  } | null>(null);
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("static");
+  const [githubRepos, setGithubRepos] = useState<Array<{
+    id: number;
+    full_name: string;
+    name: string;
+    owner: { login: string };
+    html_url: string;
+    description?: string;
+    default_branch: string;
+  }> | null>(null);
+  const [reposLoading, setReposLoading] = useState(false);
+  const [reposError, setReposError] = useState<string | null>(null);
 
   const parseGithubUrl = (url: string): { owner: string; repo: string; branch?: string } | null => {
     try {
       // Handle various GitHub URL formats
-      const cleaned = url.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "")
-      const parts = cleaned.split("/")
+      const cleaned = url.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
+      const parts = cleaned.split("/");
       if (parts.length >= 2) {
         return {
           owner: parts[0],
           repo: parts[1],
           branch: parts[3] === "tree" ? parts[4] : undefined,
-        }
+        };
       }
     } catch {
       // Ignore parse errors
     }
-    return null
-  }
+    return null;
+  };
 
   const fetchGithubRepos = useCallback(async () => {
-    setReposLoading(true)
-    setReposError(null)
+    setReposLoading(true);
+    setReposError(null);
     try {
-      const response = await fetch("/api/github-auth/repos")
+      const response = await fetch("/api/github-auth/repos");
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        setReposError(error.message || "Impossible de charger les dépôts GitHub")
-        setGithubRepos([])
-        return
+        const error = await response.json().catch(() => ({}));
+        setReposError(error.message || "Impossible de charger les dépôts GitHub");
+        setGithubRepos([]);
+        return;
       }
 
-      const data = await response.json()
-      setGithubRepos(data.repos || [])
+      const data = await response.json();
+      setGithubRepos(data.repos || []);
     } catch {
-      setReposError("Impossible de charger les dépôts GitHub")
-      setGithubRepos([])
+      setReposError("Impossible de charger les dépôts GitHub");
+      setGithubRepos([]);
     } finally {
-      setReposLoading(false)
+      setReposLoading(false);
     }
-  }, [])
+  }, []);
 
   const handleSelectRepo = (fullName: string) => {
-    setRepoUrl(`https://github.com/${fullName}`)
-    setProjectPreview(null)
-    setImportStatus(null)
-  }
+    setRepoUrl(`https://github.com/${fullName}`);
+    setProjectPreview(null);
+    setImportStatus(null);
+  };
 
   useEffect(() => {
-    let cleanupTimeout: number | undefined
+    let cleanupTimeout: number | undefined;
 
     if (!open) {
       cleanupTimeout = window.setTimeout(() => {
-        setGithubRepos(null)
-        setReposError(null)
-      }, 0)
+        setGithubRepos(null);
+        setReposError(null);
+      }, 0);
       return () => {
         if (cleanupTimeout) {
-          window.clearTimeout(cleanupTimeout)
+          window.clearTimeout(cleanupTimeout);
         }
-      }
+      };
     }
 
-    const fetchTimeout = window.setTimeout(() => fetchGithubRepos(), 0)
-    return () => window.clearTimeout(fetchTimeout)
-  }, [open, fetchGithubRepos])
+    const fetchTimeout = window.setTimeout(() => fetchGithubRepos(), 0);
+    return () => window.clearTimeout(fetchTimeout);
+  }, [open, fetchGithubRepos]);
 
   const handleImport = async () => {
     if (projectPreview) {
       const project: SavedProject = {
         id: `proj-${Date.now()}`,
-        name: projectPreview.framework === "unknown" ? repoUrl : `${projectPreview.framework} project`,
+        name:
+          projectPreview.framework === "unknown" ? repoUrl : `${projectPreview.framework} project`,
         framework: projectPreview.framework,
         language: projectPreview.language || undefined,
         folderPath: `github:${repoUrl}`,
@@ -101,25 +122,31 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
         routes: projectPreview.routes,
         analyzedAt: new Date().toISOString(),
         mode: analysisMode,
-      }
+      };
 
-      onImport(project)
-      toast({ title: `Projet "${project.name}" importé avec ${project.routes.length} routes`, meta: { event: "importExport" } } as any)
-      onClose()
-      setRepoUrl("")
-      setProjectPreview(null)
-      setImportStatus(null)
-      return
+      onImport(project);
+      toast({
+        title: `Projet "${project.name}" importé avec ${project.routes.length} routes`,
+        meta: { event: "importExport" },
+      } as any);
+      onClose();
+      setRepoUrl("");
+      setProjectPreview(null);
+      setImportStatus(null);
+      return;
     }
 
-    const parsed = parseGithubUrl(repoUrl)
+    const parsed = parseGithubUrl(repoUrl);
     if (!parsed) {
-      toast({ title: "URL GitHub invalide. Format: https://github.com/owner/repo", variant: "destructive" })
-      return
+      toast({
+        title: "URL GitHub invalide. Format: https://github.com/owner/repo",
+        variant: "destructive",
+      });
+      return;
     }
 
-    setIsImporting(true)
-    setImportStatus("Analyse du dépôt...")
+    setIsImporting(true);
+    setImportStatus("Analyse du dépôt...");
 
     try {
       const response = await fetch(`/api/github-import`, {
@@ -130,30 +157,34 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
           repo: parsed.repo,
           branch: parsed.branch,
         }),
-      })
+      });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.message || "Erreur lors de l'import du dépôt")
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "Erreur lors de l'import du dépôt");
       }
 
-      const data = await response.json()
+      const data = await response.json();
       setProjectPreview({
         framework: data.framework || "unknown",
         language: data.language || undefined,
         port: data.port,
         routes: data.routes || [],
-      })
-      setImportStatus("Aperçu du projet prêt")
+      });
+      setImportStatus("Aperçu du projet prêt");
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Erreur lors de l'import", variant: "destructive", meta: { event: "importExport" } } as any)
-      setProjectPreview(null)
+      toast({
+        title: err instanceof Error ? err.message : "Erreur lors de l'import",
+        variant: "destructive",
+        meta: { event: "importExport" },
+      } as any);
+      setProjectPreview(null);
     } finally {
-      setIsImporting(false)
+      setIsImporting(false);
     }
-  }
+  };
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -164,26 +195,21 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
             <Github className="size-5 text-primary" />
             <h2 className="text-lg font-semibold">Importer depuis GitHub</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-          >
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="size-4" />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1.5 block">
-              URL du dépôt GitHub
-            </label>
+            <label className="text-sm font-medium mb-1.5 block">URL du dépôt GitHub</label>
             <Input
               placeholder="https://github.com/owner/repo"
               value={repoUrl}
               onChange={(e) => {
-                setRepoUrl(e.target.value)
-                setProjectPreview(null)
-                setImportStatus(null)
+                setRepoUrl(e.target.value);
+                setProjectPreview(null);
+                setImportStatus(null);
               }}
               disabled={isImporting}
             />
@@ -208,9 +234,9 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
                 <Select
                   value={repoUrl.startsWith("https://github.com/") ? repoUrl : ""}
                   onValueChange={(value) => {
-                    setRepoUrl(value)
-                    setProjectPreview(null)
-                    setImportStatus(null)
+                    setRepoUrl(value);
+                    setProjectPreview(null);
+                    setImportStatus(null);
                   }}
                 >
                   <SelectTrigger className="w-full" size="sm">
@@ -221,49 +247,39 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
                       <SelectItem key={repo.id} value={`https://github.com/${repo.full_name}`}>
                         <div className="flex flex-col gap-0.5">
                           <span className="font-medium">{repo.full_name}</span>
-                          <span className="text-xs text-muted-foreground">{repo.default_branch}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {repo.default_branch}
+                          </span>
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Choisis un dépôt pour pré-remplir l’URL et lancer l’analyse.</p>
+                <p className="text-xs text-muted-foreground">
+                  Choisis un dépôt pour pré-remplir l’URL et lancer l’analyse.
+                </p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Connectez-vous dans les paramètres pour afficher vos dépôts GitHub.</p>
+              <p className="text-sm text-muted-foreground">
+                Connectez-vous dans les paramètres pour afficher vos dépôts GitHub.
+              </p>
             )}
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">
-              Méthode d'analyse
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAnalysisMode("static")}
-                disabled={isImporting}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                  analysisMode === "static"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-background text-foreground hover:border-primary/50"
-                }`}
-              >
+            <label className="text-sm font-medium mb-2 block">Méthode d'analyse</label>
+            <ToggleGroup
+              type="single"
+              value={analysisMode}
+              onValueChange={(value) => value && setAnalysisMode(value as AnalysisMode)}
+            >
+              <ToggleGroupItem value="static" className="flex-1">
                 Statique
-              </button>
-              <button
-                type="button"
-                onClick={() => setAnalysisMode("ai")}
-                disabled={isImporting}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                  analysisMode === "ai"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-background text-foreground hover:border-primary/50"
-                }`}
-              >
+              </ToggleGroupItem>
+              <ToggleGroupItem value="ai" className="flex-1">
                 IA
-              </button>
-            </div>
+              </ToggleGroupItem>
+            </ToggleGroup>
             <p className="text-xs text-muted-foreground mt-1.5">
               {analysisMode === "static"
                 ? "Détecte les routes par regex (plus rapide)"
@@ -280,25 +296,28 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
 
           {projectPreview && (
             <div className="rounded-2xl border border-border/50 bg-muted/10 p-4 text-sm text-foreground">
-              <p><strong>Langage détecté :</strong> {projectPreview.language ?? "Inconnu"}</p>
-              <p><strong>Framework :</strong> {projectPreview.framework}</p>
-              <p><strong>Routes :</strong> {projectPreview.routes.length}</p>
-              {projectPreview.port && <p><strong>Port :</strong> {projectPreview.port}</p>}
+              <p>
+                <strong>Langage détecté :</strong> {projectPreview.language ?? "Inconnu"}
+              </p>
+              <p>
+                <strong>Framework :</strong> {projectPreview.framework}
+              </p>
+              <p>
+                <strong>Routes :</strong> {projectPreview.routes.length}
+              </p>
+              {projectPreview.port && (
+                <p>
+                  <strong>Port :</strong> {projectPreview.port}
+                </p>
+              )}
             </div>
           )}
 
           <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={onClose}
-              disabled={isImporting}
-            >
+            <Button variant="ghost" onClick={onClose} disabled={isImporting}>
               Annuler
             </Button>
-            <Button
-              onClick={handleImport}
-              disabled={!repoUrl || isImporting}
-            >
+            <Button onClick={handleImport} disabled={!repoUrl || isImporting}>
               {isImporting && <Loader2 className="size-4 mr-2 animate-spin" />}
               {projectPreview ? "Importer le projet" : "Analyser"}
             </Button>
@@ -306,5 +325,5 @@ export function ImportGithubModal({ open, onClose, onImport }: ImportGithubModal
         </div>
       </div>
     </div>
-  )
+  );
 }

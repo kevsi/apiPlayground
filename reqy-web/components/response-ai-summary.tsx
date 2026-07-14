@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { memo } from "react"
-import { Sparkles } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { memo } from "react";
+import { Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ResponseAiSummaryProps {
-  aiSummary?: string
-  aiError?: string
-  aiIsLoading?: boolean
+  aiSummary?: string;
+  aiError?: string;
+  aiIsLoading?: boolean;
 }
 
 export const ResponseAiSummary = memo(function ResponseAiSummary({
@@ -15,26 +15,38 @@ export const ResponseAiSummary = memo(function ResponseAiSummary({
   aiError,
   aiIsLoading = false,
 }: ResponseAiSummaryProps) {
-  if (!aiSummary && !aiError && !aiIsLoading) return null
+  if (!aiSummary && !aiError && !aiIsLoading) return null;
 
   return (
-    <div className={cn(
-      "border-b border-border px-4 py-3 transition-all duration-300 animate-slide-up",
-      aiIsLoading && "bg-primary/[0.02]"
-    )}>
+    <div
+      className={cn(
+        "border-b border-border px-4 py-3 transition-all duration-300 animate-slide-up",
+        aiIsLoading && "bg-primary/[0.02]",
+      )}
+    >
       <div className="flex items-start gap-3">
-        <div className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-full",
-          aiIsLoading ? "bg-primary/10" : aiError ? "bg-red-500/10" : "bg-primary/10"
-        )}>
-          <Sparkles className={cn(
-            "size-4",
-            aiIsLoading ? "text-primary animate-pulse" : aiError ? "text-red-500" : "text-primary"
-          )} />
+        <div
+          className={cn(
+            "flex size-7 shrink-0 items-center justify-center rounded-full",
+            aiIsLoading ? "bg-primary/10" : aiError ? "bg-destructive/10" : "bg-primary/10",
+          )}
+        >
+          <Sparkles
+            className={cn(
+              "size-4",
+              aiIsLoading
+                ? "text-primary animate-pulse"
+                : aiError
+                  ? "text-destructive"
+                  : "text-primary",
+            )}
+          />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">AI Summary</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+              AI Summary
+            </span>
             {aiIsLoading && (
               <span className="flex items-center gap-1 text-[10px] text-primary">
                 <span className="size-1.5 rounded-full bg-primary animate-pulse" />
@@ -48,8 +60,8 @@ export const ResponseAiSummary = memo(function ResponseAiSummary({
               <div className="shimmer h-3 w-3/4 rounded" />
             </div>
           ) : aiError ? (
-            <div className="rounded-lg border border-red-500/10 bg-red-500/5 px-3 py-2">
-              <p className="text-xs text-red-400/90">{aiError}</p>
+            <div className="rounded-lg border border-destructive/10 bg-destructive/5 px-3 py-2">
+              <p className="text-xs text-destructive/90">{aiError}</p>
             </div>
           ) : (
             <div className="rounded-lg border border-primary/10 bg-primary/[0.02] px-3 py-2">
@@ -59,5 +71,5 @@ export const ResponseAiSummary = memo(function ResponseAiSummary({
         </div>
       </div>
     </div>
-  )
-})
+  );
+});

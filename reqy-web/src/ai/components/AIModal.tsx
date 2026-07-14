@@ -17,7 +17,6 @@ import {
   FileText,
   FlaskConical,
   Lightbulb,
-  CheckCircle2,
   Settings,
   Key,
 } from "lucide-react";
@@ -41,7 +40,12 @@ import {
 } from "@/components/ui/select";
 import { analyze } from "@/src/ai/local-engine/analyzer";
 import { buildRequestContext } from "@/src/ai/local-engine/context";
-import { buildTestSuggestionsPrompt, isValidSuggestion } from "@/src/ai/cloud-engine/test-suggestions";
+import { Panel } from "./Panel";
+import type { Diagnostic, RequestPayload } from "@/src/ai/types";
+import {
+  buildTestSuggestionsPrompt,
+  isValidSuggestion,
+} from "@/src/ai/cloud-engine/test-suggestions";
 import {
   decodeJwt,
   explainHeader,
@@ -49,7 +53,13 @@ import {
   summarizeAnnotated,
 } from "@/src/ai/cloud-engine/explain";
 import { buildNaturalLanguagePrompt } from "@/src/ai/cloud-engine/generate";
-import { streamLLM, type StreamLLMOptions, type LLMToken, type LLMTextEvent, type LLMToolCallEvent } from "@/src/ai/cloud-engine/llm";
+import {
+  streamLLM,
+  type StreamLLMOptions,
+  type LLMToken,
+  type LLMTextEvent,
+  type LLMToolCallEvent,
+} from "@/src/ai/cloud-engine/llm";
 import { extractCitations } from "@/src/ai/cloud-engine/citations";
 import { detectLanguage } from "@/src/ai/cloud-engine/language";
 import { cn } from "@/lib/utils";
@@ -66,7 +76,11 @@ import {
 } from "@/lib/config";
 import { REQLY_TOOLS, executeToolCall, maskSensitiveObject } from "@/lib/llm-tools";
 import type { ToolCall, ToolResult } from "@/lib/llm-tools";
-import { AssistantStepsRenderer, buildStep, type AssistantStep } from "@/components/assistant-steps-renderer";
+import {
+  AssistantStepsRenderer,
+  buildStep,
+  type AssistantStep,
+} from "@/components/assistant-steps-renderer";
 
 type AiTab = "analyse" | "assistant" | "explain";
 
@@ -79,6 +93,7 @@ export interface AIModalContext {
   responseHeaders?: Record<string, string>;
   responseBody?: string;
   authToken?: string;
+  onPatchRequest?: (patch: Partial<RequestPayload>) => void;
 }
 
 interface AIModalProps extends AIModalContext {
@@ -87,9 +102,24 @@ interface AIModalProps extends AIModalContext {
 }
 
 const TABS: Array<{ id: AiTab; label: string; icon: typeof Sparkles; desc: string }> = [
-  { id: "analyse", label: "Analyse", icon: Sparkles, desc: "Diagnostic local instantané — repère les problèmes courants (auth manquante, CORS, etc.)" },
-  { id: "assistant", label: "Assistant", icon: Bot, desc: "Génère des tests, débugge les erreurs, optimise les appels, ou répond à tes questions" },
-  { id: "explain", label: "Explain", icon: FileText, desc: "Décode les headers JWT, explique la structure JSON et les en-têtes de réponse" },
+  {
+    id: "analyse",
+    label: "Analyse",
+    icon: Sparkles,
+    desc: "Diagnostic local instantané — repère les problèmes courants (auth manquante, CORS, etc.)",
+  },
+  {
+    id: "assistant",
+    label: "Assistant",
+    icon: Bot,
+    desc: "Génère des tests, débugge les erreurs, optimise les appels, ou répond à tes questions",
+  },
+  {
+    id: "explain",
+    label: "Explain",
+    icon: FileText,
+    desc: "Décode les headers JWT, explique la structure JSON et les en-têtes de réponse",
+  },
 ];
 
 export function AIModal(props: AIModalProps) {
@@ -110,10 +140,12 @@ export function AIModal(props: AIModalProps) {
 
   // Refs pour la boucle multi-turn — persistentes entre handleRunLLM et handleConfirmToolCall
   const accRef = useRef("");
-  const previousTurnsRef = useRef<Array<{
-    assistantToolCalls: ToolCall[];
-    toolResults: ToolResult[];
-  }>>([]);
+  const previousTurnsRef = useRef<
+    Array<{
+      assistantToolCalls: ToolCall[];
+      toolResults: ToolResult[];
+    }>
+  >([]);
   const turnCountRef = useRef(0);
   const baseOptsRef = useRef<Omit<StreamLLMOptions, "previousTurns"> | null>(null);
   const MAX_TOOL_TURNS = 5;
@@ -146,7 +178,7 @@ export function AIModal(props: AIModalProps) {
             duration: 0,
             size: 0,
           }
-        : undefined
+        : undefined,
     );
   }, [
     props.method,
@@ -213,14 +245,17 @@ export function AIModal(props: AIModalProps) {
     if (!baseOptsRef.current) return;
     const turnNum = turnCountRef.current;
     if (turnNum >= MAX_TOOL_TURNS) {
-      setLlmError("L'assistant a atteint la limite de 5 tours d'outils. Certaines actions peuvent être incomplètes.");
+      setLlmError(
+        "L'assistant a atteint la limite de 5 tours d'outils. Certaines actions peuvent être incomplètes.",
+      );
       setLlmLoading(false);
       return;
     }
 
     const opts: StreamLLMOptions = {
       ...baseOptsRef.current,
-      previousTurns: previousTurnsRef.current.length > 0 ? [...previousTurnsRef.current] : undefined,
+      previousTurns:
+        previousTurnsRef.current.length > 0 ? [...previousTurnsRef.current] : undefined,
     };
 
     const stream = streamLLM(opts);
@@ -252,9 +287,17 @@ export function AIModal(props: AIModalProps) {
     // Créer les étapes "en attente"
     const turnSteps: AssistantStep[] = toolCallsThisTurn.map((tc) => {
       let safeArgs: Record<string, unknown> = {};
-      try { safeArgs = JSON.parse(tc.arguments); } catch { /* ignore */ }
+      try {
+        safeArgs = JSON.parse(tc.arguments);
+      } catch {
+        /* ignore */
+      }
       const masked = maskSensitiveObject(safeArgs);
-      return buildStep({ kind: "tool_call", label: `${tc.name}(${JSON.stringify(masked)})`, status: "pending" });
+      return buildStep({
+        kind: "tool_call",
+        label: `${tc.name}(${JSON.stringify(masked)})`,
+        status: "pending",
+      });
     });
     setSteps((prev) => [...prev, ...turnSteps]);
 
@@ -263,13 +306,26 @@ export function AIModal(props: AIModalProps) {
     for (let i = 0; i < toolCallsThisTurn.length; i++) {
       const tc = toolCallsThisTurn[i];
       try {
-        const result = await executeToolCall({ id: tc.callId, name: tc.name, arguments: tc.arguments });
+        const result = await executeToolCall({
+          id: tc.callId,
+          name: tc.name,
+          arguments: tc.arguments,
+        });
         results.push(result);
         setSteps((prev) =>
-          prev.map((s) => (s.id === turnSteps[i]?.id ? { ...s, status: result.error ? ("error" as const) : ("done" as const) } : s)),
+          prev.map((s) =>
+            s.id === turnSteps[i]?.id
+              ? { ...s, status: result.error ? ("error" as const) : ("done" as const) }
+              : s,
+          ),
         );
       } catch (e: any) {
-        results.push({ callId: tc.callId, name: tc.name, content: "", error: e?.message ?? "Erreur inconnue" });
+        results.push({
+          callId: tc.callId,
+          name: tc.name,
+          content: "",
+          error: e?.message ?? "Erreur inconnue",
+        });
         setSteps((prev) =>
           prev.map((s) => (s.id === turnSteps[i]?.id ? { ...s, status: "error" as const } : s)),
         );
@@ -284,7 +340,11 @@ export function AIModal(props: AIModalProps) {
       setSteps((prev) =>
         prev.map((s) =>
           s.id === targetStepId
-            ? { ...s, status: "awaiting_confirmation" as const, label: `⚠ ${targetTc.name} — confirmation requise` }
+            ? {
+                ...s,
+                status: "awaiting_confirmation" as const,
+                label: `⚠ ${targetTc.name} — confirmation requise`,
+              }
             : s,
         ),
       );
@@ -303,7 +363,11 @@ export function AIModal(props: AIModalProps) {
     previousTurnsRef.current = [
       ...previousTurnsRef.current,
       {
-        assistantToolCalls: toolCallsThisTurn.map((tc) => ({ id: tc.callId, name: tc.name, arguments: tc.arguments })),
+        assistantToolCalls: toolCallsThisTurn.map((tc) => ({
+          id: tc.callId,
+          name: tc.name,
+          arguments: tc.arguments,
+        })),
         toolResults: results,
       },
     ];
@@ -313,68 +377,82 @@ export function AIModal(props: AIModalProps) {
     runOneTurn();
   }
 
-  const handleConfirmToolCall = useCallback(async (stepId: string, confirmed: boolean) => {
-    const pending = pendingConfirmation;
-    if (!pending || pending.stepId !== stepId) return;
+  const handleConfirmToolCall = useCallback(
+    async (stepId: string, confirmed: boolean) => {
+      const pending = pendingConfirmation;
+      if (!pending || pending.stepId !== stepId) return;
 
-    const { toolCall, toolCallsThisTurn, results, turnSteps } = pending;
-    setPendingConfirmation(null);
+      const { toolCall, toolCallsThisTurn, results, turnSteps } = pending;
+      setPendingConfirmation(null);
 
-    // Marquer l'étape "en cours" pendant la ré-exécution
-    setSteps((prev) =>
-      prev.map((s) => (s.id === stepId ? { ...s, status: "pending" as const } : s)),
-    );
-
-    try {
-      const result = await executeToolCall(
-        { id: toolCall.callId, name: toolCall.name, arguments: toolCall.arguments },
-        confirmed,
-      );
-
-      // Vérifier result.error après exécution confirmée
-      const hasError = !confirmed ? false : !!result.error;
+      // Marquer l'étape "en cours" pendant la ré-exécution
       setSteps((prev) =>
-        prev.map((s) =>
-          s.id === stepId
-            ? {
-                ...s,
-                status: hasError ? ("error" as const) : ("done" as const),
-                label: confirmed
-                  ? hasError
-                    ? `❌ ${toolCall.name} : ${result.error}`
-                    : `✅ ${toolCall.name}`
-                  : `⛔ ${toolCall.name} (annulé)`,
-              }
-            : s,
-        ),
+        prev.map((s) => (s.id === stepId ? { ...s, status: "pending" as const } : s)),
       );
 
-      // Si annulé, propager error: "Action annulée par l'utilisateur"
-      const finalResult: ToolResult = confirmed
-        ? result
-        : { callId: toolCall.callId, name: toolCall.name, content: "", error: "Action annulée par l'utilisateur" };
+      try {
+        const result = await executeToolCall(
+          { id: toolCall.callId, name: toolCall.name, arguments: toolCall.arguments },
+          confirmed,
+        );
 
-      // Remplacer le placeholder requireConfirmation par le vrai résultat
-      const updatedResults = results.map((r) => (r.requireConfirmation ? finalResult : r));
+        // Vérifier result.error après exécution confirmée
+        const hasError = !confirmed ? false : !!result.error;
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.id === stepId
+              ? {
+                  ...s,
+                  status: hasError ? ("error" as const) : ("done" as const),
+                  label: confirmed
+                    ? hasError
+                      ? `❌ ${toolCall.name} : ${result.error}`
+                      : `✅ ${toolCall.name}`
+                    : `⛔ ${toolCall.name} (annulé)`,
+                }
+              : s,
+          ),
+        );
 
-      // Pousser ce tour dans l'historique
-      previousTurnsRef.current = [
-        ...previousTurnsRef.current,
-        {
-          assistantToolCalls: toolCallsThisTurn.map((tc) => ({ id: tc.callId, name: tc.name, arguments: tc.arguments })),
-          toolResults: updatedResults,
-        },
-      ];
-      turnCountRef.current += 1;
+        // Si annulé, propager error: "Action annulée par l'utilisateur"
+        const finalResult: ToolResult = confirmed
+          ? result
+          : {
+              callId: toolCall.callId,
+              name: toolCall.name,
+              content: "",
+              error: "Action annulée par l'utilisateur",
+            };
 
-      // Reprendre la boucle multi-turn
-      runOneTurn();
-    } catch (e: any) {
-      setSteps((prev) => prev.map((s) => (s.id === stepId ? { ...s, status: "error" as const } : s)));
-      setLlmError(e?.message ?? "Erreur lors de la confirmation");
-      setLlmLoading(false);
-    }
-  }, [pendingConfirmation]);
+        // Remplacer le placeholder requireConfirmation par le vrai résultat
+        const updatedResults = results.map((r) => (r.requireConfirmation ? finalResult : r));
+
+        // Pousser ce tour dans l'historique
+        previousTurnsRef.current = [
+          ...previousTurnsRef.current,
+          {
+            assistantToolCalls: toolCallsThisTurn.map((tc) => ({
+              id: tc.callId,
+              name: tc.name,
+              arguments: tc.arguments,
+            })),
+            toolResults: updatedResults,
+          },
+        ];
+        turnCountRef.current += 1;
+
+        // Reprendre la boucle multi-turn
+        runOneTurn();
+      } catch (e: any) {
+        setSteps((prev) =>
+          prev.map((s) => (s.id === stepId ? { ...s, status: "error" as const } : s)),
+        );
+        setLlmError(e?.message ?? "Erreur lors de la confirmation");
+        setLlmLoading(false);
+      }
+    },
+    [pendingConfirmation],
+  );
 
   async function handleRunLLM() {
     if (!prompt) return;
@@ -433,6 +511,19 @@ export function AIModal(props: AIModalProps) {
     setTimeout(() => setCopied(false), 1500);
   }
 
+  const handleApplyFix = useCallback(
+    (diag: Diagnostic) => {
+      if (!diag.fix) return;
+      if (props.onPatchRequest) {
+        props.onPatchRequest(diag.fix.applyFix());
+        toast.success("Fix appliqué", { description: diag.title });
+      } else {
+        toast.info("Aucune cible de patch disponible pour cette requête.");
+      }
+    },
+    [props.onPatchRequest],
+  );
+
   const isLocalTab = activeTab === "analyse" || activeTab === "explain";
 
   return (
@@ -468,7 +559,7 @@ export function AIModal(props: AIModalProps) {
                   "inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
                   active
                     ? "border-b-2 border-primary text-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 data-testid={`ai-tab-${t.id}`}
               >
@@ -487,46 +578,7 @@ export function AIModal(props: AIModalProps) {
         {/* Content */}
         <div className="min-h-[260px] max-h-[420px] overflow-y-auto p-1">
           {activeTab === "analyse" && (
-            <div className="space-y-2">
-              {diagnostics.length === 0 ? (
-                <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-700">
-                  <CheckCircle2 className="size-4" />
-                  Aucun problème détecté — tout semble nominal.
-                </div>
-              ) : (
-                diagnostics.map((d) => (
-                  <div
-                    key={d.id}
-                    className="rounded-lg border border-border bg-card p-3 space-y-1"
-                    data-testid={`ai-diagnostic-${d.id}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "text-[10px] font-bold uppercase px-1.5 py-0.5 rounded",
-                          d.severity === "error" && "bg-red-500/20 text-red-700",
-                          d.severity === "warning" && "bg-amber-500/20 text-amber-700",
-                          d.severity === "info" && "bg-blue-500/20 text-blue-700"
-                        )}
-                      >
-                        {d.severity}
-                      </span>
-                      <span className="text-sm font-semibold">{d.title}</span>
-                      <span className="ml-auto text-[10px] text-muted-foreground font-mono">
-                        {d.id}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{d.explanation}</p>
-                    {d.fix && (
-                      <p className="text-xs">
-                        <span className="font-semibold">Fix: </span>
-                        {d.fix.description}
-                      </p>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+            <Panel diagnostics={diagnostics} onApplyFix={handleApplyFix} />
           )}
 
           {activeTab === "explain" && (
@@ -534,7 +586,7 @@ export function AIModal(props: AIModalProps) {
               responseHeaders={props.responseHeaders}
               responseBody={props.responseBody}
               authHeader={Object.entries(props.responseHeaders ?? {}).find(
-                ([k]) => k.toLowerCase() === "authorization"
+                ([k]) => k.toLowerCase() === "authorization",
               )}
             />
           )}
@@ -543,8 +595,8 @@ export function AIModal(props: AIModalProps) {
             <div className="space-y-3">
               {/* Inline config when no API key */}
               {showConfig && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-warning">
                     <Key className="size-3.5" />
                     Configure ta clé API pour utiliser l'assistant
                   </div>
@@ -570,8 +622,12 @@ export function AIModal(props: AIModalProps) {
                       onChange={(e) => setConfigApiKey(e.target.value)}
                       className="flex-1 h-9 text-xs"
                     />
-                    <Button size="sm" variant="default" onClick={handleSaveConfig}
-                      className="h-9 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={handleSaveConfig}
+                      className="h-9 shrink-0"
+                    >
                       <Key className="size-3 mr-1" />
                       OK
                     </Button>
@@ -584,9 +640,10 @@ export function AIModal(props: AIModalProps) {
                 <Textarea
                   value={userPrompt}
                   onChange={(e) => setUserPrompt(e.target.value)}
-                  placeholder={props.responseStatus != null && props.responseStatus >= 400
-                    ? "Explique l'erreur et propose un correctif..."
-                    : "Génère des assertions de test, optimise la requête, ou pose une question..."
+                  placeholder={
+                    props.responseStatus != null && props.responseStatus >= 400
+                      ? "Explique l'erreur et propose un correctif..."
+                      : "Génère des assertions de test, optimise la requête, ou pose une question..."
                   }
                   rows={3}
                   className="resize-none text-sm flex-1 [field-sizing:fixed]"
@@ -616,7 +673,7 @@ export function AIModal(props: AIModalProps) {
               </div>
 
               {llmError && (
-                <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-2 text-xs text-red-600">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-2 text-xs text-destructive">
                   {llmError}
                 </div>
               )}
@@ -674,12 +731,7 @@ export function AIModal(props: AIModalProps) {
             </Button>
           )}
           <div className="flex-1" />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => props.onOpenChange(false)}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenChange(false)}>
             Fermer
           </Button>
         </DialogFooter>
@@ -710,7 +762,11 @@ function ExplainTab({
     if (!responseBody) return null;
     try {
       const parsed = JSON.parse(responseBody);
-      return { ok: true, tree: annotateJson(parsed), summary: summarizeAnnotated(annotateJson(parsed)) };
+      return {
+        ok: true,
+        tree: annotateJson(parsed),
+        summary: summarizeAnnotated(annotateJson(parsed)),
+      };
     } catch {
       return null;
     }
@@ -721,10 +777,10 @@ function ExplainTab({
       {jwtInfo && (
         <div className="rounded-lg border border-border bg-card p-3 space-y-1">
           <p className="text-xs font-semibold flex items-center gap-1.5">
-            <Lightbulb className="size-3 text-amber-500" />
+            <Lightbulb className="size-3 text-warning" />
             JWT détecté dans Authorization
             {jwtInfo.expired && (
-              <span className="ml-auto text-[10px] font-bold uppercase rounded bg-red-500/20 text-red-700 px-1.5 py-0.5">
+              <span className="ml-auto text-[10px] font-bold uppercase rounded bg-destructive/20 text-destructive px-1.5 py-0.5">
                 expiré
               </span>
             )}
@@ -733,7 +789,7 @@ function ExplainTab({
             {JSON.stringify(
               { header: jwtInfo.header, payload: jwtInfo.payload, exp: jwtInfo.expiresAt },
               null,
-              2
+              2,
             )}
           </pre>
         </div>
@@ -756,7 +812,9 @@ function ExplainTab({
                   {ex.warnings.length > 0 && (
                     <ul className="pl-3 space-y-0.5">
                       {ex.warnings.map((w, i) => (
-                        <li key={i} className="text-amber-600">⚠ {w}</li>
+                        <li key={i} className="text-warning">
+                          ⚠ {w}
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -772,9 +830,7 @@ function ExplainTab({
       {jsonAnnotation?.ok && jsonAnnotation.tree && (
         <div className="rounded-lg border border-border bg-card p-3 space-y-1">
           <p className="text-xs font-semibold">Structure JSON</p>
-          <p className="text-[10px] font-mono text-muted-foreground">
-            {jsonAnnotation.summary}
-          </p>
+          <p className="text-[10px] font-mono text-muted-foreground">{jsonAnnotation.summary}</p>
         </div>
       )}
     </div>

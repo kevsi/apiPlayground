@@ -166,7 +166,7 @@ export function ApiSidebar({
           {!collapsed && (
             <>
               <span className="font-medium">Ask Monu AI</span>
-              <span className="ml-auto flex size-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50 group-hover/ai:animate-pulse" />
+              <span className="ml-auto flex size-2 rounded-full bg-success shadow-sm shadow-success/50 group-hover/ai:animate-pulse" />
             </>
           )}
         </Link>

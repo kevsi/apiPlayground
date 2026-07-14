@@ -1,16 +1,10 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useCallback } from "react"
-import {
-  Loader2,
-  RefreshCw,
-  X,
-  Check,
-  AlertCircle,
-} from "lucide-react"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, RefreshCw, X, Check, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -18,34 +12,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
-import type { ProviderInfo } from "./ai-provider-card"
-import {
-  STATIC_MODELS,
-  ANTHROPIC_NO_FETCH,
-  fetchModelsByProvider,
-} from "@/lib/provider-models"
-import type { ModelOption } from "@/lib/provider-models"
-import { useTestConnection } from "@/hooks/use-test-connection"
-import { ModelSearchList } from "@/components/settings/model-search-list"
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import type { ProviderInfo } from "./ai-provider-card";
+import { STATIC_MODELS, ANTHROPIC_NO_FETCH, fetchModelsByProvider } from "@/lib/provider-models";
+import type { ModelOption } from "@/lib/provider-models";
+import { useTestConnection } from "@/hooks/use-test-connection";
+import { ModelSearchList } from "@/components/settings/model-search-list";
 
 interface AiProviderModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  providerInfo: ProviderInfo
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  providerInfo: ProviderInfo;
   // Current saved values
-  currentApiKey: string
-  currentModel: string
-  currentBaseUrl: string
+  currentApiKey: string;
+  currentModel: string;
+  currentBaseUrl: string;
   // Save handler
-  onSave: (config: {
-    apiKey: string
-    model: string
-    baseUrl: string
-  }) => void
+  onSave: (config: { apiKey: string; model: string; baseUrl: string }) => void;
   // Delete handler
-  onDelete?: () => void
+  onDelete?: () => void;
 }
 
 export function AiProviderModal({
@@ -58,104 +44,102 @@ export function AiProviderModal({
   onSave,
   onDelete,
 }: AiProviderModalProps) {
-  const provider = providerInfo.value
-  const isCustom = provider === "custom"
+  const provider = providerInfo.value;
+  const isCustom = provider === "custom";
 
   // -- Form state --
-  const [apiKey, setApiKey] = useState(currentApiKey)
-  const [baseUrl, setBaseUrl] = useState(currentBaseUrl)
-  const [selectedModel, setSelectedModel] = useState(currentModel)
+  const [apiKey, setApiKey] = useState(currentApiKey);
+  const [baseUrl, setBaseUrl] = useState(currentBaseUrl);
+  const [selectedModel, setSelectedModel] = useState(currentModel);
 
   // -- Model fetching state --
-  const [models, setModels] = useState<ModelOption[]>([])
-  const [loadingModels, setLoadingModels] = useState(false)
-  const [modelsFetched, setModelsFetched] = useState(false)
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelsFetched, setModelsFetched] = useState(false);
 
   // -- Test connection --
-  const { testLoading, testResult, testConnection, clearTestResult } = useTestConnection()
+  const { testLoading, testResult, testConnection, clearTestResult } = useTestConnection();
 
   // Reset form when modal opens with different provider
   useEffect(() => {
     if (open) {
-      setApiKey(currentApiKey)
-      setBaseUrl(currentBaseUrl)
-      setSelectedModel(currentModel)
-      setModels([])
-      setModelsFetched(false)
-      setLoadingModels(false)
-      clearTestResult()
+      setApiKey(currentApiKey);
+      setBaseUrl(currentBaseUrl);
+      setSelectedModel(currentModel);
+      setModels([]);
+      setModelsFetched(false);
+      setLoadingModels(false);
+      clearTestResult();
     }
-  }, [open, provider, currentApiKey, currentModel, currentBaseUrl, clearTestResult])
+  }, [open, provider, currentApiKey, currentModel, currentBaseUrl, clearTestResult]);
 
   // Auto-fetch models after typing API key (same as existing AISection)
   useEffect(() => {
-    if (!apiKey || provider === "ollama" || ANTHROPIC_NO_FETCH.has(provider)) return
-    if (isCustom && !baseUrl.trim()) return
+    if (!apiKey || provider === "ollama" || ANTHROPIC_NO_FETCH.has(provider)) return;
+    if (isCustom && !baseUrl.trim()) return;
 
     const timeout = setTimeout(() => {
-      void handleFetchModels()
-    }, 1000)
+      void handleFetchModels();
+    }, 1000);
 
-    return () => clearTimeout(timeout)
+    return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, provider, baseUrl])
+  }, [apiKey, provider, baseUrl]);
 
   const handleFetchModels = useCallback(async () => {
-    if (loadingModels) return
-    setLoadingModels(true)
+    if (loadingModels) return;
+    setLoadingModels(true);
     try {
-      let result: ModelOption[]
+      let result: ModelOption[];
 
       if (ANTHROPIC_NO_FETCH.has(provider)) {
-        result = STATIC_MODELS[provider] ?? []
-        toast.info("Liste statique utilisée (pas d'endpoint public).")
+        result = STATIC_MODELS[provider] ?? [];
+        toast.info("Liste statique utilisée (pas d'endpoint public).");
       } else {
-        result = await fetchModelsByProvider({ provider, apiKey, baseUrl, isCustom })
+        result = await fetchModelsByProvider({ provider, apiKey, baseUrl, isCustom });
       }
 
       // Merge with any manually added models
       setModels((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id))
-        const newModels = result.filter((m) => !existingIds.has(m.id))
-        return [...prev, ...newModels]
-      })
-      setModelsFetched(true)
+        const existingIds = new Set(prev.map((m) => m.id));
+        const newModels = result.filter((m) => !existingIds.has(m.id));
+        return [...prev, ...newModels];
+      });
+      setModelsFetched(true);
       if (result.length > 0) {
-        toast.success(`${result.length} modèles chargés.`)
+        toast.success(`${result.length} modèles chargés.`);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      const fallback = STATIC_MODELS[provider] ?? []
+      const message = err instanceof Error ? err.message : String(err);
+      const fallback = STATIC_MODELS[provider] ?? [];
       if (fallback.length > 0) {
         setModels((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id))
-          const newModels = fallback.filter((m) => !existingIds.has(m.id))
-          return [...prev, ...newModels]
-        })
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newModels = fallback.filter((m) => !existingIds.has(m.id));
+          return [...prev, ...newModels];
+        });
       }
-      setModelsFetched(true)
+      setModelsFetched(true);
       toast.warning(
         `Échec du chargement (${message}).${
-          fallback.length > 0
-            ? ` Fallback sur ${fallback.length} modèles statiques.`
-            : ""
+          fallback.length > 0 ? ` Fallback sur ${fallback.length} modèles statiques.` : ""
         }`,
-      )
+      );
     } finally {
-      setLoadingModels(false)
+      setLoadingModels(false);
     }
-  }, [provider, apiKey, baseUrl, isCustom, loadingModels])
+  }, [provider, apiKey, baseUrl, isCustom, loadingModels]);
 
   const handleAddModel = useCallback((modelId: string) => {
-    setModels((prev) => [...prev, { id: modelId, label: modelId }])
-    setSelectedModel(modelId)
-    toast.success(`Modèle "${modelId}" ajouté.`)
-  }, [])
+    setModels((prev) => [...prev, { id: modelId, label: modelId }]);
+    setSelectedModel(modelId);
+    toast.success(`Modèle "${modelId}" ajouté.`);
+  }, []);
 
   const handleRemoveModel = useCallback((modelId: string) => {
-    setModels((prev) => prev.filter((m) => m.id !== modelId))
-    setSelectedModel((prev) => (prev === modelId ? "" : prev))
-  }, [])
+    setModels((prev) => prev.filter((m) => m.id !== modelId));
+    setSelectedModel((prev) => (prev === modelId ? "" : prev));
+  }, []);
 
   const handleTestClick = useCallback(() => {
     void testConnection({
@@ -164,23 +148,23 @@ export function AiProviderModal({
       model: selectedModel,
       baseUrl,
       isCustom,
-    })
-  }, [testConnection, provider, apiKey, selectedModel, baseUrl, isCustom])
+    });
+  }, [testConnection, provider, apiKey, selectedModel, baseUrl, isCustom]);
 
   const handleSave = () => {
     onSave({
       apiKey,
       model: selectedModel,
       baseUrl: isCustom ? baseUrl : "",
-    })
-    onOpenChange(false)
-  }
+    });
+    onOpenChange(false);
+  };
 
-  const hasApiKey = Boolean(apiKey || provider === "ollama")
-  const hasModel = Boolean(selectedModel || provider === "ollama")
+  const hasApiKey = Boolean(apiKey || provider === "ollama");
+  const hasModel = Boolean(selectedModel || provider === "ollama");
 
-  const FallbackIcon = providerInfo.fallbackIcon
-  const hasIconPath = !!providerInfo.iconPath
+  const FallbackIcon = providerInfo.fallbackIcon;
+  const hasIconPath = !!providerInfo.iconPath;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -220,9 +204,7 @@ export function AiProviderModal({
           {/* Base URL - only for custom provider */}
           {isCustom && (
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Base URL
-              </label>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Base URL</label>
               <Input
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
@@ -237,17 +219,13 @@ export function AiProviderModal({
 
           {/* API Key */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Clé API
-            </label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Clé API</label>
             <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={
-                provider === "ollama"
-                  ? "Non requis (exécution locale)"
-                  : "Entrez votre clé API"
+                provider === "ollama" ? "Non requis (exécution locale)" : "Entrez votre clé API"
               }
               disabled={provider === "ollama"}
             />
@@ -281,8 +259,8 @@ export function AiProviderModal({
             className={cn(
               "flex items-center gap-2 px-6 py-2.5 text-sm border-t border-dashed max-w-full",
               testResult.success
-                ? "bg-emerald-50/50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-800/50"
-                : "bg-red-50/50 text-red-700 dark:bg-red-950/30 dark:text-red-400 border-red-200/50 dark:border-red-800/50",
+                ? "bg-success/10 text-success border-success/30"
+                : "bg-destructive/10 text-destructive border-destructive/30",
             )}
           >
             {testResult.success ? (
@@ -290,7 +268,10 @@ export function AiProviderModal({
             ) : (
               <AlertCircle className="size-4 shrink-0" />
             )}
-            <span className="flex-1 max-w-[180px] text-xs leading-relaxed" title={testResult.message}>
+            <span
+              className="flex-1 max-w-[180px] text-xs leading-relaxed"
+              title={testResult.message}
+            >
               {testResult.message}
             </span>
             <button
@@ -326,12 +307,7 @@ export function AiProviderModal({
                 variant="outline"
                 size="sm"
                 onClick={handleTestClick}
-                disabled={
-                  testLoading ||
-                  !hasApiKey ||
-                  !hasModel ||
-                  (isCustom && !baseUrl.trim())
-                }
+                disabled={testLoading || !hasApiKey || !hasModel || (isCustom && !baseUrl.trim())}
               >
                 {testLoading ? (
                   <>
@@ -345,11 +321,7 @@ export function AiProviderModal({
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                size="sm"
-              >
+              <Button variant="outline" onClick={() => onOpenChange(false)} size="sm">
                 Annuler
               </Button>
               <Button onClick={handleSave} size="sm">
@@ -360,5 +332,5 @@ export function AiProviderModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

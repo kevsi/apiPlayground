@@ -7,13 +7,10 @@
  * if one exists. No-op visually while the request is in-flight.
  */
 import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import {
-  rateDiagnostic,
-  getRating,
-  type Rating,
-} from "@/src/ai/cloud-engine/feedback-store";
+import { rateDiagnostic, getRating, type Rating } from "@/src/ai/cloud-engine/feedback-store";
 
 export interface RatingButtonsProps {
   diagnosticId: string;
@@ -40,36 +37,38 @@ export function RatingButtons({ diagnosticId, className }: RatingButtonsProps) {
       data-testid="rating-buttons"
       data-rating={rating ?? "none"}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => handleClick("up")}
         aria-label="Diagnostic utile"
         aria-pressed={rating === "up"}
         title="Ce diagnostic m'a aidé"
         className={cn(
-          "inline-flex size-6 items-center justify-center rounded transition-colors",
+          "size-6 rounded [&_svg]:size-3",
           rating === "up"
-            ? "bg-emerald-500/20 text-emerald-600"
-            : "text-muted-foreground/60 hover:bg-emerald-500/10 hover:text-emerald-600"
+            ? "bg-success/20 text-success"
+            : "text-muted-foreground/60 hover:bg-success/10 hover:text-success",
         )}
       >
         <ThumbsUp className="size-3" />
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => handleClick("down")}
         aria-label="Diagnostic inutile"
         aria-pressed={rating === "down"}
         title="Ce diagnostic n'est pas pertinent"
         className={cn(
-          "inline-flex size-6 items-center justify-center rounded transition-colors",
+          "size-6 rounded [&_svg]:size-3",
           rating === "down"
-            ? "bg-red-500/20 text-red-600"
-            : "text-muted-foreground/60 hover:bg-red-500/10 hover:text-red-600"
+            ? "bg-destructive/20 text-destructive"
+            : "text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive",
         )}
       >
         <ThumbsDown className="size-3" />
-      </button>
+      </Button>
     </div>
   );
 }

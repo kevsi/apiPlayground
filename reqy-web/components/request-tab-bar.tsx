@@ -1,43 +1,54 @@
-"use client"
+"use client";
 
-import { ChevronLeft, ChevronRight, CheckCircle, Clock, Copy, Folder, List, Plus, Save, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import {
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle,
+  Clock,
+  Copy,
+  Folder,
+  List,
+  Plus,
+  Save,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
-import type { RequestTab } from "@/lib/request-executor"
-import { methodColors, getMethodDotClass } from "@/lib/request-tab-utils"
-import type { TabContextMenu } from "@/hooks/use-request-tabs-state"
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import type { RequestTab } from "@/lib/request-executor";
+import { methodColors, getMethodDotClass } from "@/lib/request-tab-utils";
+import type { TabContextMenu } from "@/hooks/use-request-tabs-state";
 
 interface RequestTabBarProps {
-  tabs: RequestTab[]
-  activeTabId: string
-  canScrollLeft: boolean
-  canScrollRight: boolean
-  tabListRef: React.RefObject<HTMLDivElement | null>
-  contextMenu: TabContextMenu | null
-  onSelectTab: (tabId: string) => void
-  onScroll: (direction: "left" | "right") => void
-  onAddTab: () => void
-  onCloseTab: (id: string, e: React.MouseEvent) => void
-  onContextMenu: (menu: TabContextMenu) => void
-  onCloseContextMenu: () => void
-  onSaveActiveTab: () => void
-  onDuplicateTab: (tab: RequestTab) => void
-  onCloseOthers: (id: string) => void
-  onCloseToRight: (id: string) => void
-  onCloseAllTabs: () => void
-  onSaveAllTabs: () => void
+  tabs: RequestTab[];
+  activeTabId: string;
+  canScrollLeft: boolean;
+  canScrollRight: boolean;
+  tabListRef: React.RefObject<HTMLDivElement | null>;
+  contextMenu: TabContextMenu | null;
+  onSelectTab: (tabId: string) => void;
+  onScroll: (direction: "left" | "right") => void;
+  onAddTab: () => void;
+  onCloseTab: (id: string, e: React.MouseEvent) => void;
+  onContextMenu: (menu: TabContextMenu) => void;
+  onCloseContextMenu: () => void;
+  onSaveActiveTab: () => void;
+  onDuplicateTab: (tab: RequestTab) => void;
+  onCloseOthers: (id: string) => void;
+  onCloseToRight: (id: string) => void;
+  onCloseAllTabs: () => void;
+  onSaveAllTabs: () => void;
   // Phase HTTP-2: 4 quick-action icons for the active tab, moved here from
   // request-active-toolbar (the toolbar was removed entirely).
-  onOpenCollections: () => void
-  onDuplicateActive: () => void
-  onSaveActive: () => void
-  onOpenHistory: () => void
+  onOpenCollections: () => void;
+  onDuplicateActive: () => void;
+  onSaveActive: () => void;
+  onOpenHistory: () => void;
 }
 
 export function RequestTabBar({
@@ -64,7 +75,7 @@ export function RequestTabBar({
   onSaveActive,
   onOpenHistory,
 }: RequestTabBarProps) {
-  const hasActiveTab = tabs.some((t) => t.id === activeTabId)
+  const hasActiveTab = tabs.some((t) => t.id === activeTabId);
 
   return (
     <>
@@ -80,7 +91,11 @@ export function RequestTabBar({
             <ChevronLeft className="size-3.5" />
           </button>
         )}
-        <div ref={tabListRef} role="tablist" className="flex flex-1 items-center gap-1 overflow-hidden px-1.5">
+        <div
+          ref={tabListRef}
+          role="tablist"
+          className="flex flex-1 items-center gap-1 overflow-hidden px-1.5"
+        >
           {tabs.map((tab) => (
             <div
               key={tab.id}
@@ -90,14 +105,14 @@ export function RequestTabBar({
               aria-controls={`tabpanel-${tab.id}`}
               onClick={() => onSelectTab(tab.id)}
               onContextMenu={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                onContextMenu({ tabId: tab.id, x: e.clientX, y: e.clientY })
+                e.preventDefault();
+                e.stopPropagation();
+                onContextMenu({ tabId: tab.id, x: e.clientX, y: e.clientY });
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  onSelectTab(tab.id)
+                  e.preventDefault();
+                  onSelectTab(tab.id);
                 }
               }}
               className={cn(
@@ -108,13 +123,18 @@ export function RequestTabBar({
               )}
             >
               {activeTabId === tab.id && <div className="tab-active-bar" />}
-              <span className={cn("size-1.5 rounded-full shrink-0", getMethodDotClass(tab.method))} />
+              <span
+                className={cn("size-1.5 rounded-full shrink-0", getMethodDotClass(tab.method))}
+              />
               <span className="max-w-[200px] truncate text-sm font-medium">{tab.name}</span>
               {!tab.isSaved && (
-                <span title="Unsaved — Ctrl+S to save" className="size-1.5 rounded-full bg-orange-400/80 shrink-0" />
+                <span
+                  title="Unsaved — Ctrl+S to save"
+                  className="size-1.5 rounded-full bg-warning/80 shrink-0"
+                />
               )}
               {tab.isSaved && tab.hasResponse && (
-                <span className="size-1.5 rounded-full bg-emerald-500/60 shrink-0" />
+                <span className="size-1.5 rounded-full bg-success/60 shrink-0" />
               )}
               <button
                 type="button"
@@ -203,9 +223,13 @@ export function RequestTabBar({
                   onSelect={() => onSelectTab(tab.id)}
                   className="gap-2 text-xs cursor-pointer"
                 >
-                  <span className={cn("method-pill shrink-0", methodColors[tab.method])}>{tab.method}</span>
+                  <span className={cn("method-pill shrink-0", methodColors[tab.method])}>
+                    {tab.method}
+                  </span>
                   <span className="truncate flex-1">{tab.name}</span>
-                  {tab.id === activeTabId && <CheckCircle className="size-3 text-primary shrink-0" />}
+                  {tab.id === activeTabId && (
+                    <CheckCircle className="size-3 text-primary shrink-0" />
+                  )}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -232,8 +256,8 @@ export function RequestTabBar({
           <button
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             onClick={() => {
-              onSaveActiveTab()
-              onCloseContextMenu()
+              onSaveActiveTab();
+              onCloseContextMenu();
             }}
           >
             <Save className="size-3.5" />
@@ -242,9 +266,9 @@ export function RequestTabBar({
           <button
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             onClick={() => {
-              const tab = tabs.find((t) => t.id === contextMenu.tabId)
-              if (tab) onDuplicateTab(tab)
-              onCloseContextMenu()
+              const tab = tabs.find((t) => t.id === contextMenu.tabId);
+              if (tab) onDuplicateTab(tab);
+              onCloseContextMenu();
             }}
           >
             <Copy className="size-3.5" />
@@ -254,8 +278,8 @@ export function RequestTabBar({
           <button
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             onClick={() => {
-              onCloseTab(contextMenu.tabId, { stopPropagation: () => {} } as React.MouseEvent)
-              onCloseContextMenu()
+              onCloseTab(contextMenu.tabId, { stopPropagation: () => {} } as React.MouseEvent);
+              onCloseContextMenu();
             }}
           >
             <X className="size-3.5" />
@@ -264,8 +288,8 @@ export function RequestTabBar({
           <button
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             onClick={() => {
-              onCloseOthers(contextMenu.tabId)
-              onCloseContextMenu()
+              onCloseOthers(contextMenu.tabId);
+              onCloseContextMenu();
             }}
           >
             <X className="size-3.5" />
@@ -274,8 +298,8 @@ export function RequestTabBar({
           <button
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             onClick={() => {
-              onCloseToRight(contextMenu.tabId)
-              onCloseContextMenu()
+              onCloseToRight(contextMenu.tabId);
+              onCloseContextMenu();
             }}
           >
             <X className="size-3.5" />
@@ -284,8 +308,8 @@ export function RequestTabBar({
           <button
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             onClick={() => {
-              onCloseAllTabs()
-              onCloseContextMenu()
+              onCloseAllTabs();
+              onCloseContextMenu();
             }}
           >
             <X className="size-3.5" />
@@ -295,8 +319,8 @@ export function RequestTabBar({
           <button
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
             onClick={() => {
-              onSaveAllTabs()
-              onCloseContextMenu()
+              onSaveAllTabs();
+              onCloseContextMenu();
             }}
           >
             <Save className="size-3.5" />
@@ -305,5 +329,5 @@ export function RequestTabBar({
         </div>
       )}
     </>
-  )
+  );
 }

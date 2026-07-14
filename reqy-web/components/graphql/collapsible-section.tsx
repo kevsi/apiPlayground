@@ -1,28 +1,28 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ChevronDown, ChevronUp, X, AlertCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { useState } from "react";
+import { ChevronDown, ChevronUp, X, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface Props {
   /** Section title shown in the header (e.g. "Variables", "Headers", "Builder") */
-  title: string
+  title: string;
   /** Optional count badge (e.g. number of variables / headers) */
-  count?: number
+  count?: number;
   /** Show a small red dot if true */
-  error?: boolean
+  error?: boolean;
   /** Whether the section body is initially visible (defaults to true) */
-  defaultOpen?: boolean
+  defaultOpen?: boolean;
   /** Optional close handler — if provided, an X button is rendered */
-  onClose?: () => void
+  onClose?: () => void;
   /** Extra small description next to the title */
-  hint?: string
+  hint?: string;
   /** Optional max-height class for the body content (defaults to 40vh) */
-  bodyMaxHeightClass?: string
+  bodyMaxHeightClass?: string;
   /** Extra class for the outer wrapper */
-  className?: string
-  children: React.ReactNode
+  className?: string;
+  children: React.ReactNode;
 }
 
 /**
@@ -46,9 +46,12 @@ export function CollapsibleSection({
   className,
   children,
 }: Props) {
-  const [open, setOpen] = useState(defaultOpen)
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={cn("border-b bg-background", className)} data-testid={`collapsible-${title.toLowerCase()}`}>
+    <div
+      className={cn("border-b bg-background", className)}
+      data-testid={`collapsible-${title.toLowerCase()}`}
+    >
       <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/20">
         <button
           type="button"
@@ -72,15 +75,13 @@ export function CollapsibleSection({
           )}
           {error && (
             <AlertCircle
-              className="w-3.5 h-3.5 text-red-500 shrink-0"
+              className="w-3.5 h-3.5 text-destructive shrink-0"
               data-testid={`collapsible-error-${title.toLowerCase()}`}
               aria-label="Invalid input"
             />
           )}
           {hint && (
-            <span className="text-[10px] text-muted-foreground truncate shrink-0">
-              {hint}
-            </span>
+            <span className="text-[10px] text-muted-foreground truncate shrink-0">{hint}</span>
           )}
         </button>
         {onClose && (
@@ -96,9 +97,7 @@ export function CollapsibleSection({
           </Button>
         )}
       </div>
-      {open && (
-        <div className={cn("overflow-auto", bodyMaxHeightClass)}>{children}</div>
-      )}
+      {open && <div className={cn("overflow-auto", bodyMaxHeightClass)}>{children}</div>}
     </div>
-  )
+  );
 }

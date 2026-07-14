@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, Copy, Users, UserPlus, AlertCircle, Shield, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,9 +48,12 @@ function formatDate(ts: number): string {
 export default function WorkspacesPage() {
   const workspaces = useRequestStore((s) => s.workspaces);
   const fetchWorkspacesFromApi = useRequestStore((s) => s.fetchWorkspacesFromApi);
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinInput, setJoinInput] = useState("");
   const [membersOpen, setMembersOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -161,10 +165,20 @@ export default function WorkspacesPage() {
             Organize your team, share collections, and manage access.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          New Workspace
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            data-testid="join-workspace-button"
+            variant="outline"
+            onClick={() => setJoinOpen(true)}
+          >
+            <UserPlus className="mr-2 size-4" />
+            Join Workspace
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            New Workspace
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6 space-y-6">
@@ -204,9 +218,9 @@ export default function WorkspacesPage() {
                           className={cn(
                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
                             ws.role === "owner"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                              ? "bg-success/10 text-success"
                               : ws.role
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                ? "bg-warning/10 text-warning"
                                 : "bg-muted text-muted-foreground",
                           )}
                         >
@@ -320,8 +334,8 @@ export default function WorkspacesPage() {
                     className={cn(
                       "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
                       m.role === "owner"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
+                        ? "bg-success/10 text-success"
+                        : "bg-warning/10 text-warning",
                     )}
                   >
                     {m.role}
@@ -392,6 +406,51 @@ export default function WorkspacesPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Join Workspace Dialog */}
+      <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rejoindre un workspace</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Collez le lien d'invitation ou le jeton fourni par l'administrateur du workspace.
+          </p>
+          <Input
+            value={joinInput}
+            onChange={(e) => setJoinInput(e.target.value)}
+            placeholder="https://.../join?token=abc ou jeton"
+            className="h-9"
+          />
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setJoinOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={!joinInput.trim()}
+              onClick={() => {
+                const raw = joinInput.trim();
+                let token = raw;
+                try {
+                  if (raw.includes("token=")) {
+                    const url = new URL(
+                      raw.includes("://") ? raw : `https://x/?${raw.split("?")[1] ?? ""}`,
+                    );
+                    token = url.searchParams.get("token") || raw;
+                  }
+                } catch {
+                  token = raw;
+                }
+                setJoinOpen(false);
+                setJoinInput("");
+                router.push(`/join?token=${encodeURIComponent(token)}`);
+              }}
+            >
+              Continuer
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -1,11 +1,17 @@
-"use client"
+"use client";
 
-import React from "react"
-import { Eye, Code, FileImage, FileText, Music, Video, BarChart3, Check, Copy } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import DOMPurify from "dompurify"
+import React from "react";
+import { Eye, Code, FileImage, FileText, Music, Video, BarChart3, Check, Copy } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import DOMPurify from "dompurify";
 import {
   type ResponseFormat,
   getContentType,
@@ -21,9 +27,13 @@ import {
   highlightMarkup,
   extractVideoUrls,
   extractImageUrls,
-} from "./response-utils"
+} from "./response-utils";
 
-const formatOptions: Array<{ value: ResponseFormat; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+const formatOptions: Array<{
+  value: ResponseFormat;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
   { value: "pretty", label: "Pretty", icon: Eye },
   { value: "raw", label: "Raw", icon: Code },
   { value: "preview", label: "Preview", icon: Eye },
@@ -36,15 +46,15 @@ const formatOptions: Array<{ value: ResponseFormat; label: string; icon: React.C
   { value: "binary", label: "Binary", icon: FileImage },
   { value: "audio", label: "Audio", icon: Music },
   { value: "video", label: "Video", icon: Video },
-]
+];
 
 interface ResponseContentRendererProps {
-  responseBody?: string
-  responseData?: string | Blob
-  responseHeaders?: Record<string, string>
-  responseFormat: ResponseFormat
-  onFormatChange: (format: ResponseFormat) => void
-  mediaUrl: string | null
+  responseBody?: string;
+  responseData?: string | Blob;
+  responseHeaders?: Record<string, string>;
+  responseFormat: ResponseFormat;
+  onFormatChange: (format: ResponseFormat) => void;
+  mediaUrl: string | null;
 }
 
 export function ResponseContentRenderer({
@@ -55,10 +65,10 @@ export function ResponseContentRenderer({
   onFormatChange,
   mediaUrl,
 }: ResponseContentRendererProps) {
-  const safeBody = responseBody ?? ""
-  const [copied, setCopied] = React.useState(false)
+  const safeBody = responseBody ?? "";
+  const [copied, setCopied] = React.useState(false);
 
-  if (!safeBody && !responseData) return null
+  if (!safeBody && !responseData) return null;
 
   const renderRaw = () => (
     <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
@@ -66,20 +76,26 @@ export function ResponseContentRenderer({
         <code>{safeBody}</code>
       </pre>
     </div>
-  )
+  );
 
   const renderJson = () => {
     if (isJson(safeBody, responseHeaders)) {
       try {
-        const parsed = JSON.parse(safeBody)
-        const formatted = JSON.stringify(parsed, null, 2)
-        const lines = formatted.split("\n")
+        const parsed = JSON.parse(safeBody);
+        const formatted = JSON.stringify(parsed, null, 2);
+        const lines = formatted.split("\n");
         return (
           <div className="bg-code-bg h-full overflow-auto code-scrollbar">
             <div className="flex">
               <div className="shrink-0 select-none py-4 pl-3 pr-4 text-right text-[11px] leading-relaxed text-muted-foreground/20 font-mono border-r border-border/20">
                 {lines.map((_, i) => (
-                  <div key={i} className="px-1 text-right" style={{ minWidth: `${String(lines.length).length}ch` }}>{i + 1}</div>
+                  <div
+                    key={i}
+                    className="px-1 text-right"
+                    style={{ minWidth: `${String(lines.length).length}ch` }}
+                  >
+                    {i + 1}
+                  </div>
                 ))}
               </div>
               <pre
@@ -88,15 +104,15 @@ export function ResponseContentRenderer({
               />
             </div>
           </div>
-        )
+        );
       } catch {
         return (
           <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
-            <pre className="text-sm leading-relaxed text-red-400 whitespace-pre-wrap break-words font-mono">
-              <code className="text-red-400">Error parsing JSON</code>
+            <pre className="text-sm leading-relaxed text-destructive whitespace-pre-wrap break-words font-mono">
+              <code className="text-destructive">Error parsing JSON</code>
             </pre>
           </div>
-        )
+        );
       }
     }
     return (
@@ -105,26 +121,36 @@ export function ResponseContentRenderer({
           <code>{safeBody}</code>
         </pre>
       </div>
-    )
-  }
+    );
+  };
 
   const renderXml = () => (
     <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
       <pre
         className="text-sm leading-relaxed whitespace-pre-wrap break-words font-mono p-4"
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightMarkup(safeBody), { ALLOWED_TAGS: ["span", "br"], ALLOWED_ATTR: ["class"] }) }}
+        dangerouslySetInnerHTML={{
+          __html: DOMPurify.sanitize(highlightMarkup(safeBody), {
+            ALLOWED_TAGS: ["span", "br"],
+            ALLOWED_ATTR: ["class"],
+          }),
+        }}
       />
     </div>
-  )
+  );
 
   const renderHtml = () => (
     <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
       <pre
         className="text-sm leading-relaxed whitespace-pre-wrap break-words font-mono p-4"
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightMarkup(safeBody), { ALLOWED_TAGS: ["span", "br"], ALLOWED_ATTR: ["class"] }) }}
+        dangerouslySetInnerHTML={{
+          __html: DOMPurify.sanitize(highlightMarkup(safeBody), {
+            ALLOWED_TAGS: ["span", "br"],
+            ALLOWED_ATTR: ["class"],
+          }),
+        }}
       />
     </div>
-  )
+  );
 
   const renderPreview = () => {
     if (isHtml(safeBody, responseHeaders)) {
@@ -135,19 +161,29 @@ export function ResponseContentRenderer({
           className="w-full h-full border-0 bg-white"
           title="HTML Preview"
         />
-      )
+      );
     }
-    if (isImage(responseData, responseHeaders) || isPdf(responseData, responseHeaders) || isAudio(responseData, responseHeaders) || isVideo(responseData, responseHeaders)) {
+    if (
+      isImage(responseData, responseHeaders) ||
+      isPdf(responseData, responseHeaders) ||
+      isAudio(responseData, responseHeaders) ||
+      isVideo(responseData, responseHeaders)
+    ) {
       if (responseData instanceof Blob && mediaUrl) {
         if (isImage(responseData, responseHeaders)) {
           return (
             <div className="flex h-full items-center justify-center bg-code-bg">
-              <img src={mediaUrl} alt="Response image" loading="lazy" className="max-h-full max-w-full object-contain" />
+              <img
+                src={mediaUrl}
+                alt="Response image"
+                loading="lazy"
+                className="max-h-full max-w-full object-contain"
+              />
             </div>
-          )
+          );
         }
         if (isPdf(responseData, responseHeaders)) {
-          return <iframe src={mediaUrl} className="w-full h-full border-0" title="PDF Preview" />
+          return <iframe src={mediaUrl} className="w-full h-full border-0" title="PDF Preview" />;
         }
         if (isAudio(responseData, responseHeaders)) {
           return (
@@ -156,7 +192,7 @@ export function ResponseContentRenderer({
                 <source src={mediaUrl} />
               </audio>
             </div>
-          )
+          );
         }
         if (isVideo(responseData, responseHeaders)) {
           return (
@@ -165,66 +201,77 @@ export function ResponseContentRenderer({
                 <source src={mediaUrl} />
               </video>
             </div>
-          )
+          );
         }
       }
     }
     if (isJson(safeBody, responseHeaders)) {
       try {
-        const parsed = JSON.parse(safeBody)
-        const videoUrls = extractVideoUrls(parsed)
+        const parsed = JSON.parse(safeBody);
+        const videoUrls = extractVideoUrls(parsed);
         if (videoUrls.length > 0) {
           return (
             <div className="grid gap-4 p-4 grid-cols-1 sm:grid-cols-2 bg-code-bg min-h-full">
               {videoUrls.map((url: string, index: number) => (
-                <div key={`${url}-${index}`} className="overflow-hidden rounded-lg border border-border/50 bg-black/50">
+                <div
+                  key={`${url}-${index}`}
+                  className="overflow-hidden rounded-lg border border-border/50 bg-black/50"
+                >
                   <video controls className="h-48 w-full bg-black">
-                    <source src={url} type={url.endsWith('.webm') ? 'video/webm' : 'video/mp4'} />
+                    <source src={url} type={url.endsWith(".webm") ? "video/webm" : "video/mp4"} />
                   </video>
                 </div>
               ))}
             </div>
-          )
+          );
         }
-        const imageUrls = extractImageUrls(parsed)
+        const imageUrls = extractImageUrls(parsed);
         if (imageUrls.length > 0) {
           return (
             <div className="grid gap-4 p-4 grid-cols-1 sm:grid-cols-2 bg-code-bg min-h-full">
               {imageUrls.map((url: string, index: number) => (
-                <div key={`${url}-${index}`} className="overflow-hidden rounded-lg border border-border/50 bg-black/50">
-                  <img src={url} alt={`Preview image ${index + 1}`} loading="lazy" className="h-48 w-full object-cover" />
+                <div
+                  key={`${url}-${index}`}
+                  className="overflow-hidden rounded-lg border border-border/50 bg-black/50"
+                >
+                  <img
+                    src={url}
+                    alt={`Preview image ${index + 1}`}
+                    loading="lazy"
+                    className="h-48 w-full object-cover"
+                  />
                 </div>
               ))}
             </div>
-          )
+          );
         }
-        const formatted = JSON.stringify(parsed, null, 2)
+        const formatted = JSON.stringify(parsed, null, 2);
         return (
           <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
             <pre className="text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
               <code>{formatted}</code>
             </pre>
           </div>
-        )
+        );
       } catch {
         return (
           <div className="flex items-center justify-center h-full text-muted-foreground bg-code-bg">
             <p>Preview not available for this content type</p>
           </div>
-        )
+        );
       }
     }
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground bg-code-bg">
         <p>Preview not available for this content type</p>
       </div>
-    )
-  }
+    );
+  };
 
   const renderVisualize = () => {
     if (isJson(safeBody, responseHeaders)) {
       try {
-        const data = JSON.parse(safeBody)
+        const data = JSON.parse(safeBody);
         if (Array.isArray(data)) {
           return (
             <div className="rounded-lg border p-4 h-full overflow-auto hide-scrollbar">
@@ -235,7 +282,9 @@ export function ResponseContentRenderer({
                 <thead>
                   <tr className="border-b bg-muted/50">
                     {Object.keys(data[0] || {}).map((key) => (
-                      <th key={key} className="text-left p-3 font-medium border-r last:border-r-0">{key}</th>
+                      <th key={key} className="text-left p-3 font-medium border-r last:border-r-0">
+                        {key}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -243,8 +292,12 @@ export function ResponseContentRenderer({
                   {data.slice(0, 20).map((item, index) => (
                     <tr key={index} className="border-b hover:bg-muted/30">
                       {Object.values(item as Record<string, unknown>).map((value: unknown, i) => (
-                        <td key={i} className="p-3 border-r last:border-r-0 max-w-xs truncate" title={String(value)}>
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        <td
+                          key={i}
+                          className="p-3 border-r last:border-r-0 max-w-xs truncate"
+                          title={String(value)}
+                        >
+                          {typeof value === "object" ? JSON.stringify(value) : String(value)}
                         </td>
                       ))}
                     </tr>
@@ -252,10 +305,12 @@ export function ResponseContentRenderer({
                 </tbody>
               </table>
               {data.length > 20 && (
-                <p className="text-xs text-muted-foreground mt-4 text-center">Showing first 20 rows of {data.length} total</p>
+                <p className="text-xs text-muted-foreground mt-4 text-center">
+                  Showing first 20 rows of {data.length} total
+                </p>
               )}
             </div>
-          )
+          );
         }
         return (
           <div className="rounded-lg border p-4 h-full overflow-auto hide-scrollbar">
@@ -267,7 +322,7 @@ export function ResponseContentRenderer({
                 <div key={key} className="border rounded-lg p-4 bg-card">
                   <div className="font-medium text-sm text-muted-foreground mb-2">{key}</div>
                   <div className="text-sm break-words">
-                    {typeof value === 'object' ? (
+                    {typeof value === "object" ? (
                       <pre className="text-xs bg-muted p-2 rounded overflow-auto hide-scrollbar max-h-32">
                         {JSON.stringify(value, null, 2)}
                       </pre>
@@ -279,37 +334,42 @@ export function ResponseContentRenderer({
               ))}
             </div>
           </div>
-        )
+        );
       } catch {
         return (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <p>Cannot visualize this data</p>
           </div>
-        )
+        );
       }
     }
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
         <p>Visualization not available for this content type</p>
       </div>
-    )
-  }
+    );
+  };
 
   const renderImage = () => {
     if (responseData instanceof Blob && mediaUrl) {
       return (
         <div className="flex h-full items-center justify-center">
-          <img src={mediaUrl} alt="Response image" loading="lazy" className="max-h-full max-w-full object-contain" />
+          <img
+            src={mediaUrl}
+            alt="Response image"
+            loading="lazy"
+            className="max-h-full max-w-full object-contain"
+          />
         </div>
-      )
+      );
     }
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <FileImage className="size-12 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">No image available</p>
       </div>
-    )
-  }
+    );
+  };
 
   const renderPdf = () => {
     if (responseData instanceof Blob && mediaUrl) {
@@ -317,36 +377,38 @@ export function ResponseContentRenderer({
         <div className="flex h-full flex-col">
           <iframe src={mediaUrl} className="h-full w-full border-0" title="PDF Preview" />
         </div>
-      )
+      );
     }
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <FileText className="size-12 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">No PDF available</p>
       </div>
-    )
-  }
+    );
+  };
 
   const renderBinary = () => {
     if (responseData instanceof Blob && mediaUrl) {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-4">
           <FileImage className="size-12 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Binary content ({responseData.size} bytes)</p>
+          <p className="text-sm text-muted-foreground">
+            Binary content ({responseData.size} bytes)
+          </p>
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              const a = document.createElement('a')
-              a.href = mediaUrl
-              a.download = 'response'
-              a.click()
+              const a = document.createElement("a");
+              a.href = mediaUrl;
+              a.download = "response";
+              a.click();
             }}
           >
             Download
           </Button>
         </div>
-      )
+      );
     }
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -356,8 +418,8 @@ export function ResponseContentRenderer({
           Download
         </Button>
       </div>
-    )
-  }
+    );
+  };
 
   const renderAudioVideo = () => {
     if (responseData instanceof Blob && mediaUrl) {
@@ -368,7 +430,7 @@ export function ResponseContentRenderer({
               <source src={mediaUrl} />
             </audio>
           </div>
-        )
+        );
       }
       if (isVideo(responseData, responseHeaders)) {
         return (
@@ -377,50 +439,66 @@ export function ResponseContentRenderer({
               <source src={mediaUrl} />
             </video>
           </div>
-        )
+        );
       }
     }
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
         <p>Media playback not available</p>
       </div>
-    )
-  }
+    );
+  };
 
   const renderContent = () => {
     switch (responseFormat) {
-      case "raw": return renderRaw()
+      case "raw":
+        return renderRaw();
       case "pretty":
-      case "json": return renderJson()
-      case "xml": return renderXml()
-      case "html": return renderHtml()
-      case "preview": return renderPreview()
-      case "visualize": return renderVisualize()
-      case "image": return renderImage()
-      case "pdf": return renderPdf()
-      case "binary": return renderBinary()
+      case "json":
+        return renderJson();
+      case "xml":
+        return renderXml();
+      case "html":
+        return renderHtml();
+      case "preview":
+        return renderPreview();
+      case "visualize":
+        return renderVisualize();
+      case "image":
+        return renderImage();
+      case "pdf":
+        return renderPdf();
+      case "binary":
+        return renderBinary();
       case "audio":
-      case "video": return renderAudioVideo()
-      default: return renderRaw()
+      case "video":
+        return renderAudioVideo();
+      default:
+        return renderRaw();
     }
-  }
+  };
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(safeBody)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(safeBody);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      setCopied(false)
+      setCopied(false);
     }
-  }
+  };
 
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 flex items-center justify-between gap-3 border-b border-border/50 px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/50">View</span>
-          <Select value={responseFormat} onValueChange={(value: ResponseFormat) => onFormatChange(value)}>
+          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/50">
+            View
+          </span>
+          <Select
+            value={responseFormat}
+            onValueChange={(value: ResponseFormat) => onFormatChange(value)}
+          >
             <SelectTrigger className="h-8 w-36 border-input bg-muted/20 text-xs font-medium transition-all duration-200 hover:border-muted-foreground/30">
               <SelectValue />
             </SelectTrigger>
@@ -441,20 +519,24 @@ export function ResponseContentRenderer({
           size="sm"
           className={cn(
             "h-8 gap-1.5 text-xs font-medium transition-all duration-200",
-            copied && "border-emerald-500/30 text-emerald-500 bg-emerald-500/10"
+            copied && "border-success/30 text-success bg-success/10",
           )}
           onClick={handleCopy}
         >
           {copied ? (
-            <><Check className="size-3.5" />Copied!</>
+            <>
+              <Check className="size-3.5" />
+              Copied!
+            </>
           ) : (
-            <><Copy className="size-3.5" />Copy</>
+            <>
+              <Copy className="size-3.5" />
+              Copy
+            </>
           )}
         </Button>
       </div>
-      <div className="flex-1 overflow-auto code-scrollbar">
-        {renderContent()}
-      </div>
+      <div className="flex-1 overflow-auto code-scrollbar">{renderContent()}</div>
     </div>
-  )
+  );
 }

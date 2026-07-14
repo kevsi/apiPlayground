@@ -30,10 +30,7 @@ export function TestResultsSection({ testResults }: TestResultsSectionProps) {
     <div className="space-y-1 p-4">
       <div className="flex items-center gap-2 mb-3">
         <span
-          className={cn(
-            "text-xs font-semibold",
-            allPassed ? "text-emerald-500" : "text-red-500",
-          )}
+          className={cn("text-xs font-semibold", allPassed ? "text-success" : "text-destructive")}
         >
           {passedCount}/{testResults.length} passed
         </span>
@@ -44,8 +41,8 @@ export function TestResultsSection({ testResults }: TestResultsSectionProps) {
           className={cn(
             "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs",
             result.passed
-              ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600"
-              : "border-red-500/20 bg-red-500/5 text-red-600",
+              ? "border-success/20 bg-success/5 text-success"
+              : "border-destructive/20 bg-destructive/5 text-destructive",
           )}
         >
           {result.passed ? (

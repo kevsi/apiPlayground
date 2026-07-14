@@ -1,32 +1,44 @@
-"use client"
+"use client";
 
-import { memo, useState, useEffect } from "react"
-import { CheckCircle, Clock, FileText, Download, Play, Loader2, Sparkles, XCircle, AlertTriangle, ChevronDown, GitCompare } from "lucide-react"
-import { getStatusBadgeClass, getStatusTextClass, getStatusLabel } from "@/lib/http-status-colors"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { memo, useState, useEffect } from "react";
+import {
+  CheckCircle,
+  Clock,
+  FileText,
+  Download,
+  Play,
+  Loader2,
+  Sparkles,
+  XCircle,
+  AlertTriangle,
+  ChevronDown,
+  GitCompare,
+} from "lucide-react";
+import { getStatusBadgeClass, getStatusTextClass, getStatusLabel } from "@/lib/http-status-colors";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 
 interface ResponseStatusBarProps {
-  responseStatus?: number
-  responseTime?: number
-  responseSize?: string
-  isLoading?: boolean
-  hasResponse: boolean
-  aiIsLoading?: boolean
-  onRun?: () => Promise<void>
-  onRunAndSave?: () => Promise<void>
-  onRunAndDownload?: () => Promise<void>
-  onAnalyze?: () => Promise<void>
-  onGenerateTests?: () => Promise<void>
-  onExport?: () => void
-  onDiff?: () => void
+  responseStatus?: number;
+  responseTime?: number;
+  responseSize?: string;
+  isLoading?: boolean;
+  hasResponse: boolean;
+  aiIsLoading?: boolean;
+  onRun?: () => Promise<void>;
+  onRunAndSave?: () => Promise<void>;
+  onRunAndDownload?: () => Promise<void>;
+  onAnalyze?: () => Promise<void>;
+  onGenerateTests?: () => Promise<void>;
+  onExport?: () => void;
+  onDiff?: () => void;
 }
 
 export const ResponseStatusBar = memo(function ResponseStatusBar({
@@ -45,47 +57,47 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
   onDiff,
 }: ResponseStatusBarProps) {
   const handleRun = async () => {
-    if (!onRun) return
-    await onRun()
-  }
+    if (!onRun) return;
+    await onRun();
+  };
 
   // ── Animated gauge fill ────────────────────────────────────────
-  const targetGaugeWidth = Math.min((responseTime ?? 0) / 10, 100)
-  const [gaugeFillWidth, setGaugeFillWidth] = useState(0)
+  const targetGaugeWidth = Math.min((responseTime ?? 0) / 10, 100);
+  const [gaugeFillWidth, setGaugeFillWidth] = useState(0);
 
   useEffect(() => {
-    let resetTimer: number | undefined
-    let fillTimer: number | undefined
+    let resetTimer: number | undefined;
+    let fillTimer: number | undefined;
 
     if (hasResponse && responseTime !== undefined) {
-      resetTimer = window.setTimeout(() => setGaugeFillWidth(0), 0)
+      resetTimer = window.setTimeout(() => setGaugeFillWidth(0), 0);
       fillTimer = window.setTimeout(() => {
-        setGaugeFillWidth(targetGaugeWidth)
-      }, 20)
+        setGaugeFillWidth(targetGaugeWidth);
+      }, 20);
     } else {
-      resetTimer = window.setTimeout(() => setGaugeFillWidth(0), 0)
+      resetTimer = window.setTimeout(() => setGaugeFillWidth(0), 0);
     }
 
     return () => {
-      if (resetTimer) clearTimeout(resetTimer)
-      if (fillTimer) clearTimeout(fillTimer)
-    }
-  }, [responseTime, hasResponse, targetGaugeWidth])
+      if (resetTimer) clearTimeout(resetTimer);
+      if (fillTimer) clearTimeout(fillTimer);
+    };
+  }, [responseTime, hasResponse, targetGaugeWidth]);
 
   const getGaugeFillColor = (time?: number) => {
-    if (time === undefined || time === null) return "#6b7280"
-    if (time < 300) return "#10b981"
-    if (time < 3000) return "#f59e0b"
-    return "#ef4444"
-  }
+    if (time === undefined || time === null) return "#6b7280";
+    if (time < 300) return "#10b981";
+    if (time < 3000) return "#f59e0b";
+    return "#ef4444";
+  };
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-1.5">
-            <Loader2 className="size-3.5 animate-spin text-amber-500" />
-            <span className="text-xs font-semibold text-amber-500">Sending request...</span>
+          <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/5 px-3 py-1.5">
+            <Loader2 className="size-3.5 animate-spin text-warning" />
+            <span className="text-xs font-semibold text-warning">Sending request...</span>
           </div>
         ) : hasResponse ? (
           <div className="flex items-center gap-3">
@@ -94,16 +106,16 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
               data-testid="response-status"
               className={cn(
                 "flex items-center gap-1.5 rounded-lg border px-2.5 py-1",
-                getStatusBadgeClass(responseStatus)
+                getStatusBadgeClass(responseStatus),
               )}
             >
-              {responseStatus != null && responseStatus >= 200 && responseStatus < 300
-                ? <CheckCircle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
-                : responseStatus != null && responseStatus >= 300 && responseStatus < 400
-                  ? <AlertTriangle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
-                  : responseStatus != null && responseStatus >= 400
-                    ? <XCircle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
-                    : null}
+              {responseStatus != null && responseStatus >= 200 && responseStatus < 300 ? (
+                <CheckCircle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
+              ) : responseStatus != null && responseStatus >= 300 && responseStatus < 400 ? (
+                <AlertTriangle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
+              ) : responseStatus != null && responseStatus >= 400 ? (
+                <XCircle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
+              ) : null}
               <span className="text-xs font-bold font-mono">{responseStatus ?? "-"}</span>
             </div>
 
@@ -114,19 +126,22 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
                   className="h-full rounded-full transition-all duration-500 ease-out"
                   style={{
                     width: `${gaugeFillWidth}%`,
-                    backgroundColor: getGaugeFillColor(responseTime)
+                    backgroundColor: getGaugeFillColor(responseTime),
                   }}
                 />
               </div>
               <span className="text-[11px] font-mono font-medium text-muted-foreground whitespace-nowrap">
-                {responseTime ?? 0}<span className="text-muted-foreground/70">ms</span>
+                {responseTime ?? 0}
+                <span className="text-muted-foreground/70">ms</span>
               </span>
             </div>
 
             {/* Size — compact */}
             <div className="flex items-center gap-1 rounded-md border border-muted-foreground/10 bg-muted/20 px-2 py-1">
               <FileText className="size-3 text-muted-foreground/70" />
-              <span className="text-[11px] font-mono font-medium text-muted-foreground">{responseSize ?? "0 B"}</span>
+              <span className="text-[11px] font-mono font-medium text-muted-foreground">
+                {responseSize ?? "0 B"}
+              </span>
             </div>
           </div>
         ) : (
@@ -141,7 +156,7 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
               size="sm"
               className={cn(
                 "h-8 gap-1.5 text-xs font-semibold transition-all duration-200",
-                isLoading && "opacity-80"
+                isLoading && "opacity-80",
               )}
             >
               {isLoading ? (
@@ -196,5 +211,5 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
         )}
       </div>
     </div>
-  )
-})
+  );
+});

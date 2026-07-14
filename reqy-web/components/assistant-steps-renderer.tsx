@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Brain,
   Loader2,
@@ -67,10 +68,7 @@ export function iconForKind(
 }
 
 /** Génère un libellé par défaut pour chaque kind. */
-export function defaultLabelForKind(
-  kind: AssistantStep["kind"],
-  detail?: string,
-): string {
+export function defaultLabelForKind(kind: AssistantStep["kind"], detail?: string): string {
   switch (kind) {
     case "thinking":
       return "Through…";
@@ -87,7 +85,15 @@ export function defaultLabelForKind(
 
 // ── StepRow (une ligne d'étape) ────────────────────────────────────────────
 
-function StepRow({ step, isLast, onConfirm }: { step: AssistantStep; isLast: boolean; onConfirm?: (stepId: string, confirmed: boolean) => void }) {
+function StepRow({
+  step,
+  isLast,
+  onConfirm,
+}: {
+  step: AssistantStep;
+  isLast: boolean;
+  onConfirm?: (stepId: string, confirmed: boolean) => void;
+}) {
   const [showDetail, setShowDetail] = useState(false);
   const isActive = step.status === "pending";
   const isError = step.status === "error";
@@ -96,10 +102,10 @@ function StepRow({ step, isLast, onConfirm }: { step: AssistantStep; isLast: boo
   return (
     <div className="flex items-start gap-2 py-0.5 group">
       {/* Colonne icône */}
-      <span className="relative flex items-center justify-center w-4 h-4 mt-0.5 shrink-0">
+      <span className="relative flex items-center justify-center size-4 mt-0.5 shrink-0">
         <Icon
           className={cn(
-            "w-4 h-4 transition-colors duration-200",
+            "size-4 transition-colors duration-200",
             isActive &&
               (step.kind === "thinking"
                 ? "animate-spin text-foreground"
@@ -110,7 +116,7 @@ function StepRow({ step, isLast, onConfirm }: { step: AssistantStep; isLast: boo
         />
         {/* Overlay check en bas à droite pour les steps done */}
         {step.status === "done" && (
-          <CheckCircle2 className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 text-emerald-500 bg-background rounded-full" />
+          <CheckCircle2 className="absolute -bottom-0.5 -right-0.5 size-2.5 text-success bg-background rounded-full" />
         )}
       </span>
 
@@ -150,20 +156,22 @@ function StepRow({ step, isLast, onConfirm }: { step: AssistantStep; isLast: boo
       {/* Boutons Confirmer/Annuler pour les étapes en attente de confirmation */}
       {step.status === "awaiting_confirmation" && onConfirm && (
         <div className="flex gap-1 ml-auto shrink-0">
-          <button
+          <Button
             type="button"
+            variant="default"
             onClick={() => onConfirm(step.id, true)}
-            className="inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white transition-colors"
+            className="h-auto gap-1 rounded bg-success px-2 py-1 text-[10px] font-semibold text-white hover:bg-success/90"
           >
             Confirmer
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => onConfirm(step.id, false)}
-            className="inline-flex items-center gap-1 rounded bg-muted-foreground/30 hover:bg-muted-foreground/50 px-2 py-1 text-[10px] font-semibold text-foreground transition-colors"
+            className="h-auto gap-1 rounded bg-muted-foreground/30 px-2 py-1 text-[10px] font-semibold text-foreground hover:bg-muted-foreground/50"
           >
             Annuler
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -188,9 +196,7 @@ export function AssistantStepsRenderer({
   const visibleSteps =
     mode === "sequential"
       ? (() => {
-          const idx = steps.findIndex(
-            (s) => s.status !== "done" && s.status !== "error",
-          );
+          const idx = steps.findIndex((s) => s.status !== "done" && s.status !== "error");
           return idx === -1 ? [] : [steps[idx]];
         })()
       : steps;
@@ -206,17 +212,26 @@ export function AssistantStepsRenderer({
       {visibleSteps.length > 0 && (
         <div className={cn(mode === "sequential" ? "flex flex-col" : "flex flex-col gap-0")}>
           {visibleSteps.map((step, i) => (
-            <StepRow key={step.id} step={step} isLast={allDone || i === visibleSteps.length - 1} onConfirm={onConfirm} />
+            <StepRow
+              key={step.id}
+              step={step}
+              isLast={allDone || i === visibleSteps.length - 1}
+              onConfirm={onConfirm}
+            />
           ))}
         </div>
       )}
 
       {/* Texte final — affiché seulement une fois toutes les étapes terminées */}
       {allDone && finalText && (
-        <div className={cn(
-          "text-sm text-foreground leading-relaxed whitespace-pre-wrap",
-          mode === "sequential" && visibleSteps.length === 0 ? "" : "mt-2 pt-2 border-t border-border/40",
-        )}>
+        <div
+          className={cn(
+            "text-sm text-foreground leading-relaxed whitespace-pre-wrap",
+            mode === "sequential" && visibleSteps.length === 0
+              ? ""
+              : "mt-2 pt-2 border-t border-border/40",
+          )}
+        >
           {finalText}
         </div>
       )}
@@ -246,8 +261,7 @@ export function toAssistantSteps(steps: ProcessStep[]): AssistantStep[] {
   };
   return steps.map((s, i) => {
     const kind = kindMap[s.type] ?? "thinking";
-    const status: AssistantStep["status"] =
-      s.status === "in_progress" ? "pending" : s.status;
+    const status: AssistantStep["status"] = s.status === "in_progress" ? "pending" : s.status;
     return {
       id: `ps-${i}-${Date.now()}`,
       kind,

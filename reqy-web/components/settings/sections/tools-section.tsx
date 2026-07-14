@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
-import { ToolAssociationModal, type Tool } from "./tool-association-modal"
+import { useEffect, useState } from "react";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { ToolAssociationModal, type Tool } from "./tool-association-modal";
 
 const TOOLS: Tool[] = [
   {
@@ -29,46 +29,56 @@ const TOOLS: Tool[] = [
     scopes: ["Lecture de vos repositories", "Lecture de votre profil", "Création de gists"],
     oauthUrl: "/api/github-auth/start",
   },
-]
+];
 
 function useToolStatus(toolId: string, refreshKey = 0): "connected" | "disconnected" | "loading" {
-  const [status, setStatus] = useState<"connected" | "disconnected" | "loading">("loading")
+  const [status, setStatus] = useState<"connected" | "disconnected" | "loading">("loading");
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     const url =
       toolId === "github"
         ? "/api/github-auth/status"
         : toolId === "postman"
-        ? "/api/postman-auth/status"
-        : null
+          ? "/api/postman-auth/status"
+          : null;
     if (!url) {
-      setStatus("disconnected")
-      return
+      setStatus("disconnected");
+      return;
     }
     fetch(url, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled) setStatus(data.connected ? "connected" : "disconnected")
+        if (!cancelled) setStatus(data.connected ? "connected" : "disconnected");
       })
       .catch(() => {
-        if (!cancelled) setStatus("disconnected")
-      })
+        if (!cancelled) setStatus("disconnected");
+      });
     return () => {
-      cancelled = true
-    }
-  }, [toolId, refreshKey])
-  return status
+      cancelled = true;
+    };
+  }, [toolId, refreshKey]);
+  return status;
 }
 
-function ToolRow({ tool, refreshKey, onAssociate }: { tool: Tool; refreshKey: number; onAssociate: (connected: boolean) => void }) {
-  const status = useToolStatus(tool.id, refreshKey)
+function ToolRow({
+  tool,
+  refreshKey,
+  onAssociate,
+}: {
+  tool: Tool;
+  refreshKey: number;
+  onAssociate: (connected: boolean) => void;
+}) {
+  const status = useToolStatus(tool.id, refreshKey);
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <div className="flex items-center gap-3 min-w-0">
         {tool.logo ? (
           <img src={tool.logo} alt="" className="size-6 shrink-0 rounded object-contain" />
         ) : (
-          <span className="text-xl shrink-0" aria-hidden="true">{tool.logoEmoji}</span>
+          <span className="text-xl shrink-0" aria-hidden="true">
+            {tool.logoEmoji}
+          </span>
         )}
         <div className="min-w-0">
           <p className="text-sm font-medium">{tool.name}</p>
@@ -82,31 +92,35 @@ function ToolRow({ tool, refreshKey, onAssociate }: { tool: Tool; refreshKey: nu
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
               status === "connected"
-                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                ? "bg-success/10 text-success"
                 : "bg-muted text-muted-foreground"
             }`}
           >
             <span
               className={`size-1.5 rounded-full ${
-                status === "connected" ? "bg-emerald-500" : "bg-muted-foreground"
+                status === "connected" ? "bg-success" : "bg-muted-foreground"
               }`}
             />
             {status === "connected" ? "Connecté" : "Non connecté"}
           </span>
         )}
-        <Button size="sm" variant={status === "connected" ? "outline" : "default"} onClick={() => onAssociate(status === "connected")}>
+        <Button
+          size="sm"
+          variant={status === "connected" ? "outline" : "default"}
+          onClick={() => onAssociate(status === "connected")}
+        >
           {status === "connected" ? "Gérer" : "Associer"}
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 export function ToolsSection() {
-  const [activeTool, setActiveTool] = useState<Tool | null>(null)
-  const [activeConnected, setActiveConnected] = useState(false)
-  const [open, setOpen] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [activeTool, setActiveTool] = useState<Tool | null>(null);
+  const [activeConnected, setActiveConnected] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div className="space-y-6">
@@ -123,9 +137,9 @@ export function ToolsSection() {
             tool={tool}
             refreshKey={refreshKey}
             onAssociate={(connected) => {
-              setActiveTool(tool)
-              setActiveConnected(connected)
-              setOpen(true)
+              setActiveTool(tool);
+              setActiveConnected(connected);
+              setOpen(true);
             }}
           />
         ))}
@@ -138,5 +152,5 @@ export function ToolsSection() {
         connected={activeConnected}
       />
     </div>
-  )
+  );
 }

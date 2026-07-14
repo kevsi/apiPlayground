@@ -1,35 +1,28 @@
-"use client"
-import {
-  RefreshCw,
-  BookOpen,
-  Loader2,
-  ListTree,
-  Braces,
-  KeyRound,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { PrettifyButton } from "./prettify-button"
+"use client";
+import { RefreshCw, BookOpen, Loader2, ListTree, Braces, KeyRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { PrettifyButton } from "./prettify-button";
 
 interface Props {
-  onIntrospect: () => void
-  onToggleSchema: () => void
-  onPrettify: () => void
-  schemaOpen: boolean
-  introspecting: boolean
-  canPrettify: boolean
-  onToggleBuilder?: () => void
-  showBuilder?: boolean
-  builderAvailable?: boolean
+  onIntrospect: () => void;
+  onToggleSchema: () => void;
+  onPrettify: () => void;
+  schemaOpen: boolean;
+  introspecting: boolean;
+  canPrettify: boolean;
+  onToggleBuilder?: () => void;
+  showBuilder?: boolean;
+  builderAvailable?: boolean;
   // Variables & Headers toggles (new)
-  onToggleVariables?: () => void
-  showVariables?: boolean
-  variablesCount?: number
-  variablesError?: boolean
-  onToggleHeaders?: () => void
-  showHeaders?: boolean
-  headersCount?: number
-  headersError?: boolean
+  onToggleVariables?: () => void;
+  showVariables?: boolean;
+  variablesCount?: number;
+  variablesError?: boolean;
+  onToggleHeaders?: () => void;
+  showHeaders?: boolean;
+  headersCount?: number;
+  headersError?: boolean;
 }
 
 export function GraphqlToolbar({
@@ -89,11 +82,7 @@ export function GraphqlToolbar({
           disabled={!builderAvailable}
           className={cn("h-8 text-xs", !builderAvailable && "opacity-50")}
           data-testid="graphql-toggle-builder"
-          title={
-            builderAvailable
-              ? "Toggle visual query builder"
-              : "Run Refresh Schema first"
-          }
+          title={builderAvailable ? "Toggle visual query builder" : "Run Refresh Schema first"}
         >
           <ListTree className="w-3.5 h-3.5 mr-1" />
           {showBuilder ? "Hide" : "Show"} Builder
@@ -110,7 +99,7 @@ export function GraphqlToolbar({
           onClick={onToggleVariables}
           className={cn(
             "h-8 text-xs gap-1.5",
-            variablesError && "border-red-500/50 text-red-600",
+            variablesError && "border-destructive/50 text-destructive",
           )}
           data-testid="graphql-toggle-variables"
           title={variablesError ? "Variables JSON is invalid" : "Toggle variables panel"}
@@ -121,9 +110,7 @@ export function GraphqlToolbar({
             <span
               className={cn(
                 "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold",
-                showVariables
-                  ? "bg-primary-foreground text-primary"
-                  : "bg-primary/15 text-primary",
+                showVariables ? "bg-primary-foreground text-primary" : "bg-primary/15 text-primary",
               )}
             >
               {variablesCount}
@@ -138,7 +125,7 @@ export function GraphqlToolbar({
           onClick={onToggleHeaders}
           className={cn(
             "h-8 text-xs gap-1.5",
-            headersError && "border-red-500/50 text-red-600",
+            headersError && "border-destructive/50 text-destructive",
           )}
           data-testid="graphql-toggle-headers"
           title={headersError ? "Headers JSON is invalid" : "Toggle headers panel"}
@@ -149,9 +136,7 @@ export function GraphqlToolbar({
             <span
               className={cn(
                 "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold",
-                showHeaders
-                  ? "bg-primary-foreground text-primary"
-                  : "bg-primary/15 text-primary",
+                showHeaders ? "bg-primary-foreground text-primary" : "bg-primary/15 text-primary",
               )}
             >
               {headersCount}
@@ -162,5 +147,5 @@ export function GraphqlToolbar({
 
       <PrettifyButton onClick={onPrettify} disabled={!canPrettify} />
     </div>
-  )
+  );
 }

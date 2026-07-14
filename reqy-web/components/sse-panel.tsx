@@ -1,42 +1,41 @@
-"use client"
+"use client";
 
-import { useState, useCallback, useRef } from "react"
-import { useSSE, type SSEEvent } from "@/hooks/use-sse"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Wifi, WifiOff, Loader2, Trash2, Activity, Radio } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { useState, useCallback, useRef } from "react";
+import { useSSE, type SSEEvent } from "@/hooks/use-sse";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Wifi, WifiOff, Loader2, Trash2, Activity, Radio } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function formatTimestamp(ts: number): string {
-  const d = new Date(ts)
-  const hh = d.getHours().toString().padStart(2, "0")
-  const mm = d.getMinutes().toString().padStart(2, "0")
-  const ss = d.getSeconds().toString().padStart(2, "0")
-  const ms = d.getMilliseconds().toString().padStart(3, "0")
-  return `${hh}:${mm}:${ss}.${ms}`
+  const d = new Date(ts);
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  const ss = d.getSeconds().toString().padStart(2, "0");
+  const ms = d.getMilliseconds().toString().padStart(3, "0");
+  return `${hh}:${mm}:${ss}.${ms}`;
 }
 
 function prettyPrintJson(raw: string): string {
   try {
-    const parsed = JSON.parse(raw)
-    return JSON.stringify(parsed, null, 2)
+    const parsed = JSON.parse(raw);
+    return JSON.stringify(parsed, null, 2);
   } catch {
-    return raw
+    return raw;
   }
 }
 
 function EventItem({ event }: { event: SSEEvent }) {
-  const formatted = prettyPrintJson(event.data)
-  const isCustomEvent = event.event !== "message"
+  const formatted = prettyPrintJson(event.data);
+  const isCustomEvent = event.event !== "message";
 
   return (
     <div
       className={cn(
         "group/event flex flex-col gap-1 rounded-lg border p-3 transition-all duration-200",
-        isCustomEvent
-          ? "border-amber-500/20 bg-amber-500/5"
-          : "border-blue-500/20 bg-blue-500/5"
+        isCustomEvent ? "border-warning/20 bg-warning/5" : "border-primary/20 bg-primary/5",
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -46,8 +45,8 @@ function EventItem({ event }: { event: SSEEvent }) {
             className={cn(
               "text-[10px] font-bold font-mono px-1.5 py-0",
               isCustomEvent
-                ? "border-amber-500/30 text-amber-500 bg-amber-500/10"
-                : "border-blue-500/30 text-blue-500 bg-blue-500/10"
+                ? "border-warning/30 text-warning bg-warning/10"
+                : "border-primary/30 text-primary bg-primary/10",
             )}
           >
             {event.event.toUpperCase()}
@@ -61,56 +60,54 @@ function EventItem({ event }: { event: SSEEvent }) {
         {formatted}
       </pre>
     </div>
-  )
+  );
 }
 
 export function SSEPanel() {
-  const { status, events, connect, disconnect, clearEvents } = useSSE()
-  const [url, setUrl] = useState("https://localhost:3000/sse")
-  const eventsEndRef = useRef<HTMLDivElement>(null)
+  const { status, events, connect, disconnect, clearEvents } = useSSE();
+  const [url, setUrl] = useState("https://localhost:3000/sse");
+  const eventsEndRef = useRef<HTMLDivElement>(null);
 
   const handleConnect = useCallback(() => {
-    const trimmed = url.trim()
-    if (!trimmed) return
-    connect(trimmed)
-  }, [url, connect])
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    connect(trimmed);
+  }, [url, connect]);
 
   const handleDisconnect = useCallback(() => {
-    disconnect()
-  }, [disconnect])
+    disconnect();
+  }, [disconnect]);
 
-  const statusConfig: Record<
-    string,
-    { label: string; className: string; icon: React.ReactNode }
-  > = {
-    idle: {
-      label: "Idle",
-      className: "bg-slate-500/10 text-slate-500 border-slate-500/20",
-      icon: <Activity className="size-3" />,
-    },
-    connecting: {
-      label: "Connecting",
-      className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-      icon: <Loader2 className="size-3 animate-spin" />,
-    },
-    open: {
-      label: "Open",
-      className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-      icon: <Wifi className="size-3" />,
-    },
-    closed: {
-      label: "Closed",
-      className: "bg-slate-500/10 text-slate-500 border-slate-500/20",
-      icon: <WifiOff className="size-3" />,
-    },
-    error: {
-      label: "Error",
-      className: "bg-red-500/10 text-red-500 border-red-500/20",
-      icon: <WifiOff className="size-3" />,
-    },
-  }
+  const statusConfig: Record<string, { label: string; className: string; icon: React.ReactNode }> =
+    {
+      idle: {
+        label: "Idle",
+        className: "bg-muted text-muted-foreground",
+        icon: <Activity />,
+      },
+      connecting: {
+        label: "Connecting",
+        className: "bg-warning/10 text-warning border-warning/20",
+        icon: <Loader2 className="animate-spin" />,
+      },
+      open: {
+        label: "Open",
+        className: "bg-success/10 text-success border-success/20",
+        icon: <Wifi />,
+      },
+      closed: {
+        label: "Closed",
+        className: "bg-muted text-muted-foreground",
+        icon: <WifiOff />,
+      },
+      error: {
+        label: "Error",
+        className: "bg-destructive/10 text-destructive border-destructive/20",
+        icon: <WifiOff />,
+      },
+    };
 
-  const currentStatus = statusConfig[status] ?? statusConfig.idle
+  const currentStatus = statusConfig[status] ?? statusConfig.idle;
 
   return (
     <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
@@ -121,7 +118,9 @@ export function SSEPanel() {
             <Radio className="size-3.5 text-primary" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground tracking-tight leading-none">SSE</h3>
+            <h3 className="text-sm font-semibold text-foreground tracking-tight leading-none">
+              SSE
+            </h3>
             <p className="text-[10px] text-muted-foreground/40 leading-none mt-1">
               Monitor Server-Sent Events streams
             </p>
@@ -134,7 +133,10 @@ export function SSEPanel() {
           {/* Status badge */}
           <Badge
             variant="outline"
-            className={cn("shrink-0 gap-1.5 py-0.5 px-2 text-[11px] font-semibold", currentStatus.className)}
+            className={cn(
+              "shrink-0 gap-1.5 py-0.5 px-2 text-[11px] font-semibold",
+              currentStatus.className,
+            )}
           >
             {currentStatus.icon}
             {currentStatus.label}
@@ -142,13 +144,12 @@ export function SSEPanel() {
 
           {/* URL input */}
           <div className="relative flex-1">
-            <input
-              type="text"
+            <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://localhost:3000/sse"
               disabled={status === "open" || status === "connecting"}
-              className="w-full bg-transparent px-1 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/40 outline-none disabled:opacity-50"
+              className="font-mono text-sm"
             />
           </div>
 
@@ -159,9 +160,9 @@ export function SSEPanel() {
               size="sm"
               disabled={status === "connecting"}
               onClick={handleDisconnect}
-              className="h-7 gap-1.5 px-3 text-xs font-semibold shrink-0 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50 transition-all duration-200"
+              className="shrink-0"
             >
-              <WifiOff className="size-3.5" />
+              <WifiOff />
               Disconnect
             </Button>
           ) : (
@@ -170,9 +171,9 @@ export function SSEPanel() {
               size="sm"
               onClick={handleConnect}
               disabled={!url.trim()}
-              className="h-7 gap-1.5 px-3 text-xs font-semibold shrink-0 border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/50 transition-all duration-200"
+              className="shrink-0"
             >
-              <Wifi className="size-3.5" />
+              <Wifi />
               Connect
             </Button>
           )}
@@ -185,9 +186,7 @@ export function SSEPanel() {
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
             Events
             {events.length > 0 && (
-              <span className="ml-1.5 font-mono text-muted-foreground/30">
-                ({events.length})
-              </span>
+              <span className="ml-1.5 font-mono text-muted-foreground/30">({events.length})</span>
             )}
           </span>
           {events.length > 0 && (
@@ -222,5 +221,5 @@ export function SSEPanel() {
         </ScrollArea>
       </div>
     </div>
-  )
+  );
 }

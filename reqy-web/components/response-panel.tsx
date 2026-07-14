@@ -1,72 +1,90 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { Play, Loader2, Sparkles } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { DiffDialog } from "@/components/diff-dialog"
-import { analyze } from "@/src/ai/local-engine/analyzer"
-import { buildRequestContext } from "@/src/ai/local-engine/context"
-import type { RequestPayload } from "@/src/ai/types"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ResponseStatusBar } from "@/components/response-status-bar"
-import { ResponseTimeline } from "@/components/response-timeline"
-import { ResponseAiSummary } from "@/components/response-ai-summary"
-import { ResponseHeadersTab } from "@/components/response-headers-tab"
-import { CodeSnippet } from "@/components/response-code-snippet"
-import { TestResultsSection } from "@/components/response-test-results"
-import dynamic from "next/dynamic"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Play, Loader2, Sparkles } from "lucide-react";
+import { DiffDialog } from "@/components/diff-dialog";
+import { analyze } from "@/src/ai/local-engine/analyzer";
+import { buildRequestContext } from "@/src/ai/local-engine/context";
+import type { RequestPayload } from "@/src/ai/types";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponseStatusBar } from "@/components/response-status-bar";
+import { ResponseTimeline } from "@/components/response-timeline";
+import { ResponseAiSummary } from "@/components/response-ai-summary";
+import { ResponseHeadersTab } from "@/components/response-headers-tab";
+import { CodeSnippet } from "@/components/response-code-snippet";
+import { TestResultsSection } from "@/components/response-test-results";
+import dynamic from "next/dynamic";
 
 // Heavy dependencies — only loaded on demand (response received, AI opened).
 const ResponseContentRenderer = dynamic(
   () =>
-    import("@/components/response-content-renderer").then(
-      (m) => ({ default: m.ResponseContentRenderer }),
-    ),
+    import("@/components/response-content-renderer").then((m) => ({
+      default: m.ResponseContentRenderer,
+    })),
   { ssr: false, loading: () => null },
-)
+);
 const AIModal = dynamic(
-  () =>
-    import("@/src/ai/components/AIModal").then((m) => ({ default: m.AIModal })),
+  () => import("@/src/ai/components/AIModal").then((m) => ({ default: m.AIModal })),
   { ssr: false, loading: () => null },
-)
-import { type ResponseFormat, isJson, isXml, isHtml, isImage, isPdf, isAudio, isVideo, isBinary, extractVideoUrls, extractImageUrls, getContentType } from "@/components/response-utils"
-import type { HistoryItem, TestResult } from "@/lib/types"
-import { getStatusBorderAccentClass, getStatusWatermarkClass, getStatusGaugeClass, getStatusBadgeClass, getStatusTextClass } from "@/lib/http-status-colors"
+);
+import {
+  type ResponseFormat,
+  isJson,
+  isXml,
+  isHtml,
+  isImage,
+  isPdf,
+  isAudio,
+  isVideo,
+  isBinary,
+  extractVideoUrls,
+  extractImageUrls,
+  getContentType,
+} from "@/components/response-utils";
+import type { HistoryItem, TestResult } from "@/lib/types";
+import {
+  getStatusBorderAccentClass,
+  getStatusWatermarkClass,
+  getStatusGaugeClass,
+  getStatusBadgeClass,
+  getStatusTextClass,
+} from "@/lib/http-status-colors";
 
 interface ResponsePanelProps {
-  responseBody?: string
-  responseData?: string | Blob
-  responseStatus?: number
-  responseTime?: number
+  responseBody?: string;
+  responseData?: string | Blob;
+  responseStatus?: number;
+  responseTime?: number;
   responseTimings?: {
-    dnsMs?: number
-    connectMs?: number
-    ttfbMs?: number
-  }
-  responseSize?: string
-  responseHeaders?: Record<string, string>
-  isLoading?: boolean
-  onRun?: () => Promise<void>
-  onRunAndSave?: () => Promise<void>
-  onRunAndDownload?: () => Promise<void>
-  onAnalyze?: () => Promise<void>
-  onGenerateTests?: () => Promise<void>
-  onPatchRequest?: (patch: Partial<RequestPayload>) => void
-  aiSummary?: string
-  aiError?: string
-  aiIsLoading?: boolean
-  method?: string
-  url?: string
-  requestHeaders?: Array<{ key: string; value: string }>
-  queryParams?: Array<{ key: string; value: string }>
-  body?: string
-  bodyType?: string
-  authType?: string
-  authToken?: string
-  testResults?: TestResult[]
-  history?: HistoryItem[]
+    dnsMs?: number;
+    connectMs?: number;
+    ttfbMs?: number;
+  };
+  responseSize?: string;
+  responseHeaders?: Record<string, string>;
+  isLoading?: boolean;
+  onRun?: () => Promise<void>;
+  onRunAndSave?: () => Promise<void>;
+  onRunAndDownload?: () => Promise<void>;
+  onAnalyze?: () => Promise<void>;
+  onGenerateTests?: () => Promise<void>;
+  onPatchRequest?: (patch: Partial<RequestPayload>) => void;
+  aiSummary?: string;
+  aiError?: string;
+  aiIsLoading?: boolean;
+  method?: string;
+  url?: string;
+  requestHeaders?: Array<{ key: string; value: string }>;
+  queryParams?: Array<{ key: string; value: string }>;
+  body?: string;
+  bodyType?: string;
+  authType?: string;
+  authToken?: string;
+  testResults?: TestResult[];
+  history?: HistoryItem[];
 }
 
 export function ResponsePanel({
@@ -98,46 +116,30 @@ export function ResponsePanel({
   authToken = "",
   history = [],
 }: ResponsePanelProps) {
-  const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty")
-  const [activeTab, setActiveTab] = useState("response")
-  const [diffDialogOpen, setDiffDialogOpen] = useState(false)
-  const [aiModalOpen, setAiModalOpen] = useState(false)
-
-  // ── ReqlyAI fix undo state (Phase 4) ──────────────────────────────
-  const { toast } = useToast()
-  type AppliedFix = {
-    diagId: string
-    diagTitle: string
-    preSnapshot: {
-      method: string
-      url: string
-      headers: Array<{ key: string; value: string }>
-      body: string
-      authType: string
-    }
-  }
-  const [lastAppliedFix, setLastAppliedFix] = useState<AppliedFix | null>(null)
-  const [applyingFixId, setApplyingFixId] = useState<string | null>(null)
+  const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty");
+  const [activeTab, setActiveTab] = useState("response");
+  const [diffDialogOpen, setDiffDialogOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const mediaUrl = useMemo(() => {
     if (responseData instanceof Blob) {
-      return URL.createObjectURL(responseData)
+      return URL.createObjectURL(responseData);
     }
-    return null
-  }, [responseData])
+    return null;
+  }, [responseData]);
 
   useEffect(() => {
     return () => {
-      if (mediaUrl) URL.revokeObjectURL(mediaUrl)
-    }
-  }, [mediaUrl])
+      if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+    };
+  }, [mediaUrl]);
 
-  const responsePanelRef = useRef<HTMLDivElement>(null)
+  const responsePanelRef = useRef<HTMLDivElement>(null);
 
   const diagnostics = useMemo(() => {
-    const headerRecord: Record<string, string> = {}
+    const headerRecord: Record<string, string> = {};
     for (const h of requestHeaders ?? []) {
-      if (h.key) headerRecord[h.key] = h.value
+      if (h.key) headerRecord[h.key] = h.value;
     }
     const ctx = buildRequestContext(
       {
@@ -156,120 +158,111 @@ export function ResponsePanel({
             duration: responseTime ?? 0,
             size: 0,
           }
-        : undefined
-    )
-    return analyze(ctx)
-  }, [method, url, requestHeaders, body, authType, responseStatus, responseHeaders, responseBody, responseTime])
-  const [flash, setFlash] = useState(false)
+        : undefined,
+    );
+    return analyze(ctx);
+  }, [
+    method,
+    url,
+    requestHeaders,
+    body,
+    authType,
+    responseStatus,
+    responseHeaders,
+    responseBody,
+    responseTime,
+  ]);
+  const [flash, setFlash] = useState(false);
 
   useEffect(() => {
     if (responseBody) {
-      const t0 = window.setTimeout(() => setFlash(true), 0)
-      const timer = window.setTimeout(() => setFlash(false), 600)
+      const t0 = window.setTimeout(() => setFlash(true), 0);
+      const timer = window.setTimeout(() => setFlash(false), 600);
       return () => {
-        window.clearTimeout(t0)
-        window.clearTimeout(timer)
-      }
+        window.clearTimeout(t0);
+        window.clearTimeout(timer);
+      };
     }
-  }, [responseBody])
+  }, [responseBody]);
 
-  const hasResponse = Boolean(responseBody) || responseStatus !== undefined
+  const hasResponse = Boolean(responseBody) || responseStatus !== undefined;
 
   // ── Timing gauge animation ─────────────────────────────────────
-  const [timingGaugeWidth, setTimingGaugeWidth] = useState(0)
+  const [timingGaugeWidth, setTimingGaugeWidth] = useState(0);
 
   useEffect(() => {
     if (hasResponse && responseTime !== undefined && !isLoading) {
-      const t0 = window.setTimeout(() => setTimingGaugeWidth(0), 0)
+      const t0 = window.setTimeout(() => setTimingGaugeWidth(0), 0);
       const timer = window.setTimeout(() => {
-        setTimingGaugeWidth(100)
-      }, 20)
+        setTimingGaugeWidth(100);
+      }, 20);
       return () => {
-        window.clearTimeout(t0)
-        window.clearTimeout(timer)
-      }
+        window.clearTimeout(t0);
+        window.clearTimeout(timer);
+      };
     } else {
-      const t0 = window.setTimeout(() => setTimingGaugeWidth(0), 0)
-      return () => window.clearTimeout(t0)
+      const t0 = window.setTimeout(() => setTimingGaugeWidth(0), 0);
+      return () => window.clearTimeout(t0);
     }
-  }, [responseTime, hasResponse, isLoading])
+  }, [responseTime, hasResponse, isLoading]);
 
   // ── Auto-format ────────────────────────────────────────────────
   function getAutoFormat(): ResponseFormat {
     if (responseData instanceof Blob && responseData.type === "application/pdf") {
-      return "pdf"
+      return "pdf";
     }
     if (isJson(responseBody, responseHeaders)) {
       try {
-        const parsed = JSON.parse(responseBody as string)
-        const videoUrls = extractVideoUrls(parsed)
-        if (videoUrls.length > 0) return "preview"
-        const imageUrls = extractImageUrls(parsed)
-        if (imageUrls.length > 0) return "preview"
+        const parsed = JSON.parse(responseBody as string);
+        const videoUrls = extractVideoUrls(parsed);
+        if (videoUrls.length > 0) return "preview";
+        const imageUrls = extractImageUrls(parsed);
+        if (imageUrls.length > 0) return "preview";
       } catch {
         // ignore
       }
-      return "json"
+      return "json";
     }
-    if (isXml(responseBody, responseHeaders)) return "xml"
-    if (isHtml(responseBody, responseHeaders)) return "html"
-    if (isImage(responseData, responseHeaders)) return "image"
-    if (isPdf(responseData, responseHeaders)) return "pdf"
-    if (isAudio(responseData, responseHeaders)) return "audio"
-    if (isVideo(responseData, responseHeaders)) return "video"
-    if (isBinary(responseData, responseHeaders)) return "binary"
-    return "pretty"
+    if (isXml(responseBody, responseHeaders)) return "xml";
+    if (isHtml(responseBody, responseHeaders)) return "html";
+    if (isImage(responseData, responseHeaders)) return "image";
+    if (isPdf(responseData, responseHeaders)) return "pdf";
+    if (isAudio(responseData, responseHeaders)) return "audio";
+    if (isVideo(responseData, responseHeaders)) return "video";
+    if (isBinary(responseData, responseHeaders)) return "binary";
+    return "pretty";
   }
 
   useEffect(() => {
     if (responseBody) {
-      const t0 = window.setTimeout(() => setResponseFormat(getAutoFormat()), 0)
-      return () => window.clearTimeout(t0)
+      const t0 = window.setTimeout(() => setResponseFormat(getAutoFormat()), 0);
+      return () => window.clearTimeout(t0);
     }
-  }, [responseBody, responseHeaders])
+  }, [responseBody, responseHeaders]);
 
   const handleExport = useCallback(() => {
-    if (!responseBody) return
+    if (!responseBody) return;
     try {
-      const blob = new Blob([responseBody], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'response.json'
-      a.click()
-      URL.revokeObjectURL(url)
+      const blob = new Blob([responseBody], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "response.json";
+      a.click();
+      URL.revokeObjectURL(url);
     } catch {
       // ignore
     }
-  }, [responseBody])
+  }, [responseBody]);
 
   const handleRun = useCallback(async () => {
-    if (!onRun) return
-    await onRun()
-    setActiveTab("response")
-  }, [onRun])
+    if (!onRun) return;
+    await onRun();
+    setActiveTab("response");
+  }, [onRun]);
 
-  const handleOpenDiff = useCallback(() => setDiffDialogOpen(true), [])
-  const handleOpenAi = useCallback(() => setAiModalOpen(true), [])
-
-  // P4.6: Ctrl+Shift+F — re-apply last fix without re-clicking
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
-        if (lastAppliedFix && onPatchRequest && activeTab === "reqlyai") {
-          e.preventDefault()
-          // Re-apply: find the diagnostic by id from current diagnostics
-          const diag = diagnostics.find((d) => d.id === lastAppliedFix.diagId)
-          if (diag?.fix) {
-            onPatchRequest(diag.fix.applyFix())
-            toast({ title: "Fix ré-appliqué", description: diag.title, duration: 3000 })
-          }
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [lastAppliedFix, diagnostics, onPatchRequest, activeTab, toast])
+  const handleOpenDiff = useCallback(() => setDiffDialogOpen(true), []);
+  const handleOpenAi = useCallback(() => setAiModalOpen(true), []);
 
   return (
     <div
@@ -277,7 +270,7 @@ export function ResponsePanel({
       className={cn(
         "flex h-full flex-col bg-muted/20",
         getStatusBorderAccentClass(responseStatus),
-        flash && "response-flash"
+        flash && "response-flash",
       )}
     >
       <ResponseStatusBar
@@ -300,7 +293,7 @@ export function ResponsePanel({
           <div
             className={cn(
               "h-full transition-all duration-500 ease-out",
-              getStatusGaugeClass(responseTime)
+              getStatusGaugeClass(responseTime),
             )}
             style={{ width: `${timingGaugeWidth}%` }}
           />
@@ -353,12 +346,14 @@ export function ResponsePanel({
             >
               Tests
               {testResults && testResults.length > 0 && (
-                <span className={cn(
-                  "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-mono",
-                  testResults.every((r) => r.passed)
-                    ? "bg-emerald-500/10 text-emerald-500"
-                    : "bg-red-500/10 text-red-500"
-                )}>
+                <span
+                  className={cn(
+                    "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-mono",
+                    testResults.every((r) => r.passed)
+                      ? "bg-success/10 text-success"
+                      : "bg-destructive/10 text-destructive",
+                  )}
+                >
                   {testResults.filter((r) => r.passed).length}/{testResults.length}
                 </span>
               )}
@@ -374,7 +369,7 @@ export function ResponsePanel({
               <Sparkles className="size-3.5" />
               AI
               {diagnostics.length > 0 && (
-                <span className="ml-1 rounded-full bg-red-500/20 text-red-600 px-1.5 py-0.5 text-[10px] font-mono">
+                <span className="ml-1 rounded-full bg-destructive/20 text-destructive px-1.5 py-0.5 text-[10px] font-mono">
                   {diagnostics.length}
                 </span>
               )}
@@ -382,11 +377,20 @@ export function ResponsePanel({
           </TabsList>
         </div>
 
-        <TabsContent value="response" data-testid="response-body" className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-auto">
+        <TabsContent
+          value="response"
+          data-testid="response-body"
+          className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-auto"
+        >
           {/* Giant floating status code background */}
           {hasResponse && responseStatus != null && !isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-              <span className={cn("text-[140px] font-bold leading-none", getStatusWatermarkClass(responseStatus))}>
+              <span
+                className={cn(
+                  "text-[140px] font-bold leading-none",
+                  getStatusWatermarkClass(responseStatus),
+                )}
+              >
                 {responseStatus}
               </span>
             </div>
@@ -398,19 +402,19 @@ export function ResponsePanel({
               <div className="flex flex-col h-full">
                 <div className="shrink-0 px-4 py-3 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-1.5">
-                      <Loader2 className="size-3.5 animate-spin text-amber-500" />
-                      <span className="text-xs font-medium text-amber-500">Loading response...</span>
+                    <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/5 px-3 py-1.5">
+                      <Loader2 className="size-3.5 animate-spin text-warning" />
+                      <span className="text-xs font-medium text-warning">Loading response...</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 skeleton-loader">
-                  <div className="skeleton-line" />
-                  <div className="skeleton-line" />
-                  <div className="skeleton-line" />
-                  <div className="skeleton-line" />
-                  <div className="skeleton-line" />
-                  <div className="skeleton-line" />
+                <div className="flex flex-col gap-3 p-6">
+                  <Skeleton className="h-4 w-[45%]" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-[92%]" />
+                  <Skeleton className="h-3 w-[78%]" />
+                  <Skeleton className="h-3 w-[88%]" />
+                  <Skeleton className="h-3 w-[65%]" />
                 </div>
               </div>
             ) : hasResponse ? (
@@ -461,7 +465,6 @@ export function ResponsePanel({
           />
         </TabsContent>
 
-
         <TabsContent value="tests" className="m-0 min-h-0 flex-1 animate-fade-in overflow-auto">
           <TestResultsSection testResults={testResults ?? []} />
         </TabsContent>
@@ -486,7 +489,8 @@ export function ResponsePanel({
         responseHeaders={responseHeaders}
         responseBody={responseBody}
         authToken={authToken}
+        onPatchRequest={onPatchRequest}
       />
     </div>
-  )
+  );
 }

@@ -1,28 +1,28 @@
-"use client"
+"use client";
 
-import { RequestPanel } from "@/components/request-panel"
-import { ResponsePanel } from "@/components/response-panel"
-import { CollectionsModal } from "@/components/collections-modal"
-import { HistoryPanel } from "@/components/history-panel"
-import { BatchRunProgress } from "@/components/batch-run-progress"
-import { RequestTabBar } from "@/components/request-tab-bar"
-import { RequestChainingDialog } from "@/components/request-chaining-dialog"
-import { RequestSaveDialog } from "@/components/request-save-dialog"
-import { RequestUnsavedCloseDialog } from "@/components/request-unsaved-close-dialog"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
-import { useRequestTabsState } from "@/hooks/use-request-tabs-state"
-import { useRequestTabExecution } from "@/hooks/use-request-tab-execution"
-import { useRequestStore, type RequestItem } from "@/hooks/use-request-store"
-import { cn } from "@/lib/utils"
-import { useShallow } from "zustand/react/shallow"
-import { getMethodPanelClass, recordToHeaderArray } from "@/lib/request-tab-utils"
-import { useEffect, useRef } from "react"
-import type { RequestTab } from "@/lib/request-executor"
+import { RequestPanel } from "@/components/request-panel";
+import { ResponsePanel } from "@/components/response-panel";
+import { CollectionsModal } from "@/components/collections-modal";
+import { HistoryPanel } from "@/components/history-panel";
+import { BatchRunProgress } from "@/components/batch-run-progress";
+import { RequestTabBar } from "@/components/request-tab-bar";
+import { RequestChainingDialog } from "@/components/request-chaining-dialog";
+import { RequestSaveDialog } from "@/components/request-save-dialog";
+import { RequestUnsavedCloseDialog } from "@/components/request-unsaved-close-dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { useRequestTabsState } from "@/hooks/use-request-tabs-state";
+import { useRequestTabExecution } from "@/hooks/use-request-tab-execution";
+import { useRequestStore, type RequestItem } from "@/hooks/use-request-store";
+import { cn } from "@/lib/utils";
+import { useShallow } from "zustand/react/shallow";
+import { getMethodPanelClass, recordToHeaderArray } from "@/lib/request-tab-utils";
+import { useEffect, useRef } from "react";
+import type { RequestTab } from "@/lib/request-executor";
 
 export function RequestTabsManager() {
-  const tabState = useRequestTabsState()
-  const execution = useRequestTabExecution(tabState)
+  const tabState = useRequestTabsState();
+  const execution = useRequestTabExecution(tabState);
 
   const {
     tabs,
@@ -59,7 +59,7 @@ export function RequestTabsManager() {
     closeToRight,
     closeAllTabs,
     saveAllTabs,
-  } = tabState
+  } = tabState;
 
   const {
     aiEngine,
@@ -90,7 +90,7 @@ export function RequestTabsManager() {
     setSaveModalName,
     saveModalCollectionId,
     setSaveModalCollectionId,
-  } = execution
+  } = execution;
 
   // All of these are stable action references from the Zustand store. We pick
   // them with `useShallow` so this component only re-renders when one of the
@@ -132,7 +132,7 @@ export function RequestTabsManager() {
       updateVariableMapping: s.updateVariableMapping,
       removeVariableMapping: s.removeVariableMapping,
     })),
-  )
+  );
 
   // ── AI-sidebar → tab sync bridge ─────────────────────────────────────────
   // When the AI sidebar (dispatchAIActions) updates store.currentRequest or
@@ -144,60 +144,61 @@ export function RequestTabsManager() {
   // actually changed (e.g. on tab switch or when the editor itself called
   // setCurrentRequest after its own tab update).
 
-  const currentRequest = useRequestStore((s) => s.currentRequest)
-  const lastResponse = useRequestStore((s) => s.lastResponse)
-  const lastReqJson = useRef("")
-  const lastRespJson = useRef("")
+  const currentRequest = useRequestStore((s) => s.currentRequest);
+  const lastResponse = useRequestStore((s) => s.lastResponse);
+  const lastReqJson = useRef("");
+  const lastRespJson = useRef("");
 
   useEffect(() => {
-    if (!currentRequest) return
+    if (!currentRequest) return;
     const json = JSON.stringify({
       m: currentRequest.method,
       u: currentRequest.url,
       h: currentRequest.headers,
       p: currentRequest.params,
       b: currentRequest.body,
-    })
-    if (json === lastReqJson.current) return
-    lastReqJson.current = json
+    });
+    if (json === lastReqJson.current) return;
+    lastReqJson.current = json;
 
-    const patch: Partial<RequestTab> = {}
+    const patch: Partial<RequestTab> = {};
     if (currentRequest.method) {
-      patch.method = currentRequest.method as import("@/lib/request-executor").HttpMethod
+      patch.method = currentRequest.method as import("@/lib/request-executor").HttpMethod;
     }
     if (currentRequest.url !== undefined) {
-      patch.url = currentRequest.url
-      patch.endpoint = currentRequest.url.replace(/^https?:\/\/[^/]+/, "") || "/"
+      patch.url = currentRequest.url;
+      patch.endpoint = currentRequest.url.replace(/^https?:\/\/[^/]+/, "") || "/";
     }
     if (currentRequest.headers) {
-      patch.headers = recordToHeaderArray(currentRequest.headers)
+      patch.headers = recordToHeaderArray(currentRequest.headers);
     }
     if (currentRequest.params) {
       patch.queryParams = Object.entries(currentRequest.params).map(([key, value]) => ({
         key,
         value: String(value),
         enabled: true,
-      }))
+      }));
     }
     if (currentRequest.body !== undefined) {
-      patch.body = typeof currentRequest.body === "string"
-        ? currentRequest.body
-        : JSON.stringify(currentRequest.body)
+      patch.body =
+        typeof currentRequest.body === "string"
+          ? currentRequest.body
+          : JSON.stringify(currentRequest.body);
     }
     if (Object.keys(patch).length > 0) {
-      updateTab(activeTab.id, patch)
+      updateTab(activeTab.id, patch);
     }
-  }, [currentRequest, activeTab.id, updateTab])
+  }, [currentRequest, activeTab.id, updateTab]);
 
   useEffect(() => {
-    if (!lastResponse) return
+    if (!lastResponse) return;
     const json = JSON.stringify({
       s: lastResponse.status,
       d: lastResponse.durationMs,
       h: lastResponse.headers,
-    })
-    if (json === lastRespJson.current) return
-    lastRespJson.current = json
+    });
+    if (json === lastRespJson.current) return;
+    lastRespJson.current = json;
 
     updateTab(activeTab.id, {
       hasResponse: true,
@@ -205,49 +206,52 @@ export function RequestTabsManager() {
       responseTime: lastResponse.durationMs,
       responseHeaders: lastResponse.headers,
       responseBody: lastResponse.body as string | undefined,
-    })
-  }, [lastResponse, activeTab.id, updateTab])
+    });
+  }, [lastResponse, activeTab.id, updateTab]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div data-testid="request-tabs">
         <RequestTabBar
           tabs={tabs}
-        activeTabId={activeTabId}
-        canScrollLeft={canScrollLeft}
-        canScrollRight={canScrollRight}
-        tabListRef={tabListRef}
-        contextMenu={contextMenu}
-        onSelectTab={setActiveTabId}
-        onScroll={scrollTabs}
-        onAddTab={addNewTab}
-        onCloseTab={closeTab}
-        onContextMenu={setContextMenu}
-        onCloseContextMenu={() => setContextMenu(null)}
-        onSaveActiveTab={saveActiveTab}
-        onDuplicateTab={duplicateTab}
-        onCloseOthers={closeOthers}
-        onCloseToRight={closeToRight}
-        onCloseAllTabs={closeAllTabs}
-        onSaveAllTabs={saveAllTabs}
-        onOpenCollections={() => setCollectionsDrawerOpen(true)}
-        onDuplicateActive={() => duplicateTab(activeTab)}
-        onSaveActive={saveActiveTab}
-        onOpenHistory={() => setHistoryOpen(true)}
-      />
+          activeTabId={activeTabId}
+          canScrollLeft={canScrollLeft}
+          canScrollRight={canScrollRight}
+          tabListRef={tabListRef}
+          contextMenu={contextMenu}
+          onSelectTab={setActiveTabId}
+          onScroll={scrollTabs}
+          onAddTab={addNewTab}
+          onCloseTab={closeTab}
+          onContextMenu={setContextMenu}
+          onCloseContextMenu={() => setContextMenu(null)}
+          onSaveActiveTab={saveActiveTab}
+          onDuplicateTab={duplicateTab}
+          onCloseOthers={closeOthers}
+          onCloseToRight={closeToRight}
+          onCloseAllTabs={closeAllTabs}
+          onSaveAllTabs={saveAllTabs}
+          onOpenCollections={() => setCollectionsDrawerOpen(true)}
+          onDuplicateActive={() => duplicateTab(activeTab)}
+          onSaveActive={saveActiveTab}
+          onOpenHistory={() => setHistoryOpen(true)}
+        />
       </div>
-
-
 
       {collectionRunLogs.length > 0 && (
         <div className="border-b border-border/50 bg-muted/5 px-4 py-2">
           <div className="rounded-lg border border-border/30 bg-muted/10 px-3 py-2">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Run Logs</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                Run Logs
+              </span>
             </div>
             <div className="space-y-0.5 max-h-[80px] overflow-y-auto scrollbar-discreet">
               {collectionRunLogs.slice(-5).map((log) => (
-                <div key={`log-${log}`} className="text-[11px] font-mono text-muted-foreground/70 truncate">
+                <div
+                  key={`log-${log}`}
+                  className="text-[11px] font-mono text-muted-foreground/70 truncate"
+                >
                   <span className="text-muted-foreground/30">{`>`}</span> {log}
                 </div>
               ))}
@@ -256,7 +260,12 @@ export function RequestTabsManager() {
         </div>
       )}
 
-      <div className={cn("min-h-0 h-full flex-1 overflow-hidden transition-colors duration-200", getMethodPanelClass(activeTab.method))}>
+      <div
+        className={cn(
+          "min-h-0 h-full flex-1 overflow-hidden transition-colors duration-200",
+          getMethodPanelClass(activeTab.method),
+        )}
+      >
         <ResizablePanelGroup direction="horizontal" className="min-h-0 h-full">
           <ResizablePanel
             ref={requestPanelRef}
@@ -286,22 +295,32 @@ export function RequestTabsManager() {
                 postResponseScript={activeTab.postResponseScript}
                 onMethodChange={(method) => updateTab(activeTab.id, { method })}
                 onUrlChange={(url) => {
-                  const endpoint = url.replace(/^https?:\/\/[^/]+/, "") || "/"
-                  updateTab(activeTab.id, { url, endpoint })
+                  const endpoint = url.replace(/^https?:\/\/[^/]+/, "") || "/";
+                  updateTab(activeTab.id, { url, endpoint });
                 }}
                 onQueryParamsChange={(queryParams) => updateTab(activeTab.id, { queryParams })}
                 onHeadersChange={(headers) => updateTab(activeTab.id, { headers })}
                 onBodyChange={(body) => updateTab(activeTab.id, { body })}
                 onBodyTypeChange={(bodyType) => updateTab(activeTab.id, { bodyType })}
-                onAuthChange={(authType, authToken) => updateTab(activeTab.id, { authType, authToken })}
+                onAuthChange={(authType, authToken) =>
+                  updateTab(activeTab.id, { authType, authToken })
+                }
                 onAssertionsChange={(assertions) => updateTab(activeTab.id, { assertions })}
-                onRunnerAssertionsChange={(runnerAssertions) => updateTab(activeTab.id, { runnerAssertions })}
-                onPreRequestScriptChange={(preRequestScript) => updateTab(activeTab.id, { preRequestScript })}
-                onPostResponseScriptChange={(postResponseScript) => updateTab(activeTab.id, { postResponseScript })}
+                onRunnerAssertionsChange={(runnerAssertions) =>
+                  updateTab(activeTab.id, { runnerAssertions })
+                }
+                onPreRequestScriptChange={(preRequestScript) =>
+                  updateTab(activeTab.id, { preRequestScript })
+                }
+                onPostResponseScriptChange={(postResponseScript) =>
+                  updateTab(activeTab.id, { postResponseScript })
+                }
                 onRunTests={sendRequest}
                 onSend={sendRequest}
                 isLoading={isLoading}
-                variableNames={variableMappings.filter((m) => m.enabled && m.name.trim()).map((m) => m.name.trim())}
+                variableNames={variableMappings
+                  .filter((m) => m.enabled && m.name.trim())
+                  .map((m) => m.name.trim())}
               />
             </div>
           </ResizablePanel>
@@ -326,6 +345,7 @@ export function RequestTabsManager() {
                 responseData={activeTab.responseData}
                 responseStatus={activeTab.responseStatus}
                 responseTime={activeTab.responseTime}
+                responseTimings={activeTab.responseTimings}
                 responseSize={activeTab.responseSize}
                 responseHeaders={activeTab.responseHeaders}
                 testResults={activeTab.testResults}
@@ -337,18 +357,23 @@ export function RequestTabsManager() {
                 onAnalyze={handleAnalyzeRequest}
                 onGenerateTests={handleGenerateTests}
                 onPatchRequest={(patch) => {
-                  const tabPatch: Record<string, unknown> = {}
-                  if (patch.method !== undefined) tabPatch.method = patch.method
+                  const tabPatch: Record<string, unknown> = {};
+                  if (patch.method !== undefined) tabPatch.method = patch.method;
                   if (patch.url !== undefined) {
-                    tabPatch.url = patch.url
-                    tabPatch.endpoint = patch.url.replace(/^https?:\/\/[^/]+/, "") || "/"
+                    tabPatch.url = patch.url;
+                    tabPatch.endpoint = patch.url.replace(/^https?:\/\/[^/]+/, "") || "/";
                   }
                   if (patch.headers !== undefined) {
-                    tabPatch.headers = Object.entries(patch.headers).map(([key, value]) => ({ key, value }))
+                    tabPatch.headers = Object.entries(patch.headers).map(([key, value]) => ({
+                      key,
+                      value,
+                    }));
                   }
-                  if (patch.body !== undefined) tabPatch.body = typeof patch.body === "string" ? patch.body : JSON.stringify(patch.body)
-                  if (patch.authType !== undefined) tabPatch.authType = patch.authType
-                  updateTab(activeTab.id, tabPatch as Parameters<typeof updateTab>[1])
+                  if (patch.body !== undefined)
+                    tabPatch.body =
+                      typeof patch.body === "string" ? patch.body : JSON.stringify(patch.body);
+                  if (patch.authType !== undefined) tabPatch.authType = patch.authType;
+                  updateTab(activeTab.id, tabPatch as Parameters<typeof updateTab>[1]);
                 }}
                 aiSummary={aiEngine.lastSummary ?? undefined}
                 aiError={aiEngine.error ?? undefined}
@@ -383,12 +408,15 @@ export function RequestTabsManager() {
         }
         onDeleteCollection={deleteCollection}
         onRenameCollection={(id, name) => updateCollection(id, { name })}
-        onAddRequestToCollection={(collectionId, request?: Omit<RequestItem, "id" | "createdAt" | "updatedAt">) => {
+        onAddRequestToCollection={(
+          collectionId,
+          request?: Omit<RequestItem, "id" | "createdAt" | "updatedAt">,
+        ) => {
           if (request) {
-            addRequestToCollection(collectionId, request)
-            return
+            addRequestToCollection(collectionId, request);
+            return;
           }
-          createNewRequestInCollection(collectionId)
+          createNewRequestInCollection(collectionId);
         }}
         onRemoveRequestFromCollection={removeRequestFromCollection}
         onDuplicateCollection={duplicateCollection}
@@ -425,8 +453,8 @@ export function RequestTabsManager() {
             <HistoryPanel
               history={history}
               onSelectRequest={(item) => {
-                loadRequestIntoActiveTab(item)
-                setHistoryOpen(false)
+                loadRequestIntoActiveTab(item);
+                setHistoryOpen(false);
               }}
               onClearHistory={clearHistory}
               onRemoveItem={removeFromHistory}
@@ -452,8 +480,8 @@ export function RequestTabsManager() {
         pendingTab={pendingCloseTab}
         onOpenChange={(open) => !open && setPendingCloseTab(null)}
         onDiscard={() => {
-          if (pendingCloseTab) forceCloseTab(pendingCloseTab.id)
-          setPendingCloseTab(null)
+          if (pendingCloseTab) forceCloseTab(pendingCloseTab.id);
+          setPendingCloseTab(null);
         }}
       />
 
@@ -466,5 +494,5 @@ export function RequestTabsManager() {
         />
       )}
     </div>
-  )
+  );
 }

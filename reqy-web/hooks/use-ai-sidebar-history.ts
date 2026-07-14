@@ -44,14 +44,11 @@ export function useAiSidebarHistory(messages: ChatMessage[]) {
 
       if (existing) {
         updated = prev.map((s) =>
-          s.id === currentSessionId
-            ? { ...s, messages, updatedAt: new Date().toISOString() }
-            : s,
+          s.id === currentSessionId ? { ...s, messages, updatedAt: new Date().toISOString() } : s,
         );
       } else {
         const title =
-          messages.find((m) => m.role === "user")?.content.slice(0, 50) ||
-          "Nouvelle conversation";
+          messages.find((m) => m.role === "user")?.content.slice(0, 50) || "Nouvelle conversation";
         updated = [
           ...prev,
           {
@@ -67,7 +64,6 @@ export function useAiSidebarHistory(messages: ChatMessage[]) {
       persistence.setItem(HISTORY_KEY, updated.slice(0, MAX_HISTORY));
       return updated;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, currentSessionId]);
 
   const handleNewSession = useCallback(() => {

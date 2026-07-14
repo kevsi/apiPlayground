@@ -122,14 +122,20 @@ function buildAnthropicToolHistory(prev?: PreviousTurn[]): Record<string, unknow
       role: "assistant",
       content: turn.assistantToolCalls.map((tc) => {
         let input: Record<string, unknown> = {};
-        try { input = JSON.parse(tc.arguments); } catch { /* ignore */ }
+        try {
+          input = JSON.parse(tc.arguments);
+        } catch {
+          /* ignore */
+        }
         return { type: "tool_use", id: tc.id, name: tc.name, input };
       }),
     });
     msgs.push({
       role: "user",
       content: turn.toolResults.map((r) => ({
-        type: "tool_result", tool_use_id: r.callId, content: r.error ?? r.content,
+        type: "tool_result",
+        tool_use_id: r.callId,
+        content: r.error ?? r.content,
       })),
     });
   }
@@ -144,14 +150,20 @@ function buildGeminiToolHistory(prev?: PreviousTurn[]): Record<string, unknown>[
       role: "model",
       parts: turn.assistantToolCalls.map((tc) => {
         let args: Record<string, unknown> = {};
-        try { args = JSON.parse(tc.arguments); } catch { /* ignore */ }
+        try {
+          args = JSON.parse(tc.arguments);
+        } catch {
+          /* ignore */
+        }
         return { functionCall: { name: tc.name, args } };
       }),
     });
     for (const r of turn.toolResults) {
       contents.push({
         role: "function",
-        parts: [{ functionResponse: { name: r.name, response: { content: r.error ?? r.content } } }],
+        parts: [
+          { functionResponse: { name: r.name, response: { content: r.error ?? r.content } } },
+        ],
       });
     }
   }
@@ -289,8 +301,14 @@ export async function POST(req: NextRequest) {
 
       const toolUses = contentArray
         .filter(
-          (item: unknown): item is { type?: string; id?: string; name?: string; input?: Record<string, unknown> } =>
-            typeof item === "object" && item !== null && (item as any).type === "tool_use",
+          (
+            item: unknown,
+          ): item is {
+            type?: string;
+            id?: string;
+            name?: string;
+            input?: Record<string, unknown>;
+          } => typeof item === "object" && item !== null && (item as any).type === "tool_use",
         )
         .map((item) => ({
           id: (item as any).id,
@@ -523,10 +541,7 @@ export async function POST(req: NextRequest) {
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: system }] },
-          contents: [
-            { parts: [{ text: message }] },
-            ...buildGeminiToolHistory(previousTurns),
-          ],
+          contents: [{ parts: [{ text: message }] }, ...buildGeminiToolHistory(previousTurns)],
           ...(geminiTools?.length ? { tools: geminiTools } : {}),
         }),
       });
@@ -536,13 +551,17 @@ export async function POST(req: NextRequest) {
       if (contentType.includes("text/event-stream")) {
         const rawText = await res.text();
         let combined = "";
-        let functionCallCalls: Array<{ id?: string; name?: string; arguments: string }> = [];
+        const functionCallCalls: Array<{ id?: string; name?: string; arguments: string }> = [];
         for (const line of rawText.split("\n")) {
           if (line.startsWith("data: ")) {
             const jsonStr = line.slice(6).trim();
             if (!jsonStr || jsonStr === "[DONE]") continue;
             try {
-              const chunk: GeminiChunk & { candidates?: Array<{ functionCall?: { name?: string; args?: Record<string, unknown>; id?: string } }> } = JSON.parse(jsonStr);
+              const chunk: GeminiChunk & {
+                candidates?: Array<{
+                  functionCall?: { name?: string; args?: Record<string, unknown>; id?: string };
+                }>;
+              } = JSON.parse(jsonStr);
               const text =
                 chunk.candidates?.[0]?.content?.parts?.[0]?.text ||
                 chunk.candidates?.[0]?.content?.text ||
@@ -617,7 +636,8 @@ export async function POST(req: NextRequest) {
       const content = (firstPart?.text as string) ?? (candidateContent?.text as string) ?? "";
 
       // Détecter functionCall dans la réponse non-streamée
-      const functionCall = firstCandidate?.functionCall as { name?: string; args?: Record<string, unknown>; id?: string } | undefined;
+      const functionCall = firstCandidate?.functionCall as
+        { name?: string; args?: Record<string, unknown>; id?: string } | undefined;
       if (functionCall?.name) {
         return NextResponse.json({
           content,

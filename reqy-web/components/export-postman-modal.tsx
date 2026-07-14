@@ -1,18 +1,18 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from "react"
-import { Loader2, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "@/hooks/use-toast"
-import { Collection } from "@/hooks/use-request-store"
+import { useEffect, useState } from "react";
+import { Loader2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/hooks/use-toast";
+import { Collection } from "@/hooks/use-request-store";
 
 interface ExportPostmanModalProps {
-  open: boolean
-  onClose: () => void
-  collections: Collection[]
-  onExport: (selectedCollectionIds: string[]) => Promise<void> | void
-  isConnected: boolean
+  open: boolean;
+  onClose: () => void;
+  collections: Collection[];
+  onExport: (selectedCollectionIds: string[]) => Promise<void> | void;
+  isConnected: boolean;
 }
 
 export function ExportPostmanModal({
@@ -22,33 +22,37 @@ export function ExportPostmanModal({
   onExport,
   isConnected,
 }: ExportPostmanModalProps) {
-  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([])
-  const [isExporting, setIsExporting] = useState(false)
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const selectTimeout = window.setTimeout(
       () => setSelectedCollectionIds(collections.map((collection) => collection.id)),
       0,
-    )
-    return () => window.clearTimeout(selectTimeout)
-  }, [open, collections])
+    );
+    return () => window.clearTimeout(selectTimeout);
+  }, [open, collections]);
 
   const toggleCollection = (collectionId: string) => {
     setSelectedCollectionIds((current) =>
       current.includes(collectionId)
         ? current.filter((id) => id !== collectionId)
-        : [...current, collectionId]
-    )
-  }
+        : [...current, collectionId],
+    );
+  };
 
   const selectAll = () => {
-    setSelectedCollectionIds(collections.map((collection) => collection.id))
-  }
+    setSelectedCollectionIds(collections.map((collection) => collection.id));
+  };
 
   const clearSelection = () => {
-    setSelectedCollectionIds([])
-  }
+    setSelectedCollectionIds([]);
+  };
+
+  const selectedRequestCount = collections
+    .filter((collection) => selectedCollectionIds.includes(collection.id))
+    .reduce((sum, collection) => sum + collection.requests.length, 0);
 
   const handleExportClick = async () => {
     if (!selectedCollectionIds.length) {
@@ -56,20 +60,20 @@ export function ExportPostmanModal({
         title: "Sélectionnez au moins une collection",
         description: "Choisissez les collections Reqly à exporter vers Postman.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsExporting(true)
+    setIsExporting(true);
     try {
-      await onExport(selectedCollectionIds)
-      onClose()
+      await onExport(selectedCollectionIds);
+      onClose();
     } finally {
-      setIsExporting(false)
+      setIsExporting(false);
     }
-  }
+  };
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -79,13 +83,11 @@ export function ExportPostmanModal({
           <div>
             <h2 className="text-lg font-semibold">Exporter vers Postman</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Sélectionnez les collections Reqly à exporter, puis confirmez l’exportation vers Postman.
+              Sélectionnez les collections Reqly à exporter, puis confirmez l’exportation vers
+              Postman.
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-          >
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="size-4" />
           </button>
         </div>
@@ -123,7 +125,7 @@ export function ExportPostmanModal({
                 <p className="text-sm text-muted-foreground">Aucune collection à exporter.</p>
               ) : (
                 collections.map((collection) => {
-                  const checked = selectedCollectionIds.includes(collection.id)
+                  const checked = selectedCollectionIds.includes(collection.id);
                   return (
                     <label
                       key={collection.id}
@@ -136,11 +138,12 @@ export function ExportPostmanModal({
                       <div className="flex-1">
                         <p className="font-medium">{collection.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {collection.requests.length} requête{collection.requests.length === 1 ? "" : "s"}
+                          {collection.requests.length} requête
+                          {collection.requests.length === 1 ? "" : "s"}
                         </p>
                       </div>
                     </label>
-                  )
+                  );
                 })
               )}
             </div>
@@ -148,25 +151,35 @@ export function ExportPostmanModal({
             <div className="space-y-2 rounded-lg border border-border bg-slate-50 px-4 py-3 text-sm text-slate-700">
               <p className="font-medium">Confirmation d'exportation</p>
               <p>
-                Vous êtes sur le point d’exporter <span className="font-semibold">{selectedCollectionIds.length}</span> collection{selectedCollectionIds.length === 1 ? "" : "s"} vers Postman.
+                Vous êtes sur le point d’exporter{" "}
+                <span className="font-semibold">{selectedCollectionIds.length}</span> collection
+                {selectedCollectionIds.length === 1 ? "" : "s"} vers Postman.
               </p>
               <p>
-                Cela inclut <span className="font-semibold">{collections.reduce((sum, collection) => sum + collection.requests.length, 0)}</span> requête{collections.reduce((sum, collection) => sum + collection.requests.length, 0) === 1 ? "" : "s"} au total.
+                Cela inclut <span className="font-semibold">{selectedRequestCount}</span> requête
+                {selectedRequestCount === 1 ? "" : "s"} au total.
               </p>
             </div>
 
             <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
               <p>
-                {selectedCollectionIds.length} collection{selectedCollectionIds.length === 1 ? "" : "s"} sélectionnée{selectedCollectionIds.length === 1 ? "" : "s"}.
+                {selectedCollectionIds.length} collection
+                {selectedCollectionIds.length === 1 ? "" : "s"} sélectionnée
+                {selectedCollectionIds.length === 1 ? "" : "s"}.
               </p>
-              <p>{collections.reduce((sum, collection) => sum + collection.requests.length, 0)} requête{collections.reduce((sum, collection) => sum + collection.requests.length, 0) === 1 ? "" : "s"} au total</p>
+              <p>
+                {selectedRequestCount} requête{selectedRequestCount === 1 ? "" : "s"} au total
+              </p>
             </div>
 
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={onClose} disabled={isExporting}>
                 Annuler
               </Button>
-              <Button onClick={handleExportClick} disabled={isExporting || selectedCollectionIds.length === 0}>
+              <Button
+                onClick={handleExportClick}
+                disabled={isExporting || selectedCollectionIds.length === 0}
+              >
                 {isExporting ? (
                   <>
                     <Loader2 className="size-4 mr-2 animate-spin" />
@@ -181,5 +194,5 @@ export function ExportPostmanModal({
         )}
       </div>
     </div>
-  )
+  );
 }

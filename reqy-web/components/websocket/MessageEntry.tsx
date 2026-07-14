@@ -35,7 +35,7 @@ export function MessageEntry({ message }: MessageEntryProps) {
         "group/message flex flex-col gap-1 rounded-lg border p-3 transition-all duration-200 cursor-pointer",
         isSent
           ? "border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10"
-          : "border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10",
+          : "border-success/20 bg-success/5 hover:bg-success/10",
       )}
       onClick={() => showExpand && setExpanded((e) => !e)}
       title={`${message.byteSize} bytes`}
@@ -48,7 +48,7 @@ export function MessageEntry({ message }: MessageEntryProps) {
               "text-sm font-bold font-mono px-1.5 py-0",
               isSent
                 ? "border-blue-500/30 text-blue-500 bg-blue-500/10"
-                : "border-emerald-500/30 text-emerald-500 bg-emerald-500/10",
+                : "border-success/30 text-success bg-success/10",
             )}
           >
             {isSent ? "\u2191" : "\u2193"}

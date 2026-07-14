@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Sparkles, Loader2, AlertCircle } from "lucide-react"
+import { useState, useEffect } from "react";
+import { Sparkles, Loader2, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,25 +9,25 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
   "Give me the first 5 countries with their code and capital",
   "Fetch the current user with their last 3 orders",
   "List all products under $50, sorted by price",
   "Get a user by ID with their posts and comments",
-]
+];
 
 interface Props {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSubmit: (description: string) => void | Promise<void>
-  loading?: boolean
-  error?: string | null
-  hasSchema?: boolean
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (description: string) => void | Promise<void>;
+  loading?: boolean;
+  error?: string | null;
+  hasSchema?: boolean;
 }
 
 export function GraphqlAIDialog({
@@ -38,20 +38,20 @@ export function GraphqlAIDialog({
   error = null,
   hasSchema = false,
 }: Props) {
-  const [description, setDescription] = useState("")
+  const [description, setDescription] = useState("");
 
   // Reset on close.
   useEffect(() => {
-    if (!open) setDescription("")
-  }, [open])
+    if (!open) setDescription("");
+  }, [open]);
 
-  const trimmed = description.trim()
-  const canSubmit = trimmed.length > 0 && !loading
+  const trimmed = description.trim();
+  const canSubmit = trimmed.length > 0 && !loading;
 
   const handleSubmit = async () => {
-    if (!canSubmit) return
-    await onSubmit(trimmed)
-  }
+    if (!canSubmit) return;
+    await onSubmit(trimmed);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -64,7 +64,7 @@ export function GraphqlAIDialog({
           <DialogDescription>
             Décris en français (ou anglais) les données que tu veux récupérer.
             {!hasSchema && (
-              <span className="block mt-1 text-amber-600">
+              <span className="block mt-1 text-warning">
                 Aucun schéma chargé — lance d&apos;abord Refresh Schema pour de meilleurs résultats.
               </span>
             )}
@@ -80,8 +80,8 @@ export function GraphqlAIDialog({
             autoFocus
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault()
-                handleSubmit()
+                e.preventDefault();
+                handleSubmit();
               }
             }}
             data-testid="graphql-ai-description"
@@ -109,7 +109,7 @@ export function GraphqlAIDialog({
 
           {error && (
             <div
-              className="flex items-start gap-1 text-xs text-red-600 bg-red-500/10 border border-red-500/30 rounded p-2"
+              className="flex items-start gap-1 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded p-2"
               data-testid="graphql-ai-error"
             >
               <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
@@ -118,8 +118,8 @@ export function GraphqlAIDialog({
           )}
 
           <p className="text-[10px] text-muted-foreground">
-            Astuce : ⌘/Ctrl+Entrée pour générer. Configure ton provider dans
-            Settings si ce n&apos;est pas déjà fait.
+            Astuce : ⌘/Ctrl+Entrée pour générer. Configure ton provider dans Settings si ce
+            n&apos;est pas déjà fait.
           </p>
         </div>
 
@@ -132,11 +132,7 @@ export function GraphqlAIDialog({
           >
             Annuler
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            data-testid="graphql-ai-submit"
-          >
+          <Button onClick={handleSubmit} disabled={!canSubmit} data-testid="graphql-ai-submit">
             {loading ? (
               <>
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Génération…
@@ -150,5 +146,5 @@ export function GraphqlAIDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

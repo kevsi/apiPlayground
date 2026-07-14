@@ -1,6 +1,6 @@
-﻿"use client"
+﻿"use client";
 
-import { useEffect, useState } from "react"
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,53 +8,53 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
-import { useRequestStore } from "@/hooks/use-request-store"
-import { useShallow } from "zustand/react/shallow"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { useRequestStore } from "@/hooks/use-request-store";
+import { useShallow } from "zustand/react/shallow";
 
 interface ExtractedFolder {
-  id: string
-  name: string
-  parentId: string | null
+  id: string;
+  name: string;
+  parentId: string | null;
 }
 
 interface ExtractedRequest {
-  id: string
-  name: string
-  method: string
-  url: string
-  endpoint: string
-  headers: Record<string, string>
-  body: string
-  bodyType?: "json" | "form-data" | "x-www-form" | "raw" | "binary"
-  queryParams: Array<{ key: string; value: string }>
-  folderId: string | null
-  authType: "none" | "bearer" | "basic" | "api-key" | "oauth2"
-  authToken?: string
-  createdAt: string
-  updatedAt: string
+  id: string;
+  name: string;
+  method: string;
+  url: string;
+  endpoint: string;
+  headers: Record<string, string>;
+  body: string;
+  bodyType?: "json" | "form-data" | "x-www-form" | "raw" | "binary";
+  queryParams: Array<{ key: string; value: string }>;
+  folderId: string | null;
+  authType: "none" | "bearer" | "basic" | "api-key" | "oauth2";
+  authToken?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface PostmanImportModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  collectionId: string | null
-  collectionName: string
-  onImported?: (collectionId: string) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  collectionId: string | null;
+  collectionName: string;
+  onImported?: (collectionId: string) => void;
 }
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  GET: "bg-success/10 text-success",
   POST: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  PUT: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  PUT: "bg-warning/10 text-warning",
   PATCH: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  DELETE: "bg-red-500/15 text-red-700 dark:text-red-300",
-}
+  DELETE: "bg-destructive/10 text-destructive",
+};
 
-const PREVIEW_LIMIT = 3
+const PREVIEW_LIMIT = 3;
 
 export function PostmanImportModal({
   open,
@@ -63,13 +63,13 @@ export function PostmanImportModal({
   collectionName,
   onImported,
 }: PostmanImportModalProps) {
-  const { toast } = useToast()
-  const [requests, setRequests] = useState<ExtractedRequest[]>([])
-  const [folders, setFolders] = useState<ExtractedFolder[]>([])
-  const [collectionIdReturned, setCollectionIdReturned] = useState<string>("")
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast();
+  const [requests, setRequests] = useState<ExtractedRequest[]>([]);
+  const [folders, setFolders] = useState<ExtractedFolder[]>([]);
+  const [collectionIdReturned, setCollectionIdReturned] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // Atomic + useShallow ÔÇö we only need two actions; no need to subscribe to
   // the entire store (and the `as any` cast is no longer required).
   const { addCollection, addRequestToCollection, addFolder } = useRequestStore(
@@ -78,19 +78,19 @@ export function PostmanImportModal({
       addRequestToCollection: s.addRequestToCollection,
       addFolder: s.addFolder,
     })),
-  )
+  );
 
   useEffect(() => {
     if (!open || !collectionId) {
-      setRequests([])
-      setFolders([])
-      setCollectionIdReturned("")
-      setError(null)
-      return
+      setRequests([]);
+      setFolders([]);
+      setCollectionIdReturned("");
+      setError(null);
+      return;
     }
-    let cancelled = false
-    setLoading(true)
-    setError(null)
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
     fetch("/api/postman-import/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -99,58 +99,50 @@ export function PostmanImportModal({
     })
       .then((r) => r.json())
       .then((data) => {
-        if (cancelled) return
+        if (cancelled) return;
         if (!data.requests) {
-          setError(data.message ?? "R├®ponse invalide")
-          return
+          setError(data.message ?? "R├®ponse invalide");
+          return;
         }
         // Store ALL requests ÔÇö preview only shows PREVIEW_LIMIT of them.
-        setRequests(data.requests)
-        setFolders(data.folders ?? [])
-        setCollectionIdReturned(data.collectionId ?? collectionId)
+        setRequests(data.requests);
+        setFolders(data.folders ?? []);
+        setCollectionIdReturned(data.collectionId ?? collectionId);
       })
       .catch(() => {
-        if (!cancelled) setError("Erreur r├®seau")
+        if (!cancelled) setError("Erreur r├®seau");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+        if (!cancelled) setLoading(false);
+      });
     return () => {
-      cancelled = true
-    }
-  }, [open, collectionId])
+      cancelled = true;
+    };
+  }, [open, collectionId]);
 
   function handleConfirm() {
-    if (requests.length === 0 || saving) return
-    setSaving(true)
+    if (requests.length === 0 || saving) return;
+    setSaving(true);
     try {
       const newCollectionId = addCollection({
         name: collectionName,
         color: "emerald",
         icon: "package",
-      })
+      });
 
       // Folders are emitted in DFS pre-order (parents before children) by
       // lib/postman-collection.ts. Walk them in order and remap each server
       // folderId to the freshly generated client one.
-      const folderIdMap = new Map<string, string>()
+      const folderIdMap = new Map<string, string>();
       for (const folder of folders as ExtractedFolder[]) {
-        const parentClientId = folder.parentId
-          ? folderIdMap.get(folder.parentId) ?? null
-          : null
-        const clientId: string = addFolder(
-          newCollectionId,
-          folder.name,
-          parentClientId,
-        )
-        folderIdMap.set(folder.id, clientId)
+        const parentClientId = folder.parentId ? (folderIdMap.get(folder.parentId) ?? null) : null;
+        const clientId: string = addFolder(newCollectionId, folder.name, parentClientId);
+        folderIdMap.set(folder.id, clientId);
       }
 
       // Now create every request, remapping its folderId through the map.
       for (const req of requests) {
-        const clientFolderId = req.folderId
-          ? folderIdMap.get(req.folderId) ?? null
-          : null
+        const clientFolderId = req.folderId ? (folderIdMap.get(req.folderId) ?? null) : null;
         addRequestToCollection(newCollectionId, {
           name: req.name,
           method: req.method as never,
@@ -163,34 +155,32 @@ export function PostmanImportModal({
           folderId: clientFolderId,
           authType: req.authType,
           ...(req.authToken ? { authToken: req.authToken } : {}),
-        })
+        });
       }
 
       toast({
         title: "Import├®",
         description: `${requests.length} route${requests.length > 1 ? "s" : ""} ajout├®e${requests.length > 1 ? "s" : ""} ├á votre biblioth├¿que${
-          folders.length > 0
-            ? ` (${folders.length} dossier${folders.length > 1 ? "s" : ""})`
-            : ""
+          folders.length > 0 ? ` (${folders.length} dossier${folders.length > 1 ? "s" : ""})` : ""
         }.`,
         meta: { event: "importExport" },
-      } as any)
-      onImported?.(newCollectionId)
-      onOpenChange(false)
+      } as any);
+      onImported?.(newCollectionId);
+      onOpenChange(false);
     } catch (e) {
       toast({
         title: "Erreur",
         description: e instanceof Error ? e.message : "Import ├®chou├®",
         variant: "destructive",
         meta: { event: "importExport" },
-      } as any)
+      } as any);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  const previewRequests = requests.slice(0, PREVIEW_LIMIT)
-  const hiddenCount = Math.max(0, requests.length - previewRequests.length)
+  const previewRequests = requests.slice(0, PREVIEW_LIMIT);
+  const hiddenCount = Math.max(0, requests.length - previewRequests.length);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -201,14 +191,14 @@ export function PostmanImportModal({
             {loading
               ? "Chargement de l'aper├ºuÔÇª"
               : error
-              ? error
-              : requests.length > 0
-              ? `${requests.length} route${requests.length > 1 ? "s" : ""}${
-                  folders.length > 0
-                    ? ` dans ${folders.length} dossier${folders.length > 1 ? "s" : ""}`
-                    : ""
-                } (aper├ºu des ${PREVIEW_LIMIT} premi├¿res).`
-              : "Aucune route ├á importer."}
+                ? error
+                : requests.length > 0
+                  ? `${requests.length} route${requests.length > 1 ? "s" : ""}${
+                      folders.length > 0
+                        ? ` dans ${folders.length} dossier${folders.length > 1 ? "s" : ""}`
+                        : ""
+                    } (aper├ºu des ${PREVIEW_LIMIT} premi├¿res).`
+                  : "Aucune route ├á importer."}
           </DialogDescription>
         </DialogHeader>
 
@@ -225,15 +215,10 @@ export function PostmanImportModal({
                 key={r.id}
                 className="flex items-center gap-2 rounded border bg-muted/20 p-2 text-sm"
               >
-                <Badge
-                  variant="secondary"
-                  className={`shrink-0 ${METHOD_COLORS[r.method] ?? ""}`}
-                >
+                <Badge variant="secondary" className={`shrink-0 ${METHOD_COLORS[r.method] ?? ""}`}>
                   {r.method}
                 </Badge>
-                <code className="min-w-0 flex-1 truncate font-mono text-xs">
-                  {r.url}
-                </code>
+                <code className="min-w-0 flex-1 truncate font-mono text-xs">{r.url}</code>
               </div>
             ))}
             {hiddenCount > 0 && (
@@ -243,8 +228,7 @@ export function PostmanImportModal({
               </p>
             )}
             <p className="pt-1 text-center text-xs text-muted-foreground">
-              Collection Postman ID:{" "}
-              <span className="font-mono">{collectionIdReturned}</span>
+              Collection Postman ID: <span className="font-mono">{collectionIdReturned}</span>
             </p>
           </div>
         ) : null}
@@ -255,18 +239,13 @@ export function PostmanImportModal({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Annuler
           </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={loading || saving || requests.length === 0}
-          >
+          <Button onClick={handleConfirm} disabled={loading || saving || requests.length === 0}>
             {saving
               ? "ImportationÔÇª"
-              : `Confirmer l'import${
-                  requests.length > 0 ? ` (${requests.length})` : ""
-                }`}
+              : `Confirmer l'import${requests.length > 0 ? ` (${requests.length})` : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

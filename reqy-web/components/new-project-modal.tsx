@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2, FolderOpen, Sparkles, Code2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { isTauriAvailable } from "@/lib/tauri";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -112,30 +113,19 @@ export function NewProjectModal({ open, onClose, onAdd }: NewProjectModalProps) 
 
         <div className="space-y-4 pt-2">
           {/* Mode toggle */}
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            <button
-              onClick={() => setMode("static")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors",
-                mode === "static"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent",
-              )}
-            >
-              <Code2 className="size-4" /> Parser statique
-            </button>
-            <button
-              onClick={() => setMode("ai")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors",
-                mode === "ai"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent",
-              )}
-            >
-              <Sparkles className="size-4" /> Analyse IA
-            </button>
-          </div>
+          <ToggleGroup
+            type="single"
+            value={mode}
+            onValueChange={(value) => value && setMode(value as AnalysisMode)}
+            className="grid grid-cols-2"
+          >
+            <ToggleGroupItem value="static" className="gap-2">
+              <Code2 /> Parser statique
+            </ToggleGroupItem>
+            <ToggleGroupItem value="ai" className="gap-2">
+              <Sparkles /> Analyse IA
+            </ToggleGroupItem>
+          </ToggleGroup>
 
           {mode === "ai" && (
             <p className="text-xs text-muted-foreground">

@@ -1,21 +1,21 @@
-"use client"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Code2, Loader2 } from "lucide-react"
-import { generateOpenApiSpec } from "@/lib/openapi-export"
-import { generateSdk } from "@/lib/openapi-gen/generator"
-import type { Collection } from "@/hooks/use-request-store"
+"use client";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Code2, Loader2 } from "lucide-react";
+import { generateOpenApiSpec } from "@/lib/openapi-export";
+import { generateSdk } from "@/lib/openapi-gen/generator";
+import type { Collection } from "@/hooks/use-request-store";
 
 interface HistoryLikeItem {
-  requestId: string
-  responseBody?: unknown
+  requestId: string;
+  responseBody?: unknown;
 }
 
 interface Props {
-  collections: Collection[]
-  historyItems?: HistoryLikeItem[]
-  inferFromHistory?: boolean
-  defaultName?: string
+  collections: Collection[];
+  historyItems?: HistoryLikeItem[];
+  inferFromHistory?: boolean;
+  defaultName?: string;
 }
 
 export function SdkDownloadButton({
@@ -24,41 +24,43 @@ export function SdkDownloadButton({
   inferFromHistory = false,
   defaultName = "reqly",
 }: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const download = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
       const mappedHistory = inferFromHistory
         ? historyItems?.map((h) => ({
             requestId: h.requestId,
             responseBody: h.responseBody,
           }))
-        : undefined
+        : undefined;
       const spec = generateOpenApiSpec(collections, {
         enableInference: inferFromHistory && !!mappedHistory,
         historyItems: mappedHistory,
-      })
-      const result = await generateSdk(spec, "typescript-fetch", defaultName)
+      });
+      const result = await generateSdk(spec, "typescript-fetch", defaultName);
 
       if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
         try {
-          const handle = await (window as unknown as {
-            showSaveFilePicker: (opts: {
-              suggestedName?: string
-              types?: Array<{
-                description: string
-                accept: Record<string, string[]>
-              }>
-            }) => Promise<{
-              createWritable: () => Promise<{
-                write: (chunk: BufferSource | Blob) => Promise<void>
-                close: () => Promise<void>
-              }>
-            }>
-          }).showSaveFilePicker({
+          const handle = await (
+            window as unknown as {
+              showSaveFilePicker: (opts: {
+                suggestedName?: string;
+                types?: Array<{
+                  description: string;
+                  accept: Record<string, string[]>;
+                }>;
+              }) => Promise<{
+                createWritable: () => Promise<{
+                  write: (chunk: BufferSource | Blob) => Promise<void>;
+                  close: () => Promise<void>;
+                }>;
+              }>;
+            }
+          ).showSaveFilePicker({
             suggestedName: result.filename,
             types: [
               {
@@ -66,31 +68,31 @@ export function SdkDownloadButton({
                 accept: { "application/zip": [".zip"] },
               },
             ],
-          })
-          const writable = await handle.createWritable()
-          await writable.write(result.blob)
-          await writable.close()
-          return
+          });
+          const writable = await handle.createWritable();
+          await writable.write(result.blob);
+          await writable.close();
+          return;
         } catch {
           // User cancelled
-          return
+          return;
         }
       }
 
-      const url = URL.createObjectURL(result.blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = result.filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "SDK generation failed")
+      setError(err instanceof Error ? err.message : "SDK generation failed");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-2">
@@ -109,10 +111,10 @@ export function SdkDownloadButton({
         )}
         {loading ? "Generating..." : "Download TypeScript SDK"}
       </Button>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
       <p className="text-xs text-muted-foreground">
         Generates a TypeScript client via OpenAPI Generator (ZIP).
       </p>
     </div>
-  )
+  );
 }

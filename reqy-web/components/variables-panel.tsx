@@ -1,39 +1,34 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Copy, Check, Eye, EyeOff, Braces, X } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { useRequestStore } from "@/hooks/use-request-store"
-import { useShallow } from "zustand/react/shallow"
-import { interpolate } from "@/lib/utils"
+import { useState } from "react";
+import { Copy, Check, Eye, EyeOff, Braces, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useRequestStore } from "@/hooks/use-request-store";
+import { useShallow } from "zustand/react/shallow";
+import { interpolate } from "@/lib/utils";
 
 export function VariablesPanel() {
-  const environments = useRequestStore((s) => s.environments)
-  const activeEnvironmentId = useRequestStore((s) => s.activeEnvironmentId)
-  const [open, setOpen] = useState(false)
-  const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState("")
-  const [showPreview, setShowPreview] = useState(false)
+  const environments = useRequestStore((s) => s.environments);
+  const activeEnvironmentId = useRequestStore((s) => s.activeEnvironmentId);
+  const [open, setOpen] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
 
-  const activeEnv = environments.find((e) => e.id === activeEnvironmentId)
-  const vars = activeEnv?.variables?.filter((v) => v.enabled && v.key.trim()) || []
+  const activeEnv = environments.find((e) => e.id === activeEnvironmentId);
+  const vars = activeEnv?.variables?.filter((v) => v.enabled && v.key.trim()) || [];
 
   const handleCopy = (key: string) => {
-    navigator.clipboard.writeText(`{{${key}}}`)
-    setCopiedKey(key)
-    setTimeout(() => setCopiedKey(null), 1500)
-  }
+    navigator.clipboard.writeText(`{{${key}}}`);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 1500);
+  };
 
-  const resolved = interpolate(previewUrl || "{{URL}}", vars)
-  const hasUnresolved = previewUrl && resolved.includes("{{") && resolved.includes("}}")
+  const resolved = interpolate(previewUrl || "{{URL}}", vars);
+  const hasUnresolved = previewUrl && resolved.includes("{{") && resolved.includes("}}");
 
   return (
     <>
@@ -43,7 +38,7 @@ export function VariablesPanel() {
         onClick={() => setOpen(true)}
         className={cn(
           "h-8 gap-1.5 text-xs font-normal",
-          vars.length > 0 && "border-emerald-500/30 text-emerald-600"
+          vars.length > 0 && "border-success/30 text-success",
         )}
       >
         <Braces className="size-3.5" />
@@ -95,12 +90,14 @@ export function VariablesPanel() {
                         placeholder="{{BASE_URL}}/api/users"
                         className="h-8 font-mono text-xs"
                       />
-                      <div className={cn(
-                        "rounded-md border px-3 py-2 text-xs font-mono break-all",
-                        hasUnresolved
-                          ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400"
-                      )}>
+                      <div
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-xs font-mono break-all",
+                          hasUnresolved
+                            ? "border-destructive/30 bg-destructive/10 text-destructive"
+                            : "border-success/30 bg-success/10 text-success",
+                        )}
+                      >
                         <span className="text-[10px] font-medium uppercase tracking-wider block mb-1">
                           {hasUnresolved ? "⚠ Unresolved" : "✓ Resolved"}
                         </span>
@@ -140,7 +137,9 @@ export function VariablesPanel() {
                           className="group grid grid-cols-[1fr_1fr_auto] gap-3 px-4 py-3 items-center hover:bg-accent/40 transition-colors"
                         >
                           <code className="text-xs font-semibold text-primary truncate">
-                            {"{{"}{v.key}{"}}"}
+                            {"{{"}
+                            {v.key}
+                            {"}}"}
                           </code>
                           <code className="text-xs text-muted-foreground truncate">
                             {v.value || <span className="italic opacity-50">empty</span>}
@@ -153,7 +152,7 @@ export function VariablesPanel() {
                             title={`Copy {{${v.key}}}`}
                           >
                             {copiedKey === v.key ? (
-                              <Check className="size-3.5 text-emerald-500" />
+                              <Check className="size-3.5 text-success" />
                             ) : (
                               <Copy className="size-3.5" />
                             )}
@@ -168,8 +167,11 @@ export function VariablesPanel() {
                 <div className="rounded-lg border bg-muted/50 p-4 text-xs text-muted-foreground space-y-1">
                   <p className="font-semibold text-foreground">How to use</p>
                   <p>
-                    Type <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">{"{{KEY}}"}</code> in
-                    URL, headers, or body to reference a variable.
+                    Type{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                      {"{{KEY}}"}
+                    </code>{" "}
+                    in URL, headers, or body to reference a variable.
                   </p>
                   <p>It will be replaced with the variable value when the request is sent.</p>
                 </div>
@@ -189,5 +191,5 @@ export function VariablesPanel() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

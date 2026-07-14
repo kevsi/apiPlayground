@@ -1,34 +1,44 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useMemo } from "react"
-import { GitCompare, Copy, Check, ArrowLeftRight, LayoutPanelLeft, Minus, Plus, Search } from "lucide-react"
-import { getStatusBadgeClass } from "@/lib/http-status-colors"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useMemo } from "react";
+import {
+  GitCompare,
+  Copy,
+  Check,
+  ArrowLeftRight,
+  LayoutPanelLeft,
+  Minus,
+  Plus,
+  Search,
+} from "lucide-react";
+import { getStatusBadgeClass } from "@/lib/http-status-colors";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { DiffViewer } from "@/components/diff-viewer"
-import type { HistoryItem } from "@/lib/types"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/select";
+import { DiffViewer } from "@/components/diff-viewer";
+import type { HistoryItem } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 
 interface DiffDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  history: HistoryItem[]
-  currentResponse?: string
-  currentResponseStatus?: number
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  history: HistoryItem[];
+  currentResponse?: string;
+  currentResponseStatus?: number;
 }
 
 export function DiffDialog({
@@ -39,26 +49,26 @@ export function DiffDialog({
   currentResponseStatus,
 }: DiffDialogProps) {
   const historyWithResponses = history.filter(
-    (item) => item.responseBody && item.responseBody !== currentResponse
-  )
+    (item) => item.responseBody && item.responseBody !== currentResponse,
+  );
 
-  const [leftId, setLeftId] = useState<string>("")
-  const [rightId, setRightId] = useState<string>("")
-  const [viewMode, setViewMode] = useState<"unified" | "split">("unified")
-  const [copiedLeft, setCopiedLeft] = useState(false)
-  const [copiedRight, setCopiedRight] = useState(false)
+  const [leftId, setLeftId] = useState<string>("");
+  const [rightId, setRightId] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"unified" | "split">("unified");
+  const [copiedLeft, setCopiedLeft] = useState(false);
+  const [copiedRight, setCopiedRight] = useState(false);
 
   useEffect(() => {
     if (open) {
       if (currentResponse) {
-        setLeftId("__current__")
+        setLeftId("__current__");
       }
-      const mostRecent = historyWithResponses[0]
+      const mostRecent = historyWithResponses[0];
       if (mostRecent) {
-        setRightId(mostRecent.id)
+        setRightId(mostRecent.id);
       }
     }
-  }, [open, currentResponse, historyWithResponses])
+  }, [open, currentResponse, historyWithResponses]);
 
   const leftOptions = [
     ...(currentResponse
@@ -83,7 +93,7 @@ export function DiffDialog({
       method: item.method,
       url: item.url,
     })),
-  ]
+  ];
 
   const rightOptions = historyWithResponses.map((item) => ({
     id: item.id,
@@ -93,51 +103,51 @@ export function DiffDialog({
     time: new Date(item.executedAt).toLocaleTimeString(),
     method: item.method,
     url: item.url,
-  }))
+  }));
 
   const getLeftContent = () => {
-    if (leftId === "__current__") return currentResponse ?? ""
-    const item = history.find((h) => h.id === leftId)
-    return item ? (typeof item.responseBody === "string" ? item.responseBody : "") : ""
-  }
+    if (leftId === "__current__") return currentResponse ?? "";
+    const item = history.find((h) => h.id === leftId);
+    return item ? (typeof item.responseBody === "string" ? item.responseBody : "") : "";
+  };
 
   const getRightContent = () => {
-    const item = history.find((h) => h.id === rightId)
-    return item ? (typeof item.responseBody === "string" ? item.responseBody : "") : ""
-  }
+    const item = history.find((h) => h.id === rightId);
+    return item ? (typeof item.responseBody === "string" ? item.responseBody : "") : "";
+  };
 
-  const leftMeta = leftOptions.find((o) => o.id === leftId)
-  const rightMeta = rightOptions.find((o) => o.id === rightId)
+  const leftMeta = leftOptions.find((o) => o.id === leftId);
+  const rightMeta = rightOptions.find((o) => o.id === rightId);
 
   const handleCopy = (side: "left" | "right") => {
-    const content = side === "left" ? getLeftContent() : getRightContent()
-    navigator.clipboard?.writeText(content)
+    const content = side === "left" ? getLeftContent() : getRightContent();
+    navigator.clipboard?.writeText(content);
     if (side === "left") {
-      setCopiedLeft(true)
-      setTimeout(() => setCopiedLeft(false), 1500)
+      setCopiedLeft(true);
+      setTimeout(() => setCopiedLeft(false), 1500);
     } else {
-      setCopiedRight(true)
-      setTimeout(() => setCopiedRight(false), 1500)
+      setCopiedRight(true);
+      setTimeout(() => setCopiedRight(false), 1500);
     }
-  }
+  };
 
   const handleSwap = () => {
-    const tmp = leftId
-    setLeftId(rightId)
-    setRightId(tmp)
-  }
+    const tmp = leftId;
+    setLeftId(rightId);
+    setRightId(tmp);
+  };
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setLeftId("")
-      setRightId("")
+      setLeftId("");
+      setRightId("");
     }
-    onOpenChange(newOpen)
-  }
+    onOpenChange(newOpen);
+  };
 
-  const hasSelection = leftId && rightId
-  const leftContent = getLeftContent()
-  const rightContent = getRightContent()
+  const hasSelection = leftId && rightId;
+  const leftContent = getLeftContent();
+  const rightContent = getRightContent();
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -158,32 +168,18 @@ export function DiffDialog({
             </div>
 
             {/* View mode toggle */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-border bg-muted/40 p-1">
-              <button
-                onClick={() => setViewMode("unified")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
-                  viewMode === "unified"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Search className="size-3" />
-                Unified
-              </button>
-              <button
-                onClick={() => setViewMode("split")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
-                  viewMode === "split"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <LayoutPanelLeft className="size-3" />
-                Split
-              </button>
-            </div>
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(value) => value && setViewMode(value as "unified" | "split")}
+            >
+              <ToggleGroupItem value="unified" className="gap-1.5">
+                <Search className="size-3" /> Unified
+              </ToggleGroupItem>
+              <ToggleGroupItem value="split" className="gap-1.5">
+                <LayoutPanelLeft className="size-3" /> Split
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
         </DialogHeader>
 
@@ -192,22 +188,29 @@ export function DiffDialog({
           {/* Left selector */}
           <div className="flex flex-1 flex-col gap-1.5 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="flex size-5 items-center justify-center rounded-full bg-red-500/15 text-[10px] font-bold text-red-500">L</span>
+              <span className="flex size-5 items-center justify-center rounded-full bg-red-500/15 text-[10px] font-bold text-red-500">
+                L
+              </span>
               <span className="text-xs font-medium text-muted-foreground">Base</span>
               {leftMeta?.status != null && (
                 <Badge
                   variant="outline"
-                  className={cn("h-4 px-1.5 text-[10px] font-semibold border", getStatusBadgeClass(leftMeta.status))}
+                  className={cn(
+                    "h-4 px-1.5 text-[10px] font-semibold border",
+                    getStatusBadgeClass(leftMeta.status),
+                  )}
                 >
                   {leftMeta.status}
                 </Badge>
               )}
               {leftMeta?.time && (
-                <span className="text-[10px] text-muted-foreground/60 ml-auto">{leftMeta.time}</span>
+                <span className="text-[10px] text-muted-foreground/60 ml-auto">
+                  {leftMeta.time}
+                </span>
               )}
             </div>
             <Select value={leftId} onValueChange={setLeftId}>
-              <SelectTrigger className="h-8 text-xs border-red-500/20 focus:ring-red-500/20 bg-red-500/5">
+              <SelectTrigger className="h-8 text-xs border-destructive/20 focus:ring-destructive/20 bg-destructive/5">
                 <SelectValue placeholder="Select base response..." />
               </SelectTrigger>
               <SelectContent>
@@ -215,7 +218,12 @@ export function DiffDialog({
                   <SelectItem key={opt.id} value={opt.id} className="text-xs">
                     <div className="flex items-center gap-2">
                       {opt.status != null && (
-                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", getStatusBadgeClass(opt.status))}>
+                        <span
+                          className={cn(
+                            "rounded px-1 py-0.5 text-[10px] font-bold border",
+                            getStatusBadgeClass(opt.status),
+                          )}
+                        >
                           {opt.status}
                         </span>
                       )}
@@ -240,22 +248,29 @@ export function DiffDialog({
           {/* Right selector */}
           <div className="flex flex-1 flex-col gap-1.5 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">R</span>
+              <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">
+                R
+              </span>
               <span className="text-xs font-medium text-muted-foreground">Compare</span>
               {rightMeta?.status != null && (
                 <Badge
                   variant="outline"
-                  className={cn("h-4 px-1.5 text-[10px] font-semibold border", getStatusBadgeClass(rightMeta.status))}
+                  className={cn(
+                    "h-4 px-1.5 text-[10px] font-semibold border",
+                    getStatusBadgeClass(rightMeta.status),
+                  )}
                 >
                   {rightMeta.status}
                 </Badge>
               )}
               {rightMeta?.time && (
-                <span className="text-[10px] text-muted-foreground/60 ml-auto">{rightMeta.time}</span>
+                <span className="text-[10px] text-muted-foreground/60 ml-auto">
+                  {rightMeta.time}
+                </span>
               )}
             </div>
             <Select value={rightId} onValueChange={setRightId}>
-              <SelectTrigger className="h-8 text-xs border-emerald-500/20 focus:ring-emerald-500/20 bg-emerald-500/5">
+              <SelectTrigger className="h-8 text-xs border-success/20 focus:ring-success/20 bg-success/5">
                 <SelectValue placeholder="Select response to compare..." />
               </SelectTrigger>
               <SelectContent>
@@ -263,7 +278,12 @@ export function DiffDialog({
                   <SelectItem key={opt.id} value={opt.id} className="text-xs">
                     <div className="flex items-center gap-2">
                       {opt.status != null && (
-                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold border", getStatusBadgeClass(opt.status))}>
+                        <span
+                          className={cn(
+                            "rounded px-1 py-0.5 text-[10px] font-bold border",
+                            getStatusBadgeClass(opt.status),
+                          )}
+                        >
                           {opt.status}
                         </span>
                       )}
@@ -299,9 +319,12 @@ export function DiffDialog({
                 <GitCompare className="size-7 text-muted-foreground/40" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground/80">Select two responses to compare</p>
+                <p className="text-sm font-semibold text-foreground/80">
+                  Select two responses to compare
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground/60 max-w-[260px]">
-                  Choose a base and a comparison response from the dropdowns above to visualize the diff.
+                  Choose a base and a comparison response from the dropdowns above to visualize the
+                  diff.
                 </p>
               </div>
             </div>
@@ -309,5 +332,5 @@ export function DiffDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

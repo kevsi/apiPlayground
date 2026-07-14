@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Copy, Check, AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+import { useState } from "react";
+import { Copy, Check, AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface Props {
-  data?: unknown
-  errors?: unknown
-  error?: string | null
-  status?: number
-  timeMs?: number
-  loading?: boolean
+  data?: unknown;
+  errors?: unknown;
+  error?: string | null;
+  status?: number;
+  timeMs?: number;
+  loading?: boolean;
 }
 
 const STATUS_TEXT: Record<number, string> = {
@@ -36,37 +36,38 @@ const STATUS_TEXT: Record<number, string> = {
   502: "Bad Gateway",
   503: "Service Unavailable",
   504: "Gateway Timeout",
-}
+};
 
 function statusLabel(code: number): string {
-  return STATUS_TEXT[code] ?? ""
+  return STATUS_TEXT[code] ?? "";
 }
 
 export function ResponseViewer({ data, errors, error, status, timeMs, loading }: Props) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   const text: string = error
     ? error
     : (() => {
         try {
-          return JSON.stringify({ data: data ?? null, errors: errors ?? null }, null, 2)
+          return JSON.stringify({ data: data ?? null, errors: errors ?? null }, null, 2);
         } catch {
-          return "Unable to serialize response"
+          return "Unable to serialize response";
         }
-      })()
+      })();
 
   const copy = async () => {
     if (typeof navigator !== "undefined") {
-      await navigator.clipboard.writeText(text).catch(() => {})
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      await navigator.clipboard.writeText(text).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     }
-  }
+  };
 
-  const graphqlErrors = Array.isArray(errors) ? errors : []
-  const isGraphQLError = status !== undefined && status >= 200 && status < 300 && graphqlErrors.length > 0
-  const isHttpError = status !== undefined && status >= 400
-  const hasErrors = isGraphQLError || isHttpError || !!error
+  const graphqlErrors = Array.isArray(errors) ? errors : [];
+  const isGraphQLError =
+    status !== undefined && status >= 200 && status < 300 && graphqlErrors.length > 0;
+  const isHttpError = status !== undefined && status >= 400;
+  const hasErrors = isGraphQLError || isHttpError || !!error;
 
   return (
     <div className="border-t bg-card" data-testid="graphql-response-viewer">
@@ -77,8 +78,8 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
               variant={isHttpError ? "destructive" : "outline"}
               className={cn(
                 "gap-1",
-                !isHttpError && !isGraphQLError && "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-                isGraphQLError && "border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+                !isHttpError && !isGraphQLError && "border-success/40 bg-success/15 text-success",
+                isGraphQLError && "border-warning/50 bg-warning/15 text-warning",
               )}
               data-testid="graphql-response-status"
             >
@@ -94,12 +95,12 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
           )}
           {timeMs !== undefined && <span className="text-muted-foreground">{timeMs}ms</span>}
           {error && (
-            <span className="text-red-500 flex items-center gap-1">
+            <span className="text-destructive flex items-center gap-1">
               <AlertCircle className="w-3 h-3" /> {error}
             </span>
           )}
           {isGraphQLError && !error && (
-            <span className="text-amber-700 dark:text-amber-300 flex items-center gap-1">
+            <span className="text-warning flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
               {graphqlErrors.length === 1
                 ? graphqlErrors[0]?.message
@@ -107,7 +108,7 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
             </span>
           )}
           {!error && graphqlErrors.length === 0 && data !== undefined && (
-            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <span className="text-success flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> OK
             </span>
           )}
@@ -122,9 +123,12 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="text-xs font-mono overflow-auto max-h-96 p-3 bg-muted/30 whitespace-pre-wrap" data-testid="graphql-response-data">
+      <pre
+        className="text-xs font-mono overflow-auto max-h-96 p-3 bg-muted/30 whitespace-pre-wrap"
+        data-testid="graphql-response-data"
+      >
         {loading ? "Loading..." : text}
       </pre>
     </div>
-  )
+  );
 }

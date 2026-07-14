@@ -1,36 +1,44 @@
-"use client"
+"use client";
 
-import React, { useState, useCallback } from "react"
-import { Square, CheckSquare, GripVertical, Play, MoreHorizontal, FolderPlus, Trash2 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { methodSubtle } from "@/lib/http-method-colors"
-import { Button } from "@/components/ui/button"
+import React, { useState, useCallback } from "react";
+import {
+  Square,
+  CheckSquare,
+  GripVertical,
+  Play,
+  MoreHorizontal,
+  FolderPlus,
+  Trash2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { methodSubtle } from "@/lib/http-method-colors";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import type { RequestItem } from "@/hooks/use-request-store"
+} from "@/components/ui/dropdown-menu";
+import type { RequestItem } from "@/hooks/use-request-store";
 
 interface RequestTreeItemProps {
-  request: RequestItem
-  collectionId: string
-  collectionName: string
-  depth: number
-  isLastSibling: boolean
-  stems: number[]
-  isSelected: boolean
-  isDragging: boolean
-  allRequests: RequestItem[]
-  onToggleSelect: (collectionId: string, requestId: string) => void
-  onSelect: (request: RequestItem) => void
-  onSelectAndSend?: (request: RequestItem) => void
-  onRemove: (collectionId: string, requestId: string) => void
-  onStartMove: (requestId: string) => void
-  onConfirmDelete: (label: string, onConfirm: () => void) => void
-  onReorder?: (collectionId: string, folderId: string | null, orderedRequestIds: string[]) => void
-  onDragStateChange: (dragId: string | null) => void
+  request: RequestItem;
+  collectionId: string;
+  collectionName: string;
+  depth: number;
+  isLastSibling: boolean;
+  stems: number[];
+  isSelected: boolean;
+  isDragging: boolean;
+  allRequests: RequestItem[];
+  onToggleSelect: (collectionId: string, requestId: string) => void;
+  onSelect: (request: RequestItem) => void;
+  onSelectAndSend?: (request: RequestItem) => void;
+  onRemove: (collectionId: string, requestId: string) => void;
+  onStartMove: (requestId: string) => void;
+  onConfirmDelete: (label: string, onConfirm: () => void) => void;
+  onReorder?: (collectionId: string, folderId: string | null, orderedRequestIds: string[]) => void;
+  onDragStateChange: (dragId: string | null) => void;
 }
 
 export function RequestTreeItem({
@@ -52,28 +60,26 @@ export function RequestTreeItem({
   onReorder,
   onDragStateChange,
 }: RequestTreeItemProps) {
-  const dragOverRef = React.useRef<string | null>(null)
-  const indent = depth * 20
+  const dragOverRef = React.useRef<string | null>(null);
+  const indent = depth * 20;
 
   const handleDragEnd = useCallback(() => {
-    const targetId = dragOverRef.current
-    const draggedId = request.id
+    const targetId = dragOverRef.current;
+    const draggedId = request.id;
     if (draggedId && targetId && onReorder && draggedId !== targetId) {
-      const folderId = request.folderId ?? null
-      const siblings = allRequests
-        .filter((r) => r.folderId === folderId)
-        .map((r) => r.id)
-      const fromIdx = siblings.indexOf(draggedId)
-      const toIdx = siblings.indexOf(targetId)
+      const folderId = request.folderId ?? null;
+      const siblings = allRequests.filter((r) => r.folderId === folderId).map((r) => r.id);
+      const fromIdx = siblings.indexOf(draggedId);
+      const toIdx = siblings.indexOf(targetId);
       if (fromIdx !== -1 && toIdx !== -1) {
-        siblings.splice(fromIdx, 1)
-        siblings.splice(toIdx, 0, draggedId)
-        onReorder(collectionId, folderId, siblings)
+        siblings.splice(fromIdx, 1);
+        siblings.splice(toIdx, 0, draggedId);
+        onReorder(collectionId, folderId, siblings);
       }
     }
-    onDragStateChange(null)
-    dragOverRef.current = null
-  }, [request.id, request.folderId, allRequests, onReorder, collectionId, onDragStateChange])
+    onDragStateChange(null);
+    dragOverRef.current = null;
+  }, [request.id, request.folderId, allRequests, onReorder, collectionId, onDragStateChange]);
 
   return (
     <div className="relative group">
@@ -105,20 +111,20 @@ export function RequestTreeItem({
           "relative flex items-center gap-1.5 rounded-md px-2 py-1.5 transition-all duration-150",
           "hover:bg-accent/30 hover:shadow-xs",
           isSelected && "bg-primary/[0.04] ring-1 ring-primary/20",
-          isDragging && "opacity-40 scale-[0.98]"
+          isDragging && "opacity-40 scale-[0.98]",
         )}
         style={{ paddingLeft: `${indent + 20}px` }}
         draggable={!!onReorder}
         onDragStart={(e) => {
-          onDragStateChange(request.id)
-          e.dataTransfer.effectAllowed = "move"
-          e.dataTransfer.setData("text/plain", request.id)
-          dragOverRef.current = null
+          onDragStateChange(request.id);
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", request.id);
+          dragOverRef.current = null;
         }}
         onDragOver={(e) => {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = "move"
-          dragOverRef.current = request.id
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          dragOverRef.current = request.id;
         }}
         onDragEnd={handleDragEnd}
       >
@@ -132,9 +138,7 @@ export function RequestTreeItem({
           onClick={() => onToggleSelect(collectionId, request.id)}
           className={cn(
             "shrink-0 flex items-center justify-center transition-all duration-150",
-            isSelected
-              ? "text-primary"
-              : "text-muted-foreground/20 hover:text-muted-foreground/50"
+            isSelected ? "text-primary" : "text-muted-foreground/20 hover:text-muted-foreground/50",
           )}
         >
           {isSelected ? (
@@ -150,10 +154,12 @@ export function RequestTreeItem({
           onClick={() => onSelect(request)}
           className="flex flex-1 items-center gap-2 text-left min-w-0"
         >
-          <span className={cn(
-            "shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide leading-none shadow-xs",
-            methodSubtle[request.method].replace("border-", "ring-1 ring-").replace("/30", "/20")
-          )}>
+          <span
+            className={cn(
+              "shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide leading-none shadow-xs",
+              methodSubtle[request.method].replace("border-", "ring-1 ring-").replace("/30", "/20"),
+            )}
+          >
             {request.method}
           </span>
           <span className="truncate text-sm text-foreground/85 group-hover:text-foreground transition-colors">
@@ -171,7 +177,7 @@ export function RequestTreeItem({
             variant="ghost"
             size="sm"
             onClick={() => onSelectAndSend(request)}
-            className="size-6 p-0 text-muted-foreground/30 hover:text-emerald-500 hover:bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-all duration-150"
+            className="size-6 p-0 text-muted-foreground/30 hover:text-success hover:bg-success/10 opacity-0 group-hover:opacity-100 transition-all duration-150"
             title="Load & execute"
           >
             <Play className="size-3" />
@@ -194,9 +200,8 @@ export function RequestTreeItem({
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
-                onConfirmDelete(
-                  `Remove "${request.name}" from "${collectionName}"?`,
-                  () => onRemove(collectionId, request.id)
+                onConfirmDelete(`Remove "${request.name}" from "${collectionName}"?`, () =>
+                  onRemove(collectionId, request.id),
                 )
               }
               className="text-destructive"
@@ -207,5 +212,5 @@ export function RequestTreeItem({
         </DropdownMenu>
       </div>
     </div>
-  )
+  );
 }

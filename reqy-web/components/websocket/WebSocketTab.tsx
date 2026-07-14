@@ -11,7 +11,7 @@ import { MessageLog } from "./MessageLog";
 import { MessageComposer } from "./MessageComposer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, X } from "lucide-react";
 import type { WsAuthConfig } from "@/types/websocket";
 
 const DEFAULT_AUTH: WsAuthConfig = { type: "none", token: "", queryName: "token" };
@@ -132,27 +132,29 @@ export function WebSocketTab() {
 
       {/* Error banner — shown on unexpected connection loss */}
       {status === "error" && connection?.errorReason && !dismissedError && (
-        <div className="mx-3 mt-1 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 shrink-0">
-          <AlertCircle className="size-3.5 text-red-500 shrink-0" />
-          <span className="flex-1 text-sm text-red-600">
+        <div className="mx-3 mt-1 flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 shrink-0">
+          <AlertCircle className="text-destructive shrink-0" />
+          <span className="flex-1 text-sm text-destructive">
             Connection lost — {connection.errorReason}
           </span>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleReconnect}
-            className="min-h-9 gap-1 px-2 text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10"
+            className="min-h-9 gap-1 px-2 text-sm font-medium text-destructive hover:text-destructive hover:bg-destructive/10"
           >
-            <RefreshCw className="size-3" />
+            <RefreshCw />
             Reconnect
           </Button>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setDismissedError(true)}
             aria-label="Dismiss error"
-            className="text-sm text-muted-foreground/40 hover:text-foreground ml-1"
+            className="text-sm text-muted-foreground hover:text-foreground ml-1"
           >
-            ×
-          </button>
+            <X />
+          </Button>
         </div>
       )}
 

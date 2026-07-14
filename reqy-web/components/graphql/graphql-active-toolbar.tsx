@@ -1,23 +1,23 @@
-"use client"
+"use client";
 
-import { Save, Play, Square, Copy, Sparkles, Code2, GitBranch } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import type { GraphqlTab } from "@/lib/types"
+import { Save, Play, Square, Copy, Sparkles, Code2, GitBranch } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { GraphqlTab } from "@/lib/types";
 
 interface Props {
-  activeTab: GraphqlTab
-  onNameChange: (name: string) => void
-  onSave: () => void
-  onRun: () => void
-  onStop: () => void
-  onExport: () => void
-  onAiAssist: () => void
-  onAiFix?: () => void
-  onLoadFromCollection?: () => void
-  running: boolean
-  aiLoading?: boolean
-  aiError?: string | null
+  activeTab: GraphqlTab;
+  onNameChange: (name: string) => void;
+  onSave: () => void;
+  onRun: () => void;
+  onStop: () => void;
+  onExport: () => void;
+  onAiAssist: () => void;
+  onAiFix?: () => void;
+  onLoadFromCollection?: () => void;
+  running: boolean;
+  aiLoading?: boolean;
+  aiError?: string | null;
 }
 
 export function GraphqlActiveToolbar({
@@ -47,7 +47,7 @@ export function GraphqlActiveToolbar({
         data-testid="graphql-tab-name-input"
       />
       {activeTab.saved === false && activeTab.dirty && (
-        <span className="text-[10px] text-amber-600 font-medium">Unsaved</span>
+        <span className="text-[10px] text-warning font-medium">Unsaved</span>
       )}
       <div className="flex-1" />
       {onLoadFromCollection && (
@@ -55,7 +55,13 @@ export function GraphqlActiveToolbar({
           <GitBranch className="w-3 h-3 mr-1" /> Load
         </Button>
       )}
-      <Button size="sm" variant="ghost" onClick={onAiAssist} disabled={aiLoading} data-testid="graphql-ai-button">
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onAiAssist}
+        disabled={aiLoading}
+        data-testid="graphql-ai-button"
+      >
         <Sparkles className="w-3 h-3 mr-1" /> {aiLoading ? "Thinking…" : "AI"}
       </Button>
       {onAiFix && (
@@ -71,7 +77,7 @@ export function GraphqlActiveToolbar({
         </Button>
       )}
       {aiError && (
-        <span className="text-[10px] text-red-500 max-w-[160px] truncate" title={aiError}>
+        <span className="text-[10px] text-destructive max-w-[160px] truncate" title={aiError}>
           {aiError}
         </span>
       )}
@@ -82,12 +88,7 @@ export function GraphqlActiveToolbar({
         <Save className="w-3 h-3 mr-1" /> Save
       </Button>
       {running ? (
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={onStop}
-          data-testid="graphql-stop-button"
-        >
+        <Button size="sm" variant="destructive" onClick={onStop} data-testid="graphql-stop-button">
           <Square className="w-3 h-3 mr-1" /> Stop
         </Button>
       ) : (
@@ -96,5 +97,5 @@ export function GraphqlActiveToolbar({
         </Button>
       )}
     </div>
-  )
+  );
 }

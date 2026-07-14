@@ -125,9 +125,7 @@ export function toAnthropicTool(tool: ToolDefinition): Record<string, unknown> {
  * Convertit un `ToolDefinition` interne vers le format Google Gemini
  * (`tools[].functionDeclarations[]` dans `generateContent`).
  */
-export function toGeminiFunctionDeclaration(
-  tool: ToolDefinition
-): Record<string, unknown> {
+export function toGeminiFunctionDeclaration(tool: ToolDefinition): Record<string, unknown> {
   const properties: Record<string, Record<string, unknown>> = {};
   const required: string[] = [];
 
@@ -166,9 +164,7 @@ export function maskSensitiveValue(key: string, value: string): string {
   return value;
 }
 
-export function maskSensitiveObject(
-  obj: Record<string, unknown>
-): Record<string, unknown> {
+export function maskSensitiveObject(obj: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === "string") {
@@ -221,7 +217,10 @@ function activeWorkspaceEnvironments(): Environment[] {
  * pour que l'UI demande une confirmation explicite avant exécution.
  */
 
-export type ToolHandler = (args: Record<string, unknown>, options?: { confirmed?: boolean }) => Promise<ToolResult>;
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  options?: { confirmed?: boolean },
+) => Promise<ToolResult>;
 
 export interface ReqlyTool extends ToolDefinition {
   handler: ToolHandler;
@@ -263,7 +262,12 @@ async function handleGetRequestContext(_args: Record<string, unknown>): Promise<
 async function handleCreateCollection(args: Record<string, unknown>): Promise<ToolResult> {
   const name = typeof args.name === "string" ? args.name.trim() : "";
   if (!name) {
-    return { callId: "", name: "create_collection", content: "", error: "Le nom de la collection est requis." };
+    return {
+      callId: "",
+      name: "create_collection",
+      content: "",
+      error: "Le nom de la collection est requis.",
+    };
   }
 
   const store = requestStore.getState();
@@ -291,15 +295,30 @@ async function handleCreateRequest(args: Record<string, unknown>): Promise<ToolR
   const requestName = typeof args.name === "string" ? args.name.trim() : "";
 
   if (!collectionName) {
-    return { callId: "", name: "create_request", content: "", error: "La collection cible est requise." };
+    return {
+      callId: "",
+      name: "create_request",
+      content: "",
+      error: "La collection cible est requise.",
+    };
   }
   if (!method || !url) {
-    return { callId: "", name: "create_request", content: "", error: "La méthode et l'URL sont requises." };
+    return {
+      callId: "",
+      name: "create_request",
+      content: "",
+      error: "La méthode et l'URL sont requises.",
+    };
   }
 
   const collectionId = findCollectionIdByName(collectionName);
   if (!collectionId) {
-    return { callId: "", name: "create_request", content: "", error: `Collection "${collectionName}" introuvable.` };
+    return {
+      callId: "",
+      name: "create_request",
+      content: "",
+      error: `Collection "${collectionName}" introuvable.`,
+    };
   }
 
   const requestItem: Partial<RequestItem> = {
@@ -315,8 +334,13 @@ async function handleCreateRequest(args: Record<string, unknown>): Promise<ToolR
     queryParams: [],
   };
 
-  const newRequestId = requestStore.getState().addRequestToCollection(collectionId, requestItem as Omit<RequestItem, "id" | "createdAt" | "updatedAt">);
-  
+  const newRequestId = requestStore
+    .getState()
+    .addRequestToCollection(
+      collectionId,
+      requestItem as Omit<RequestItem, "id" | "createdAt" | "updatedAt">,
+    );
+
   return {
     callId: "",
     name: "create_request",
@@ -327,17 +351,30 @@ async function handleCreateRequest(args: Record<string, unknown>): Promise<ToolR
 async function handleExecuteRequest(args: Record<string, unknown>): Promise<ToolResult> {
   const method = typeof args.method === "string" ? args.method.trim() : "";
   const url = typeof args.url === "string" ? args.url.trim() : "";
-  const headers = typeof args.headers === "object" && args.headers !== null ? args.headers as Record<string, string> : {};
+  const headers =
+    typeof args.headers === "object" && args.headers !== null
+      ? (args.headers as Record<string, string>)
+      : {};
   const body = typeof args.body === "string" ? args.body : undefined;
 
   if (!method || !url) {
-    return { callId: "", name: "execute_request", content: "", error: "La méthode et l'URL sont requises." };
+    return {
+      callId: "",
+      name: "execute_request",
+      content: "",
+      error: "La méthode et l'URL sont requises.",
+    };
   }
 
   try {
     const parsed = new URL(url);
     if (!["http:", "https:"].includes(parsed.protocol)) {
-      return { callId: "", name: "execute_request", content: "", error: "URL invalide : protocole HTTP/HTTPS requis." };
+      return {
+        callId: "",
+        name: "execute_request",
+        content: "",
+        error: "URL invalide : protocole HTTP/HTTPS requis.",
+      };
     }
   } catch {
     return { callId: "", name: "execute_request", content: "", error: "URL invalide." };
@@ -362,9 +399,7 @@ async function handleExecuteRequest(args: Record<string, unknown>): Promise<Tool
     const status = store.lastResponse?.status ?? "unknown";
     const duration = store.lastResponse?.durationMs ?? 0;
     const responseBody =
-      typeof store.lastResponse?.body === "string"
-        ? store.lastResponse.body.slice(0, 2000)
-        : "";
+      typeof store.lastResponse?.body === "string" ? store.lastResponse.body.slice(0, 2000) : "";
 
     return {
       callId: "",
@@ -385,12 +420,22 @@ async function handleRenameCollection(args: Record<string, unknown>): Promise<To
   const name = typeof args.name === "string" ? args.name.trim() : "";
   const newName = typeof args.new_name === "string" ? args.new_name.trim() : "";
   if (!name || !newName) {
-    return { callId: "", name: "rename_collection", content: "", error: "Le nom actuel et le nouveau nom sont requis." };
+    return {
+      callId: "",
+      name: "rename_collection",
+      content: "",
+      error: "Le nom actuel et le nouveau nom sont requis.",
+    };
   }
 
   const collectionId = findCollectionIdByName(name);
   if (!collectionId) {
-    return { callId: "", name: "rename_collection", content: "", error: `Collection "${name}" introuvable.` };
+    return {
+      callId: "",
+      name: "rename_collection",
+      content: "",
+      error: `Collection "${name}" introuvable.`,
+    };
   }
 
   requestStore.getState().updateCollection(collectionId, { name: newName });
@@ -402,15 +447,28 @@ async function handleRenameCollection(args: Record<string, unknown>): Promise<To
   };
 }
 
-async function handleDeleteCollection(args: Record<string, unknown>, options?: { confirmed?: boolean }): Promise<ToolResult> {
+async function handleDeleteCollection(
+  args: Record<string, unknown>,
+  options?: { confirmed?: boolean },
+): Promise<ToolResult> {
   const name = typeof args.name === "string" ? args.name.trim() : "";
   if (!name) {
-    return { callId: "", name: "delete_collection", content: "", error: "Le nom de la collection est requis." };
+    return {
+      callId: "",
+      name: "delete_collection",
+      content: "",
+      error: "Le nom de la collection est requis.",
+    };
   }
 
   const collectionId = findCollectionIdByName(name);
   if (!collectionId) {
-    return { callId: "", name: "delete_collection", content: "", error: `Collection "${name}" introuvable.` };
+    return {
+      callId: "",
+      name: "delete_collection",
+      content: "",
+      error: `Collection "${name}" introuvable.`,
+    };
   }
 
   if (!options?.confirmed) {
@@ -435,7 +493,12 @@ async function handleDeleteCollection(args: Record<string, unknown>, options?: {
 async function handleCreateEnvironment(args: Record<string, unknown>): Promise<ToolResult> {
   const name = typeof args.name === "string" ? args.name.trim() : "";
   if (!name) {
-    return { callId: "", name: "create_environment", content: "", error: "Le nom de l'environnement est requis." };
+    return {
+      callId: "",
+      name: "create_environment",
+      content: "",
+      error: "Le nom de l'environnement est requis.",
+    };
   }
 
   const store = requestStore.getState();
@@ -459,18 +522,33 @@ async function handleUpdateEnvironmentVariable(args: Record<string, unknown>): P
   const value = typeof args.value === "string" ? args.value : "";
 
   if (!envName || !key) {
-    return { callId: "", name: "update_environment_variable", content: "", error: "L'environnement et la clé sont requis." };
+    return {
+      callId: "",
+      name: "update_environment_variable",
+      content: "",
+      error: "L'environnement et la clé sont requis.",
+    };
   }
 
   const envId = findEnvironmentIdByName(envName);
   if (!envId) {
-    return { callId: "", name: "update_environment_variable", content: "", error: `Environnement "${envName}" introuvable.` };
+    return {
+      callId: "",
+      name: "update_environment_variable",
+      content: "",
+      error: `Environnement "${envName}" introuvable.`,
+    };
   }
 
   const store = requestStore.getState();
   const env = store.environments.find((e) => e.id === envId);
   if (!env) {
-    return { callId: "", name: "update_environment_variable", content: "", error: `Environnement "${envName}" introuvable.` };
+    return {
+      callId: "",
+      name: "update_environment_variable",
+      content: "",
+      error: `Environnement "${envName}" introuvable.`,
+    };
   }
 
   const variables = [...env.variables];
@@ -493,9 +571,10 @@ async function handleUpdateEnvironmentVariable(args: Record<string, unknown>): P
   return {
     callId: "",
     name: "update_environment_variable",
-    content: existingIndex >= 0
-      ? `Variable "${key}" mise à jour dans "${envName}".`
-      : `Variable "${key}" ajoutée à "${envName}".`,
+    content:
+      existingIndex >= 0
+        ? `Variable "${key}" mise à jour dans "${envName}".`
+        : `Variable "${key}" ajoutée à "${envName}".`,
   };
 }
 
@@ -516,7 +595,7 @@ export async function executeToolCall(call: ToolCall, confirmed?: boolean): Prom
     };
   }
 
-  let args: Record<string, unknown> = {};
+  let args: Record<string, unknown>;
   try {
     args = JSON.parse(call.arguments || "{}");
   } catch {
@@ -552,13 +631,15 @@ export const REQLY_TOOLS: ReqlyTool[] = [
   },
   {
     name: "get_request_context",
-    description: "Retourne le contexte de la requête actuelle (méthode, URL, status, extrait du body).",
+    description:
+      "Retourne le contexte de la requête actuelle (méthode, URL, status, extrait du body).",
     parameters: {},
     handler: handleGetRequestContext,
   },
   {
     name: "create_collection",
-    description: "Crée une nouvelle collection dans le workspace actif. Nécessite une confirmation dans l'interface.",
+    description:
+      "Crée une nouvelle collection dans le workspace actif. Nécessite une confirmation dans l'interface.",
     parameters: {
       name: { type: "string", description: "Nom de la collection à créer.", required: true },
     },
@@ -569,7 +650,11 @@ export const REQLY_TOOLS: ReqlyTool[] = [
     description: "Crée une requête dans une collection existante.",
     parameters: {
       collection: { type: "string", description: "Nom de la collection cible.", required: true },
-      method: { type: "string", description: "Méthode HTTP (GET, POST, PUT, DELETE, PATCH, etc.).", required: true },
+      method: {
+        type: "string",
+        description: "Méthode HTTP (GET, POST, PUT, DELETE, PATCH, etc.).",
+        required: true,
+      },
       url: { type: "string", description: "URL complète de la requête.", required: true },
       name: { type: "string", description: "Nom de la requête (optionnel)." },
     },
@@ -577,7 +662,8 @@ export const REQLY_TOOLS: ReqlyTool[] = [
   },
   {
     name: "execute_request",
-    description: "Exécute la requête décrite par method + url (+ headers/body optionnels) et retourne le résultat HTTP.",
+    description:
+      "Exécute la requête décrite par method + url (+ headers/body optionnels) et retourne le résultat HTTP.",
     parameters: {
       method: { type: "string", description: "Méthode HTTP.", required: true },
       url: { type: "string", description: "URL cible.", required: true },
@@ -613,7 +699,8 @@ export const REQLY_TOOLS: ReqlyTool[] = [
   },
   {
     name: "update_environment_variable",
-    description: "Ajoute ou modifie une variable d'environnement. Les valeurs sensibles sont masquées automatiquement.",
+    description:
+      "Ajoute ou modifie une variable d'environnement. Les valeurs sensibles sont masquées automatiquement.",
     parameters: {
       environment: { type: "string", description: "Nom de l'environnement.", required: true },
       key: { type: "string", description: "Nom de la variable.", required: true },

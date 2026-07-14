@@ -1,6 +1,8 @@
 "use client";
 
 import { Copy, Check, Edit3, RotateCcw, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { AssistantStepsRenderer, toAssistantSteps } from "@/components/assistant-steps-renderer";
 import type { ChatMessage } from "@/components/ai-sidebar-types";
@@ -46,7 +48,10 @@ export function AiChatMessage({
           message.role === "user"
             ? "bg-primary/10 text-foreground ml-6"
             : "bg-muted/30 text-foreground mr-6 border border-border/50",
-          message.role === "assistant" && !message.content && message.steps && message.steps.length > 0
+          message.role === "assistant" &&
+            !message.content &&
+            message.steps &&
+            message.steps.length > 0
             ? "min-h-[2px] py-0.5 border-dashed border-primary/30"
             : "",
         )}
@@ -62,33 +67,42 @@ export function AiChatMessage({
         )}
       >
         {message.role === "user" ? (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => onEditStart(index, message.content)}
-            className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="size-6 rounded [&_svg]:size-3 text-muted-foreground hover:text-foreground"
             title="Modifier"
           >
             <Edit3 className="size-3" />
-          </button>
+          </Button>
         ) : (
           <>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => onCopy(message.content, index)}
-              className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-6 rounded [&_svg]:size-3 text-muted-foreground hover:text-foreground"
               title="Copier"
             >
               {copiedIndex === index ? (
-                <Check className="size-3 text-green-500" />
+                <Check className="size-3 text-success" />
               ) : (
                 <Copy className="size-3" />
               )}
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={onRetry}
-              className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-6 rounded [&_svg]:size-3 text-muted-foreground hover:text-foreground"
               title="Re-essayer"
             >
               <RotateCcw className="size-3" />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -96,27 +110,31 @@ export function AiChatMessage({
       {/* Editing overlay */}
       {editingIndex === index && (
         <div className="mt-2 space-y-1.5">
-          <textarea
+          <Textarea
             value={editingText}
             onChange={(e) => onEditingTextChange(e.target.value)}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full resize-none focus-visible:ring-2 focus-visible:ring-primary"
             rows={3}
             autoFocus
           />
           <div className="flex gap-1.5 justify-end">
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               onClick={onEditCancel}
-              className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="h-auto px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
             >
               Annuler
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="default"
               onClick={onEditConfirm}
               disabled={!editingText.trim()}
-              className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="h-auto px-3 py-1 text-xs"
             >
               Envoyer
-            </button>
+            </Button>
           </div>
         </div>
       )}

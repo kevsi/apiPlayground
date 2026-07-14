@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
-import {
-  Sparkles,
-  PanelRightClose,
-  Clock,
-  Loader2,
-  GripVerticalIcon,
-} from "lucide-react";
+import { Sparkles, PanelRightClose, Clock, Loader2, GripVerticalIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ConversationSession } from "@/components/ai-sidebar-types";
 import { AiHistoryPanel } from "@/components/ai-history-panel";
@@ -38,6 +33,16 @@ export function AiSidebar({ open, onClose }: AiSidebarProps) {
     }
   }, [open, chat.inputRef]);
 
+  // Fermeture au clavier (Escape) — le panneau est un dock custom sans Dialog Radix
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   // ── Handlers combining chat + history ────────────────────────────────────
 
   const handleSelectSession = useCallback(
@@ -67,11 +72,19 @@ export function AiSidebar({ open, onClose }: AiSidebarProps) {
   return (
     <>
       {/* Overlay for mobile */}
-      {open && <div className="fixed inset-0 z-30 bg-black/20 md:hidden" onClick={onClose} />}
+      {open && (
+        <div
+          className="fixed inset-0 z-30 bg-black/20 md:hidden"
+          onClick={onClose}
+          aria-label="Fermer le panneau de l'assistant"
+        />
+      )}
 
       {/* Sidebar */}
       <div
         ref={sidebarRef}
+        role="complementary"
+        aria-label="Assistant IA"
         className={cn(
           "relative flex flex-col border-l border-border bg-background",
           "h-screen shrink-0 overflow-hidden",
@@ -113,10 +126,13 @@ export function AiSidebar({ open, onClose }: AiSidebarProps) {
             <span className="text-sm font-semibold">Assistant IA</span>
           </div>
           <div className="flex items-center gap-1">
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => history.setHistoryOpen(!history.historyOpen)}
               className={cn(
-                "flex size-7 items-center justify-center rounded-md transition-colors",
+                "size-7 [&_svg]:size-3.5",
                 history.historyOpen
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -124,14 +140,17 @@ export function AiSidebar({ open, onClose }: AiSidebarProps) {
               title="Historique des conversations"
             >
               <Clock className="size-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={onClose}
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 [&_svg]:size-4 text-muted-foreground hover:text-foreground hover:bg-accent"
               title="Fermer"
             >
               <PanelRightClose className="size-4" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -162,16 +181,18 @@ export function AiSidebar({ open, onClose }: AiSidebarProps) {
                     "Crée une collection 'Tests API'",
                     "Importe le projet depuis GitHub",
                   ].map((hint) => (
-                    <button
+                    <Button
                       key={hint}
+                      type="button"
+                      variant="ghost"
                       onClick={() => {
                         chat.setInput(hint);
                         chat.inputRef.current?.focus();
                       }}
-                      className="block w-full rounded-lg border border-border/50 bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-left"
+                      className="block w-full justify-start rounded-lg border border-border/50 bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
                       {hint}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>

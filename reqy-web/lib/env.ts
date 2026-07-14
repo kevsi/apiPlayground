@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 /**
  * Edge-safe environment validation.
@@ -23,71 +23,74 @@ const ServerEnvSchema = z.object({
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   ALLOW_LOCAL_HOSTS: z.enum(["true", "false"]).optional(),
-})
+});
 
 const PublicEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_SYNC_URL: z.string().url().optional(),
-})
+});
 
-export type ServerEnv = z.infer<typeof ServerEnvSchema>
-export type PublicEnv = z.infer<typeof PublicEnvSchema>
+export type ServerEnv = z.infer<typeof ServerEnvSchema>;
+export type PublicEnv = z.infer<typeof PublicEnvSchema>;
 
-let cachedServerEnv: ServerEnv | null = null
-let warnedEdge = false
+let cachedServerEnv: ServerEnv | null = null;
+let warnedEdge = false;
 
 function isEdgeRuntime(): boolean {
   // Next.js exposes NEXT_RUNTIME at build (always "edge" or "nodejs")
   // and at runtime on the server. The Edge runtime also lacks some Node
   // globals — checking NEXT_RUNTIME is the canonical way.
-  const runtime = (process as { env?: Record<string, string | undefined> }).env?.NEXT_RUNTIME
-  return runtime === "edge" || (globalThis as { EdgeRuntime?: boolean }).EdgeRuntime === true
+  const runtime = (process as { env?: Record<string, string | undefined> }).env?.NEXT_RUNTIME;
+  return runtime === "edge" || (globalThis as { EdgeRuntime?: boolean }).EdgeRuntime === true;
 }
 
 export function getServerEnv(): ServerEnv {
-  if (cachedServerEnv) return cachedServerEnv
+  if (cachedServerEnv) return cachedServerEnv;
 
   // Edge: do not crash. The build-time validator (next.config.mjs) catches
   // missing required values before the bundle ships.
   if (isEdgeRuntime()) {
     if (!warnedEdge) {
-      // eslint-disable-next-line no-console
       console.warn(
         "[env] running on Edge runtime — env validation is relaxed. " +
           "Build-time validation in next.config.mjs is the source of truth.",
-      )
-      warnedEdge = true
+      );
+      warnedEdge = true;
     }
-    return process.env as unknown as ServerEnv
+    return process.env as unknown as ServerEnv;
   }
 
   // Node.js: full validation, throw on first failure.
-  const result = ServerEnvSchema.safeParse(process.env)
+  const result = ServerEnvSchema.safeParse(process.env);
   if (!result.success) {
-    const issues = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n")
-    throw new Error(`[env] invalid server environment:\n${issues}`)
+    const issues = result.error.issues
+      .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(`[env] invalid server environment:\n${issues}`);
   }
-  cachedServerEnv = result.data
-  return cachedServerEnv
+  cachedServerEnv = result.data;
+  return cachedServerEnv;
 }
 
-let cachedPublicEnv: PublicEnv | null = null
+let cachedPublicEnv: PublicEnv | null = null;
 export function getPublicEnv(): PublicEnv {
-  if (cachedPublicEnv) return cachedPublicEnv
+  if (cachedPublicEnv) return cachedPublicEnv;
   const result = PublicEnvSchema.safeParse({
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_SYNC_URL: process.env.NEXT_PUBLIC_SYNC_URL,
-  })
+  });
   if (!result.success) {
-    const issues = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n")
-    throw new Error(`[env] invalid public environment:\n${issues}`)
+    const issues = result.error.issues
+      .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(`[env] invalid public environment:\n${issues}`);
   }
-  cachedPublicEnv = result.data
-  return cachedPublicEnv
+  cachedPublicEnv = result.data;
+  return cachedPublicEnv;
 }
 
 export function validateBuildTimeEnv(): void {

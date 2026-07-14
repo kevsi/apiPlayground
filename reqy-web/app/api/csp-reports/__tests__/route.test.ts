@@ -91,7 +91,7 @@ describe("tauri.conf.json CSP", () => {
     const path = await import("path");
     const tauriConfigPath = path.resolve(process.cwd(), "..", "src-tauri", "tauri.conf.json");
 
-    let source: string | null = null;
+    let source: string;
     try {
       source = fs.readFileSync(tauriConfigPath, "utf-8");
     } catch {

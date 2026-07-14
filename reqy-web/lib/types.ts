@@ -1,6 +1,14 @@
 export type HttpMethod =
   "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "GRAPHQL";
 
+/** Per-phase response timing, surfaced in the response timeline. */
+export interface ResponseTimings {
+  dnsMs?: number;
+  connectMs?: number;
+  ttfbMs?: number;
+  totalMs: number;
+}
+
 export interface CollectionFolder {
   id: string;
   name: string;

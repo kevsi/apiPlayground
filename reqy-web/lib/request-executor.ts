@@ -1,9 +1,11 @@
-import type { HttpMethod, RequestTestAssertion, TestResult } from "@/lib/types";
+import type { HttpMethod, RequestTestAssertion, TestResult, AssertionType } from "@/lib/types";
 export type { HttpMethod, RequestTestAssertion, TestResult } from "@/lib/types";
-import type { Assertion } from "@/lib/test-runner/types";
+import type { Assertion, AssertionResult, RequestResponse } from "@/lib/test-runner/types";
+import { evaluateAssertions } from "@/lib/test-runner/assertions";
 import { interpolate, replaceLocalhostPort, parseJsonSafe } from "@/lib/utils";
 import { proxyAuthHeaders } from "@/lib/proxy-auth";
 import { invokeTauriFetch } from "@/lib/tauri";
+import type { ResponseTimings } from "@/components/response-timeline";
 export type BodyType = "json" | "form-data" | "x-www-form" | "raw" | "binary";
 export type AuthType = "none" | "bearer" | "basic" | "api-key" | "oauth2";
 
@@ -40,6 +42,7 @@ export interface RequestTab {
   responseBody?: string;
   responseData?: string | Blob;
   responseHeaders?: Record<string, string>;
+  responseTimings?: ResponseTimings;
   assertions?: RequestTestAssertion[];
   runnerAssertions?: Assertion[];
   preRequestScript?: string;
@@ -72,6 +75,44 @@ export const sanitizeUrl = (url: string) => {
   sanitized = sanitized.replace(/^(https?:)\/{3,}(\/)?/i, "$1//");
   return sanitized;
 };
+
+function toTestResults(results: AssertionResult[]): TestResult[] {
+  return results.map((r, i) => {
+    const a = r.assertion;
+    let target: string = a.type;
+    let expected = "";
+    switch (a.type) {
+      case "status":
+        target = "status";
+        expected = JSON.stringify(a.expected);
+        break;
+      case "responseTime":
+        target = "response time";
+        expected = `${a.operator} ${a.valueMs}ms`;
+        break;
+      case "jsonPath":
+        target = a.path;
+        expected = `${a.operator}${a.value !== undefined ? ` ${JSON.stringify(a.value)}` : ""}`;
+        break;
+      case "schema":
+        target = "schema";
+        expected = "schema validation";
+        break;
+    }
+    return {
+      assertionId: `${a.type}-${i}`,
+      type: a.type as AssertionType,
+      target,
+      expected,
+      passed: r.passed,
+      message:
+        r.error ??
+        (r.passed
+          ? "Assertion passed"
+          : `Expected ${expected}, got ${JSON.stringify(r.actualValue)}`),
+    };
+  });
+}
 
 export const normalizeUrl = (url: string) => {
   const sanitizedUrl = sanitizeUrl(url);
@@ -241,6 +282,7 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
   let responseStatus: number | undefined;
   let responseSize = "0 B";
   let responseTime: number | undefined;
+  let proxyTimings: { dnsMs?: number; connectMs?: number; ttfbMs?: number } | undefined;
 
   // Create an AbortController with a 30-second timeout to prevent hung requests
   const controller = new AbortController();
@@ -301,6 +343,7 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
       });
 
       const proxyResult = await parseJsonSafe(proxyResponse);
+      proxyTimings = proxyResult.timings;
       responseStatus = proxyResult.status ?? proxyResponse.status ?? 0;
       responseHeaders = proxyResult.headers || {};
 
@@ -348,6 +391,33 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
     responseTime = Math.round(performance.now() - startedAt);
   }
 
+  const responseTimings: ResponseTimings = {
+    dnsMs: proxyTimings?.dnsMs,
+    connectMs: proxyTimings?.connectMs,
+    ttfbMs: proxyTimings?.ttfbMs,
+    totalMs: responseTime ?? 0,
+  };
+
+  let testResults: TestResult[] | undefined;
+  const runnerAssertions = context.tab.runnerAssertions;
+  if (runnerAssertions && runnerAssertions.length > 0) {
+    let parsedBody: unknown = responseBody ?? "";
+    if (typeof responseBody === "string") {
+      try {
+        parsedBody = JSON.parse(responseBody);
+      } catch {
+        /* keep raw string when not JSON */
+      }
+    }
+    const evalResponse: RequestResponse = {
+      statusCode: responseStatus ?? 0,
+      responseTimeMs: responseTime ?? 0,
+      body: parsedBody,
+      headers: responseHeaders ?? {},
+    };
+    testResults = toTestResults(evaluateAssertions(runnerAssertions, evalResponse));
+  }
+
   return {
     responseStatus,
     responseHeaders,
@@ -355,5 +425,7 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
     responseData,
     responseSize,
     responseTime,
+    responseTimings,
+    testResults,
   };
 };
