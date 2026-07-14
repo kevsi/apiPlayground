@@ -5,15 +5,25 @@
  * the generated ZIP as a Blob for download.
  */
 
-const OPENAPI_GEN_URL = "https://api.openapi-generator.tech/api/gen/clients"
+export const OPENAPI_GEN_URL = "https://api.openapi-generator.tech/api/gen/clients";
 
 export interface GenerateResult {
   /** The raw ZIP blob */
-  blob: Blob
+  blob: Blob;
   /** Suggested filename e.g. "my-api-typescript-fetch.zip" */
-  filename: string
+  filename: string;
   /** The generator name used (e.g. "typescript-fetch", "python") */
-  generator: string
+  generator: string;
+}
+
+export interface GenerateOptions {
+  /** Override the OpenAPI Generator base URL (defaults to the hosted cloud API).
+   *  Point this at a self-hosted instance to keep specs on your own network. */
+  baseUrl?: string;
+  /** Request timeout in ms (default 120000). */
+  timeoutMs?: number;
+  /** Options forwarded to the OpenAPI Generator (e.g. `{ supportsES6: true }`). */
+  generatorOptions?: Record<string, unknown>;
 }
 
 /** Map user-facing labels to OpenAPI Generator identifiers. */
@@ -29,12 +39,18 @@ export const GENERATORS: Record<string, string> = {
   Swift: "swift5",
   Ruby: "ruby",
   Dart: "dart",
-}
+};
 
-export const AVAILABLE_LANGUAGES = Object.keys(GENERATORS)
+export const AVAILABLE_LANGUAGES = Object.keys(GENERATORS);
 
 /**
- * Generate an SDK from an OpenAPI spec using the hosted OpenAPI Generator.
+ * Generate an SDK from an OpenAPI spec using the OpenAPI Generator.
+ *
+ * The request is always proxied through the same-origin `/api/sdk-generate`
+ * route, which performs both the generation call and the ZIP download
+ * server-side. This avoids CORS and mixed-content failures (the generator
+ * returns an `http://` download link that the browser/Webview refuses to
+ * fetch directly) and keeps third-party traffic off the client.
  *
  * @param spec     The full OpenAPI spec object (v3)
  * @param language The generator name e.g. "typescript-fetch", "python"
@@ -45,39 +61,57 @@ export async function generateSdk(
   spec: unknown,
   language: string,
   apiName = "api",
+  options: GenerateOptions = {},
 ): Promise<GenerateResult> {
-  // 1. POST the spec to the hosted generator
-  const response = await fetch(`${OPENAPI_GEN_URL}/${language}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      spec,
-      options: {},
-    }),
-  })
+  return generateViaRoute(spec, language, apiName, options);
+}
+
+async function generateViaRoute(
+  spec: unknown,
+  language: string,
+  apiName: string,
+  options: GenerateOptions,
+): Promise<GenerateResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 120000);
+  let response: Response;
+  try {
+    response = await fetch("/api/sdk-generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        spec,
+        language,
+        options: options.generatorOptions ?? {},
+        baseUrl: options.baseUrl,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(`SDK generation timed out after ${options.timeoutMs ?? 120000}ms.`, {
+        cause: err,
+      });
+    }
+    throw new Error("Could not reach the SDK generation endpoint. Is the app server running?", {
+      cause: err,
+    });
+  }
+  clearTimeout(timeout);
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "Unknown error")
-    throw new Error(`OpenAPI Generator API error (${response.status}): ${text}`)
+    let detail = "";
+    try {
+      const data = (await response.json()) as { error?: string };
+      detail = data?.error ? `: ${data.error}` : "";
+    } catch {
+      // ignore — fall through to the generic status message
+    }
+    throw new Error(`SDK generation failed (${response.status})${detail}`);
   }
 
-  const data = (await response.json()) as { code: string; link: string }
-  const { link } = data
-
-  if (!link) {
-    throw new Error("OpenAPI Generator returned no download link")
-  }
-
-  // 2. Download the generated ZIP
-  const zipResponse = await fetch(link)
-
-  if (!zipResponse.ok) {
-    throw new Error(`Failed to download generated SDK: ${zipResponse.status}`)
-  }
-
-  const blob = await zipResponse.blob()
-  const safeName = apiName.replace(/\s+/g, "-").toLowerCase()
-  const filename = `${safeName}-${language}.zip`
-
-  return { blob, filename, generator: language }
+  const blob = await response.blob();
+  const safeName = apiName.replace(/\s+/g, "-").toLowerCase();
+  return { blob, filename: `${safeName}-${language}.zip`, generator: language };
 }
