@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import { loadConfig } from "./config.js";
-import { reportCLI, reportJSON, buildJUnit, buildHTML, writeReport, printSummary, printError } from "./reporters.js";
+import { reportCLI, reportJSON, buildJUnit, buildHTML, writeReport, printSummary, printError, } from "./reporters.js";
 export function toCurl(req) {
     let curl = `curl -X ${req.method} "${req.url}"`;
     if (req.headers) {

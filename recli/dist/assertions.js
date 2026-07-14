@@ -10,10 +10,14 @@
 // RunResult → UnifiedEvalContext internally.
 import { evaluateTextAssertion, evaluateTextAssertions, assertsPassed as assertsPassedShared, runResultToContext, } from "@reqly/shared/assertions";
 export function evaluateAssertion(assertion, result, vars) {
-    return evaluateTextAssertion(assertion, runResultToContext(result), { vars });
+    return evaluateTextAssertion(assertion, runResultToContext(result), {
+        vars,
+    });
 }
 export function evaluateAssertions(assertions, result, vars) {
-    return evaluateTextAssertions(assertions, runResultToContext(result), { vars });
+    return evaluateTextAssertions(assertions, runResultToContext(result), {
+        vars,
+    });
 }
 export { evaluateSchemaAssertion } from "@reqly/shared/assertions";
 export const assertsPassed = assertsPassedShared;

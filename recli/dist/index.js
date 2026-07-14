@@ -3,7 +3,7 @@ import { program } from "commander";
 import fs from "node:fs";
 import { registerRun } from "./commands/run.js";
 import { registerGraphql } from "./commands/graphql.js";
-import { registerValidate, registerInit, registerExport, registerWatch } from "./commands/validate.js";
+import { registerValidate, registerInit, registerExport, registerWatch, } from "./commands/validate.js";
 import { registerOpenApi } from "./commands/openapi.js";
 import { registerDiff } from "./commands/diff.js";
 import { registerTui } from "./commands/tui.js";
