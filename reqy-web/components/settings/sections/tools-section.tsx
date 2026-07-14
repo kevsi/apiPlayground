@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { ToolAssociationModal, type Tool } from "./tool-association-modal";
+import { buildMcpClientConfig } from "@/lib/mcp/config";
 
 const TOOLS: Tool[] = [
   {
@@ -121,6 +122,14 @@ export function ToolsSection() {
   const [activeConnected, setActiveConnected] = useState(false);
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  const copyMcpConfig = async () => {
+    const config = buildMcpClientConfig("claude-desktop");
+    await navigator.clipboard.writeText(config);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="space-y-6">
@@ -151,6 +160,25 @@ export function ToolsSection() {
         onConnected={() => setRefreshKey((k) => k + 1)}
         connected={activeConnected}
       />
+      <div className="space-y-3 rounded-lg border border-border p-4">
+        <div>
+          <h3 className="text-lg font-semibold">Intégrations MCP</h3>
+          <p className="text-sm text-muted-foreground">
+            Connectez le serveur MCP local de Reqly à Claude Desktop ou Cursor. Copiez la
+            configuration ci-dessous et collez-la dans le fichier de configuration de votre client.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="default" onClick={copyMcpConfig}>
+            Copier la config MCP
+          </Button>
+          {copied ? (
+            <span className="text-sm font-medium text-success" role="status" aria-live="polite">
+              Copié !
+            </span>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
