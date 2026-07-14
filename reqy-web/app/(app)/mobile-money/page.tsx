@@ -1,6 +1,7 @@
 "use client";
 
 import { CallbackSimulator } from "@/components/mobile-money/callback-simulator";
+import { TunnelFacilitator } from "@/components/tunnel-facilitator";
 
 export default function MobileMoneyPage() {
   return (
@@ -14,6 +15,7 @@ export default function MobileMoneyPage() {
         ngrok) pour recevoir un vrai callback.
       </p>
       <CallbackSimulator />
+      <TunnelFacilitator />
     </main>
   );
 }
