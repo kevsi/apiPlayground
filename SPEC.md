@@ -103,17 +103,18 @@ L'IA peut interagir avec l'application via les **stores Zustand** existants :
 
 ### 4.1 Requêtes HTTP
 
-- Lire/modifier la requête courante : `useRequestStore().patchRequest()`
-- Exécuter une requête : `useRequestStore().executeRequest()`
-- Analyser une réponse : `useRequestStore().addAssertions()`
+- Lire/modifier la requête courante : `useRequestStore().updateTab(activeTabId, patch)` (patch de type `Partial<RequestTab>`)
+- Exécuter une requête : `useRequestTabExecution().sendRequest()`
+- Analyser une réponse / assertions : éditer `runnerAssertions` via `updateTab(activeTabId, { runnerAssertions })` ; les assertions sont évaluées automatiquement à l'envoi et les résultats apparaissent dans la section « Tests » de la réponse.
 
 ### 4.2 Collections
 
-- Créer/éditer/supprimer : via store collections
+- Créer/éditer/supprimer : via le store des collections (`hooks/store/collections.ts`, ex. `addCollection`)
 
-### 4.3 Projets
+### 4.3 Projets / Workspaces
 
-- Ajouter/supprimer : `useRequestStore().addProject()`, `deleteProject()`
+- Projets : `hooks/store/projects.ts` (`addProject`, `deleteProject`, `updateProject`)
+- Workspaces : `hooks/store/workspaces.ts` (`addWorkspace`)
 
 ### 4.4 Workspaces
 
