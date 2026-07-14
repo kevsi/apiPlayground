@@ -27,6 +27,7 @@ pub struct McpServerStatus {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct McpServerConfig {
   pub port: Option<u16>,
   pub env_name: Option<String>,
@@ -114,22 +115,54 @@ pub fn start_mcp_server(
     cmd.arg("--env").arg(env_name);
   }
 
-  // In dev mode, inherit stderr so we can see logs
-  if cfg!(debug_assertions) {
-    cmd.stderr(std::process::Stdio::inherit());
-  } else {
-    // Redirect stderr to null to prevent the child from blocking if the pipe fills up.
-    // In a future enhancement we could stream stderr to a Tauri event.
-    cmd.stderr(std::process::Stdio::null());
-  }
-  cmd.stdout(std::process::Stdio::piped());
+  // The HTTP transport logs to stderr (never stdout), so we discard stdout and
+  // pipe stderr so we can surface startup errors and avoid the child blocking
+  // on a full pipe.
+  cmd.stdout(std::process::Stdio::null());
+  cmd.stderr(std::process::Stdio::piped());
 
   let mut child = cmd.spawn().map_err(|e| AppError::Internal(format!("Failed to start MCP server: {}", e)))?;
 
-  // Drain a small amount of stdout to confirm the process started; then drop the handle.
-  if let Some(ref mut stdout) = child.stdout {
-    let mut buf = [0u8; 1];
-    let _ = stdout.read(&mut buf);
+  // Drain stderr in a background thread so the long-lived child never blocks on a
+  // full pipe, and so we can report the reason if startup fails.
+  let mut stderr = child
+    .stderr
+    .take()
+    .expect("stderr was configured as piped");
+  let captured = Arc::new(Mutex::new(String::new()));
+  let captured_for_thread = Arc::clone(&captured);
+  std::thread::spawn(move || {
+    let mut buf = [0u8; 1024];
+    loop {
+      match stderr.read(&mut buf) {
+        Ok(0) => break,
+        Ok(n) => {
+          if let Ok(text) = std::str::from_utf8(&buf[..n]) {
+            captured_for_thread.lock().unwrap().push_str(text);
+          }
+        }
+        Err(_) => break,
+      }
+    }
+  });
+
+  // Wait (bounded) for the process to settle. The server binds its port
+  // asynchronously, so a quick exit here means startup failed (e.g. port in use).
+  let start = std::time::Instant::now();
+  let timeout = std::time::Duration::from_millis(1500);
+  loop {
+    match child.try_wait() {
+      Ok(Some(_)) => {
+        let msg = captured.lock().unwrap().clone();
+        return Err(AppError::Internal(format!(
+          "MCP server exited during startup. {}",
+          msg.trim()
+        )));
+      }
+      Ok(None) if start.elapsed() >= timeout => break,
+      Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+      Err(e) => return Err(AppError::Internal(format!("Failed to inspect MCP process: {}", e))),
+    }
   }
 
   let pid = child.id();

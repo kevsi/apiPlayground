@@ -1,133 +1,146 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { Server, Play, Square, Terminal, Copy, Check, RefreshCw } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useMcpServer } from "@/hooks/use-mcp-server"
-import { useRequestStore, globalStore, moduleLevelCommit } from "@/hooks/use-request-store"
-import { isTauriAvailable } from "@/lib/tauri"
-import { cn } from "@/lib/utils"
-import type { Collection } from "@/hooks/request-types"
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Server, Play, Square, Terminal, Copy, Check, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useMcpServer } from "@/hooks/use-mcp-server";
+import { useRequestStore, globalStore, moduleLevelCommit } from "@/hooks/use-request-store";
+import { isTauriAvailable } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
+import type { Collection } from "@/hooks/request-types";
 
-const DEFAULT_MCP_PORT = 3311
+const DEFAULT_MCP_PORT = 3311;
 
-const KNOWN_ICONS = new Set(["lock", "users", "package", "folder"])
-const KNOWN_COLORS = new Set(["emerald", "blue", "amber", "purple", "red", "pink", "slate", "indigo", "violet", "orange"])
-const DEFAULT_ICON = "package"
-const DEFAULT_COLOR = "emerald"
+const KNOWN_ICONS = new Set(["lock", "users", "package", "folder"]);
+const KNOWN_COLORS = new Set([
+  "emerald",
+  "blue",
+  "amber",
+  "purple",
+  "red",
+  "pink",
+  "slate",
+  "indigo",
+  "violet",
+  "orange",
+]);
+const DEFAULT_ICON = "package";
+const DEFAULT_COLOR = "emerald";
 
 function normalizeIcon(icon: string | undefined): string {
-  return icon && KNOWN_ICONS.has(icon) ? icon : DEFAULT_ICON
+  return icon && KNOWN_ICONS.has(icon) ? icon : DEFAULT_ICON;
 }
 
 function normalizeColor(color: string | undefined): string {
-  return color && KNOWN_COLORS.has(color) ? color : DEFAULT_COLOR
+  return color && KNOWN_COLORS.has(color) ? color : DEFAULT_COLOR;
 }
 
 export default function McpSection() {
-  const isTauri = isTauriAvailable()
-  const { status, loading, start, stop, loadBundleCollections } = useMcpServer()
-  const store = useRequestStore()
-  const collections = store.collections
-  const environments = store.environments
-  const addCollection = store.addCollection
-  const deleteCollection = store.deleteCollection
-  const [port, setPort] = useState(DEFAULT_MCP_PORT)
-  const [copySuccess, setCopySuccess] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncSuccess, setSyncSuccess] = useState(false)
+  const isTauri = isTauriAvailable();
+  const { status, loading, start, stop, loadBundleCollections } = useMcpServer();
+  const store = useRequestStore();
+  const collections = store.collections;
+  const environments = store.environments;
+  const addCollection = store.addCollection;
+  const deleteCollection = store.deleteCollection;
+  const [port, setPort] = useState(DEFAULT_MCP_PORT);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncSuccess, setSyncSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const serverUrl = `http://localhost:${status.port ?? port}/mcp`
-  const mcpUrl = status.running ? serverUrl : `http://localhost:${port}/mcp`
+  const serverUrl = `http://localhost:${status.port ?? port}/mcp`;
+  const mcpUrl = status.running ? serverUrl : `http://localhost:${port}/mcp`;
 
   const handleToggle = async () => {
-    if (status.running) {
-      await stop()
-    } else {
-      await start(
-        Object.values(collections),
-        Object.values(environments ?? {}),
-        { port },
-      )
+    setError(null);
+    try {
+      if (status.running) {
+        await stop();
+      } else {
+        await start(Object.values(collections), Object.values(environments ?? {}), { port });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Échec du démarrage du serveur MCP");
     }
-  }
+  };
 
   const handleCopyUrl = () => {
-    navigator.clipboard.writeText(mcpUrl)
-    setCopySuccess(true)
-    setTimeout(() => setCopySuccess(false), 2000)
-  }
+    navigator.clipboard.writeText(mcpUrl);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
 
-  const syncingRef = useRef(false)
+  const syncingRef = useRef(false);
 
   const handleSyncFromMcp = useCallback(async () => {
-    if (syncingRef.current) return
-    syncingRef.current = true
-    setSyncing(true)
-    setSyncSuccess(false)
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    setSyncing(true);
+    setSyncSuccess(false);
 
-    const mcpCollections = await loadBundleCollections()
+    const mcpCollections = await loadBundleCollections();
     if (!mcpCollections?.length) {
-      setSyncing(false)
-      syncingRef.current = false
-      return
+      setSyncing(false);
+      syncingRef.current = false;
+      return;
     }
 
     // Fix duplicate collection IDs using moduleLevelCommit (same ID = React key collision)
     for (let pass = 0; pass < 5; pass++) {
-      let fixed = false
-      const seen = new Map<string, number>()
+      let fixed = false;
+      const seen = new Map<string, number>();
       for (let i = 0; i < globalStore.collections.length; i++) {
-        const c = globalStore.collections[i]
+        const c = globalStore.collections[i];
         if (seen.has(c.id)) {
-          const firstIdx = seen.get(c.id)!
-          const oldId = c.id
+          const firstIdx = seen.get(c.id)!;
+          const oldId = c.id;
           // Rename first occurrence so it survives the delete
           moduleLevelCommit((prev) => {
-            const newId = `col-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+            const newId = `col-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             return {
               ...prev,
               collections: prev.collections.map((col, idx) =>
-                idx === firstIdx ? { ...col, id: newId } : col
+                idx === firstIdx ? { ...col, id: newId } : col,
               ),
-            }
-          })
+            };
+          });
           // Delete remaining with the old duplicate ID
           moduleLevelCommit((prev) => ({
             ...prev,
             collections: prev.collections.filter((col) => col.id !== oldId),
-          }))
-          fixed = true
-          break
+          }));
+          fixed = true;
+          break;
         }
-        seen.set(c.id, i)
+        seen.set(c.id, i);
       }
-      if (!fixed) break
+      if (!fixed) break;
     }
 
     // Fix duplicate names (trimmed, case-insensitive)
-    const seenNames = new Set<string>()
-    const dupNameIds: string[] = []
+    const seenNames = new Set<string>();
+    const dupNameIds: string[] = [];
     for (const c of globalStore.collections ?? []) {
-      const key = c.name.trim().toLowerCase()
-      if (seenNames.has(key)) dupNameIds.push(c.id)
-      seenNames.add(key)
+      const key = c.name.trim().toLowerCase();
+      if (seenNames.has(key)) dupNameIds.push(c.id);
+      seenNames.add(key);
     }
     for (const id of dupNameIds) {
-      deleteCollection(id)
+      deleteCollection(id);
     }
 
     // Build name map from current store state (after dedup)
     const existingByName = new Map(
-      (globalStore.collections ?? []).map((c: Collection) => [c.name.trim().toLowerCase(), c])
-    )
-    const addedThisSync = new Set<string>()
+      (globalStore.collections ?? []).map((c: Collection) => [c.name.trim().toLowerCase(), c]),
+    );
+    const addedThisSync = new Set<string>();
     for (const mcpCol of mcpCollections) {
-      const key = (mcpCol.name ?? "").trim().toLowerCase()
-      if (existingByName.has(key) || addedThisSync.has(key)) continue
+      const key = (mcpCol.name ?? "").trim().toLowerCase();
+      if (existingByName.has(key) || addedThisSync.has(key)) continue;
       addCollection({
         name: mcpCol.name.trim(),
         description: mcpCol.description?.trim(),
@@ -135,28 +148,28 @@ export default function McpSection() {
         icon: normalizeIcon(mcpCol.icon),
         requests: mcpCol.requests ?? [],
         folders: mcpCol.folders ?? [],
-      })
-      addedThisSync.add(key)
+      });
+      addedThisSync.add(key);
     }
 
-    setSyncSuccess(true)
-    setSyncing(false)
-    syncingRef.current = false
-    setTimeout(() => setSyncSuccess(false), 3000)
-  }, [loadBundleCollections, addCollection, deleteCollection])
+    setSyncSuccess(true);
+    setSyncing(false);
+    syncingRef.current = false;
+    setTimeout(() => setSyncSuccess(false), 3000);
+  }, [loadBundleCollections, addCollection, deleteCollection]);
 
   // Auto-sync once when the server starts
-  const autoSyncedRef = useRef(false)
+  const autoSyncedRef = useRef(false);
   useEffect(() => {
     if (status.running && !autoSyncedRef.current) {
-      autoSyncedRef.current = true
-      const timer = setTimeout(() => handleSyncFromMcp(), 1000)
-      return () => clearTimeout(timer)
+      autoSyncedRef.current = true;
+      const timer = setTimeout(() => handleSyncFromMcp(), 1000);
+      return () => clearTimeout(timer);
     }
     if (!status.running) {
-      autoSyncedRef.current = false
+      autoSyncedRef.current = false;
     }
-  }, [status.running, handleSyncFromMcp])
+  }, [status.running, handleSyncFromMcp]);
 
   return (
     <Card>
@@ -168,8 +181,8 @@ export default function McpSection() {
           <div className="space-y-1">
             <CardTitle className="text-base">Serveur MCP</CardTitle>
             <CardDescription>
-              Exposez vos collections aux agents IA (OpenCode, Claude Code, Cursor, etc.)
-              via le protocole MCP.
+              Exposez vos collections aux agents IA (OpenCode, Claude Code, Cursor, etc.) via le
+              protocole MCP.
             </CardDescription>
           </div>
         </div>
@@ -184,33 +197,28 @@ export default function McpSection() {
                   className={cn(
                     "size-3 rounded-full shrink-0",
                     status.running
-                      ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                      ? "bg-success shadow-[0_0_8px_rgba(16,185,129,0.5)]"
                       : "bg-muted-foreground/30",
                   )}
                 />
                 <span className="text-sm font-medium">
-                  {status.running
-                    ? `Serveur actif sur le port ${status.port}`
-                    : "Serveur arrêté"}
+                  {status.running ? `Serveur actif sur le port ${status.port}` : "Serveur arrêté"}
                 </span>
                 {status.running && status.pid && (
-                  <span className="text-xs text-muted-foreground">
-                    (PID: {status.pid})
-                  </span>
+                  <span className="text-xs text-muted-foreground">(PID: {status.pid})</span>
                 )}
               </div>
 
               {status.running && (
                 <p className="text-xs text-muted-foreground">
-                  Vos collections sont exposées. Connectez votre agent IA à
-                  l&apos;URL ci-dessous.
+                  Vos collections sont exposées. Connectez votre agent IA à l&apos;URL ci-dessous.
                 </p>
               )}
 
               {!isTauri && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Le contrôle du serveur MCP est uniquement disponible dans
-                  l&apos;application desktop (Tauri).
+                <p className="text-xs text-warning">
+                  Le contrôle du serveur MCP est uniquement disponible dans l&apos;application
+                  desktop (Tauri).
                 </p>
               )}
             </div>
@@ -250,10 +258,12 @@ export default function McpSection() {
           </div>
 
           {syncSuccess && (
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-3">
+            <p className="text-xs text-success mt-3">
               Collections synchronisées depuis le bundle MCP
             </p>
           )}
+
+          {error && <p className="text-xs text-destructive mt-3">{error}</p>}
         </div>
 
         {/* Port config */}
@@ -294,7 +304,7 @@ export default function McpSection() {
                   title="Copier l'URL"
                 >
                   {copySuccess ? (
-                    <Check className="size-3.5 text-emerald-500" />
+                    <Check className="size-3.5 text-success" />
                   ) : (
                     <Copy className="size-3.5" />
                   )}
@@ -306,12 +316,12 @@ export default function McpSection() {
 
         {/* OpenCode config hint */}
         {status.running && (
-          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3">
+          <div className="rounded-lg bg-success/10 border border-success/20 p-3">
             <div className="flex items-start gap-2">
-              <Check className="size-4 text-emerald-500 mt-0.5 shrink-0" />
-              <div className="text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
+              <Check className="size-4 text-success mt-0.5 shrink-0" />
+              <div className="text-xs text-success space-y-1">
                 <p className="font-medium">Configuration OpenCode :</p>
-                <code className="block bg-emerald-500/10 rounded px-2 py-1 text-[11px]">
+                <code className="block bg-success/10 rounded px-2 py-1 text-[11px]">
                   {`"mcpServers": {\n  "reqly": {\n    "url": "${serverUrl}"\n  }\n}`}
                 </code>
               </div>
@@ -320,5 +330,5 @@ export default function McpSection() {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
