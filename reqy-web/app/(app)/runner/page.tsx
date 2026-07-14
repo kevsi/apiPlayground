@@ -47,6 +47,8 @@ import {
   type AssertionStatus,
   type RunnerContext,
 } from "@/lib/test-runner/types";
+import { hashRunReport, verifyRunReport } from "@/lib/run-report/hash";
+import { ShieldCheck, ShieldAlert } from "lucide-react";
 
 function formatDuration(ms?: number) {
   if (ms == null) return "—";
@@ -227,6 +229,9 @@ export default function RunnerPage() {
   const [progress, setProgress] = useState(0);
   const [report, setReport] = useState<CollectionRunReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [integrity, setIntegrity] = useState<"idle" | "valid" | "tampered">("idle");
+
+  const reportHash = useMemo(() => (report ? hashRunReport(report) : ""), [report]);
 
   const selected: Collection | null = collections.find((c) => c.id === selectedId) ?? null;
   const requestCount = selected?.requests?.length ?? 0;
@@ -257,6 +262,7 @@ export default function RunnerPage() {
       const result = await runCollectionEngine(selected, baseContext, { executor });
       setReport(result);
       setProgress(100);
+      setIntegrity("idle");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -463,6 +469,42 @@ export default function RunnerPage() {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Integrity hash + verify action */}
+              <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Hash d&apos;intégrité
+                  </span>
+                  <code className="font-mono text-xs text-foreground bg-muted rounded px-1.5 py-0.5 break-all">
+                    {reportHash}
+                  </code>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() =>
+                      setIntegrity(verifyRunReport(report, reportHash) ? "valid" : "tampered")
+                    }
+                  >
+                    Vérifier l&apos;intégrité
+                  </Button>
+                  {integrity === "valid" && (
+                    <span className="flex items-center gap-1 text-xs font-medium text-success">
+                      <ShieldCheck className="size-4" />
+                      Rapport intact
+                    </span>
+                  )}
+                  {integrity === "tampered" && (
+                    <span className="flex items-center gap-1 text-xs font-medium text-destructive">
+                      <ShieldAlert className="size-4" />
+                      Rapport modifié
+                    </span>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
