@@ -69,3 +69,8 @@ commands.allow = ["read_mcp_bundle"]
 identifier = "allow-sync-mcp-collections"
 description = "Allows the sync_mcp_collections command"
 commands.allow = ["sync_mcp_collections"]
+
+[[permission]]
+identifier = "allow-save-file"
+description = "Allows the save_file command"
+commands.allow = ["save_file"]

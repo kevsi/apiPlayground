@@ -62,3 +62,29 @@ export async function invokeTauriFetch(
     encoding: result.encoding ?? "utf8",
   };
 }
+
+/**
+ * Saves a Blob to disk using Tauri's native "Save As" dialog.
+ *
+ * The browser's `showSaveFilePicker` / `<a download>` don't work inside a
+ * Tauri Webview, so we show a native dialog (`plugin-dialog`) and write the
+ * bytes via the `save_file` Rust command (which can write anywhere the user
+ * picks, without the fs plugin's scope limits).
+ *
+ * @returns `"saved"` on success, `"cancelled"` if the user dismissed the dialog.
+ * @throws  on any write/invocation error.
+ */
+export async function saveBlobToDisk(filename: string, blob: Blob): Promise<"saved" | "cancelled"> {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const { invoke } = await import("@tauri-apps/api/core");
+
+  const target = await save({
+    defaultPath: filename,
+    filters: [{ name: "ZIP archive", extensions: ["zip"] }],
+  });
+  if (!target) return "cancelled";
+
+  const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+  await invoke("save_file", { path: target, contents: bytes });
+  return "saved";
+}

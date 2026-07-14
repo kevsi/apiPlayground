@@ -29,6 +29,7 @@
     "allow-stop-mcp-server",
     "allow-get-mcp-server-status",
     "allow-read-mcp-bundle",
-    "allow-sync-mcp-collections"
+    "allow-sync-mcp-collections",
+    "allow-save-file"
   ]
 }

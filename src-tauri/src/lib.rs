@@ -13,6 +13,16 @@ use crate::capture::{start_capture_proxy, stop_capture_proxy, ManagedCaptureProx
 use crate::fetch::{fetch_proxy, SharedClient};
 use crate::open::{export_json, open_external};
 
+/// Writes arbitrary bytes to a user-chosen path.
+///
+/// Used by the SDK "Save As" flow. We write directly with `std::fs` (instead
+/// of the `fs` plugin) so the user can save anywhere they pick via the native
+/// dialog, without being constrained by the plugin's filesystem scope.
+#[tauri::command]
+fn save_file(path: String, contents: Vec<u8>) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| format!("Failed to save file to {path}: {e}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Install Rustls crypto provider before any TLS operation.
@@ -63,6 +73,7 @@ pub fn run() {
       mcp::get_mcp_server_status,
       mcp::read_mcp_bundle,
       mcp::sync_mcp_collections,
+      save_file,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
