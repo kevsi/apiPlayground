@@ -17,12 +17,19 @@ import { useRequestStore, type RequestItem } from "@/hooks/use-request-store";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { getMethodPanelClass, recordToHeaderArray } from "@/lib/request-tab-utils";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { RequestTab } from "@/lib/request-executor";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { saveRestSnapshot, compareRestSnapshot, getRestSnapshot } from "@/lib/rest-snapshot/store";
 import type { FieldChange } from "@/lib/schema-diff";
+import {
+  proposeAssertionCorrection,
+  suggestionToAssertion,
+  type CorrectionSuggestion,
+} from "@/lib/ai-engine/propose-correction";
+import { SYSTEM_PROMPT } from "@/lib/ai-engine";
+import type { TestResult } from "@/lib/types";
 
 /** Parse a response body string into JSON; returns undefined when not JSON. */
 function parseResponseBody(body: string | undefined): unknown | undefined {
@@ -208,6 +215,38 @@ export function RequestTabsManager() {
     }
     setRestDiff({ name: name.trim(), changes: compareRestSnapshot(name.trim(), parsed) });
   };
+
+  // ── AI "Proposer une correction" on a failed assertion (Task 5) ───────────
+  // The AI is only ever asked to *suggest* a corrected assertion. Applying it
+  // requires an explicit user click ("Appliquer") — we never auto-apply, which
+  // respects the existing store.aiAutoApply default-off guard. The askAI fn
+  // reuses the real engine's text completion (callAIText under the hood).
+  const correctionAskAI = useCallback(
+    async (prompt: string) => {
+      const ctx = aiEngine.buildContext();
+      return aiEngine.sendMessage(prompt, SYSTEM_PROMPT, ctx);
+    },
+    [aiEngine],
+  );
+
+  const handleApplyCorrection = useCallback(
+    (result: TestResult, suggestion: CorrectionSuggestion) => {
+      const match = /-(\d+)$/.exec(result.assertionId);
+      const index = match ? Number(match[1]) : -1;
+      const assertions = activeTab.runnerAssertions ?? [];
+      const original = assertions[index];
+      if (index < 0 || !original) {
+        toast({ title: "Assertion introuvable", variant: "destructive" });
+        return;
+      }
+      const corrected = suggestionToAssertion(suggestion, original);
+      updateTab(activeTab.id, {
+        runnerAssertions: assertions.map((a, i) => (i === index ? corrected : a)),
+      } as Parameters<typeof updateTab>[1]);
+      toast({ title: "Assertion corrigée" });
+    },
+    [activeTab, updateTab],
+  );
 
   useEffect(() => {
     if (!currentRequest) return;
@@ -437,6 +476,8 @@ export function RequestTabsManager() {
                 }}
                 aiSummary={aiEngine.lastSummary ?? undefined}
                 aiError={aiEngine.error ?? undefined}
+                proposeAskAI={correctionAskAI}
+                onApplyCorrection={handleApplyCorrection}
                 method={activeTab.method}
                 url={activeTab.url}
                 queryParams={activeTab.queryParams}

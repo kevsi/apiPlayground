@@ -16,6 +16,7 @@ import { ResponseAiSummary } from "@/components/response-ai-summary";
 import { ResponseHeadersTab } from "@/components/response-headers-tab";
 import { CodeSnippet } from "@/components/response-code-snippet";
 import { TestResultsSection } from "@/components/response-test-results";
+import type { CorrectionSuggestion } from "@/lib/ai-engine/propose-correction";
 import dynamic from "next/dynamic";
 
 // Heavy dependencies — only loaded on demand (response received, AI opened).
@@ -85,6 +86,8 @@ interface ResponsePanelProps {
   authToken?: string;
   testResults?: TestResult[];
   history?: HistoryItem[];
+  proposeAskAI?: (prompt: string) => Promise<string>;
+  onApplyCorrection?: (result: TestResult, suggestion: CorrectionSuggestion) => void;
 }
 
 export function ResponsePanel({
@@ -115,6 +118,8 @@ export function ResponsePanel({
   authType = "none",
   authToken = "",
   history = [],
+  proposeAskAI,
+  onApplyCorrection,
 }: ResponsePanelProps) {
   const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty");
   const [activeTab, setActiveTab] = useState("response");
@@ -466,7 +471,14 @@ export function ResponsePanel({
         </TabsContent>
 
         <TabsContent value="tests" className="m-0 min-h-0 flex-1 animate-fade-in overflow-auto">
-          <TestResultsSection testResults={testResults ?? []} />
+          <TestResultsSection
+            testResults={testResults ?? []}
+            endpoint={`${method} ${url}`}
+            responseStatus={responseStatus}
+            responseBody={responseBody}
+            askAI={proposeAskAI}
+            onApplyCorrection={onApplyCorrection}
+          />
         </TabsContent>
       </Tabs>
 

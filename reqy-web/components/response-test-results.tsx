@@ -3,12 +3,26 @@
 import { CheckCircle, XCircle, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TestResult } from "@/lib/types";
+import { AssertionCorrection } from "@/components/assertion-correction";
+import type { CorrectionSuggestion } from "@/lib/ai-engine/propose-correction";
 
 interface TestResultsSectionProps {
   testResults: TestResult[];
+  endpoint?: string;
+  responseStatus?: number;
+  responseBody?: string;
+  askAI?: (prompt: string) => Promise<string>;
+  onApplyCorrection?: (result: TestResult, suggestion: CorrectionSuggestion) => void;
 }
 
-export function TestResultsSection({ testResults }: TestResultsSectionProps) {
+export function TestResultsSection({
+  testResults,
+  endpoint = "",
+  responseStatus,
+  responseBody,
+  askAI,
+  onApplyCorrection,
+}: TestResultsSectionProps) {
   if (!testResults || testResults.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center text-center px-4">
@@ -56,6 +70,16 @@ export function TestResultsSection({ testResults }: TestResultsSectionProps) {
               {result.expected ? ` = ${result.expected}` : ""}
             </span>
             <span className="text-muted-foreground/80">{result.message}</span>
+            {!result.passed && askAI && onApplyCorrection && (
+              <AssertionCorrection
+                result={result}
+                endpoint={endpoint}
+                responseStatus={responseStatus}
+                responseBody={responseBody}
+                askAI={askAI}
+                onApply={onApplyCorrection}
+              />
+            )}
           </div>
         </div>
       ))}
