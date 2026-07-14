@@ -65,7 +65,7 @@ for (const file of routeFiles) {
   backups.set(file, fs.readFileSync(file, 'utf8'))
 }
 
-let buildStatus = 1
+let buildStatus
 try {
   for (const file of routeFiles) {
     const original = backups.get(file)
@@ -91,4 +91,4 @@ try {
   console.log('[build-desktop] Restored route files to original state')
 }
 
-process.exit(buildStatus)
+process.exit(buildStatus ?? 1)
