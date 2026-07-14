@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Hono } from "hono";
 import { createHmac } from "node:crypto";
 import syncRoute from "../routes/sync.js";
 import db from "../db.js";
+import * as wsHub from "../ws-hub.js";
 import type { AuthContext } from "../auth.js";
 
 // Build a signed session cookie (same shape auth.ts expects).
@@ -29,17 +30,14 @@ function buildApp(opts: { broadcastMock?: ReturnType<typeof makeMockBroadcast> }
 
 function makeMockBroadcast() {
   const calls: Array<{ workspaceId: string; payload: any }> = [];
-  // Replace broadcastToWorkspace with a spy for the duration of the test.
-  const mod = require("../ws-hub.js") as typeof import("../ws-hub.js");
-  const original = mod.broadcastToWorkspace;
-  const spy = (workspaceId: string, payload: object) => {
+  // Spy on broadcastToWorkspace for the duration of the test.
+  const spy = vi.spyOn(wsHub, "broadcastToWorkspace").mockImplementation((workspaceId, payload) => {
     calls.push({ workspaceId, payload });
-  };
-  (mod as any).broadcastToWorkspace = spy;
+  });
   return {
     calls,
     restore: () => {
-      (mod as any).broadcastToWorkspace = original;
+      spy.mockRestore();
     },
   };
 }

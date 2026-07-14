@@ -2,9 +2,13 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const DB_PATH = process.env.REQLY_DB_PATH
-  ? path.resolve(process.env.REQLY_DB_PATH)
-  : path.join(path.resolve(process.cwd(), "data"), "reqly-sync.db");
+const DB_PATH =
+  process.env.REQLY_DB_PATH === ":memory:"
+    ? ":memory:"
+    : path.resolve(
+        process.env.REQLY_DB_PATH ??
+          path.join(path.resolve(process.cwd(), "data"), "reqly-sync.db"),
+      );
 
 const DB_DIR = path.dirname(DB_PATH);
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
@@ -83,5 +87,19 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_environments_ws ON environments(workspace_id, updated_at);
   CREATE INDEX IF NOT EXISTS idx_folders_col ON folders(collection_id, updated_at);
 `);
+
+// Defensive migration: an existing DB file created before the `version`/`deleted`
+// columns were added would otherwise fail at query time ("no such column").
+function ensureColumn(table: string, column: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+for (const table of ["collections", "environments", "folders"]) {
+  ensureColumn(table, "version", "INTEGER NOT NULL DEFAULT 1");
+  ensureColumn(table, "deleted", "INTEGER NOT NULL DEFAULT 0");
+}
 
 export default db;

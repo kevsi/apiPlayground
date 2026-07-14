@@ -16,7 +16,11 @@ import {
  */
 function makeMockSocket() {
   const sent: string[] = [];
-  const ws = {
+  const ws: {
+    readyState: number;
+    send: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
+  } = {
     readyState: WebSocket.OPEN,
     send: vi.fn((data: string) => {
       sent.push(data);
@@ -107,9 +111,9 @@ describe("ws-hub", () => {
       const b = makeMockSocket();
       const c = makeMockSocket();
       // CONNECTING, OPEN, CLOSED
-      a.ws.readyState = WebSocket.CONNECTING;
-      b.ws.readyState = WebSocket.OPEN;
-      c.ws.readyState = WebSocket.CLOSED;
+      a.mock.readyState = WebSocket.CONNECTING;
+      b.mock.readyState = WebSocket.OPEN;
+      c.mock.readyState = WebSocket.CLOSED;
       addClient({ ws: a.ws, userId: "u-1", workspaceId: "ws-1" });
       addClient({ ws: b.ws, userId: "u-2", workspaceId: "ws-1" });
       addClient({ ws: c.ws, userId: "u-3", workspaceId: "ws-1" });

@@ -18,12 +18,10 @@ workspaces.post("/", async (c) => {
   const id = `ws-${randomUUID()}`;
   const now = Date.now();
 
-  db.prepare(`INSERT OR IGNORE INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?)`).run(
-    auth.userId,
-    auth.email,
-    auth.name,
-    now,
-  );
+  db.prepare(
+    `INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name`,
+  ).run(auth.userId, auth.email, auth.name, now);
 
   const tx = db.transaction(() => {
     db.prepare(

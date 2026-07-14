@@ -98,24 +98,19 @@ export const syncLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxReques
 import type { Context, Next } from "hono";
 
 export function rateLimitMiddleware(limiter: InMemoryRateLimiter) {
-  return (c: Context, next: Next) => {
+  return async (c: Context, next: Next): Promise<Response | void> => {
     const ip =
       c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
       c.req.header("x-real-ip") ||
       "unknown";
     const result = limiter.check(`ip:${ip}`);
     if (!result.allowed) {
-      c.res ??= c.json({ error: "Too many requests. Please slow down." }, 429, {
+      return c.json({ error: "Too many requests. Please slow down." }, 429, {
         "Retry-After": String(Math.ceil((result.resetAt - Date.now()) / 1000)),
         "X-RateLimit-Remaining": "0",
       });
-      return;
     }
-    c.res ??= new Response(null, {
-      headers: {
-        "X-RateLimit-Remaining": String(result.remaining),
-      },
-    });
+    c.header("X-RateLimit-Remaining", String(result.remaining));
     return next();
   };
 }
