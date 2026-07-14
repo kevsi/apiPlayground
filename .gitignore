@@ -52,3 +52,6 @@ featurres.txt
 settings_tiny.jpg
 RECOVERY_STEPS.md
 "debug auth/"
+
+# ── Generated SDK output (produced by the SDK generator) ──────────
+general-typescript-fetch/
