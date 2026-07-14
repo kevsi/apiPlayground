@@ -24,6 +24,20 @@ use crate::fetch::SharedClient;
 pub struct CaptureProxyState {
   pub shutdown_flag: Option<Arc<AtomicBool>>,
   pub server_thread: Option<std::thread::JoinHandle<()>>,
+  /// Retained captured requests for the current (or last) capture session.
+  /// Populated by the proxy thread after each forwarded request so the
+  /// frontend can list/get them via Tauri commands.
+  pub captured: Vec<CapturedRequest>,
+}
+
+/// Lightweight view of a captured request, returned by `list_captured_sessions`.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CapturedSummary {
+  pub id: String,
+  pub method: String,
+  pub url: String,
+  pub timestamp: u64,
 }
 
 pub type ManagedCaptureProxyState = Arc<Mutex<CaptureProxyState>>;
@@ -127,6 +141,8 @@ fn start_proxy_server(
 
   // Spawn the blocking proxy loop in a std thread with a dedicated runtime
   let handle = app_handle.clone();
+  // Clone the Arc so the proxy thread can retain captured requests.
+  let captured_store = state.clone();
   let server_handle = std::thread::spawn(move || {
     let rt = match tokio::runtime::Runtime::new() {
       Ok(r) => r,
@@ -245,6 +261,11 @@ fn start_proxy_server(
 
       let _ = handle.emit("captured-request-updated", &captured);
 
+      // Retain the full request+response so it can be listed/gotten later.
+      if let Ok(mut g) = captured_store.lock() {
+        g.captured.push(captured.clone());
+      }
+
       // Build tiny_http response headers — filter out invalid header entries
       // instead of unwrapping (which would panic the proxy thread).
       let http_resp_headers: Vec<Header> = resp_headers
@@ -285,10 +306,12 @@ pub fn start_capture_proxy(
   }
 
   {
-    let guard = state.lock()?;
+    let mut guard = state.lock()?;
     if guard.shutdown_flag.is_some() {
       return Err(AppError::AlreadyRunning("Capture proxy is already running".into()));
     }
+    // Start each capture session from a clean slate.
+    guard.captured.clear();
   }
 
   start_proxy_server(app_handle, port, &state, client.0.clone())
@@ -329,6 +352,32 @@ pub fn stop_capture_proxy(state: tauri::State<'_, ManagedCaptureProxyState>) -> 
   } else {
     Err(AppError::NotRunning("Capture proxy is not running".into()))
   }
+}
+
+#[tauri::command]
+pub fn list_captured_sessions(
+  state: tauri::State<'_, ManagedCaptureProxyState>,
+) -> Result<Vec<CapturedSummary>, AppError> {
+  let guard = state.lock()?;
+  Ok(guard
+    .captured
+    .iter()
+    .map(|c| CapturedSummary {
+      id: c.id.clone(),
+      method: c.method.clone(),
+      url: c.url.clone(),
+      timestamp: c.timestamp,
+    })
+    .collect())
+}
+
+#[tauri::command]
+pub fn get_captured_session(
+  id: String,
+  state: tauri::State<'_, ManagedCaptureProxyState>,
+) -> Result<Option<CapturedRequest>, AppError> {
+  let guard = state.lock()?;
+  Ok(guard.captured.iter().find(|c| c.id == id).cloned())
 }
 
 #[cfg(test)]

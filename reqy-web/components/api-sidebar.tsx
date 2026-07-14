@@ -14,6 +14,7 @@ import {
   FolderKanban,
   Play,
   Smartphone,
+  Radio,
 } from "lucide-react";
 import { AppIcon } from "@/components/app-icon";
 import { ToolsSection } from "@/components/sidebar/tools-section";
@@ -32,6 +33,7 @@ const navItems = [
   { icon: FolderKanban, label: "Workspaces", href: "/workspaces/", key: "workspaces" },
   { icon: Play, label: "Runner", href: "/runner/", key: "runner" },
   { icon: Smartphone, label: "Mobile Money", href: "/mobile-money/", key: "mobile-money" },
+  { icon: Radio, label: "Capture", href: "/capture/", key: "capture" },
   { icon: Sparkles, label: "AI Assistant", href: "/ai-insights/", key: "ai-insights" },
   { icon: Settings, label: "Settings", href: "/settings/", key: "settings" },
 ];

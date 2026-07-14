@@ -9,7 +9,10 @@ mod capture;
 mod open;
 mod fetch;
 
-use crate::capture::{start_capture_proxy, stop_capture_proxy, ManagedCaptureProxyState};
+use crate::capture::{
+  get_captured_session, list_captured_sessions, start_capture_proxy,
+  stop_capture_proxy, ManagedCaptureProxyState,
+};
 use crate::fetch::{fetch_proxy, SharedClient};
 use crate::open::{export_json, open_external};
 
@@ -64,6 +67,8 @@ pub fn run() {
       open_external,
       start_capture_proxy,
       stop_capture_proxy,
+      list_captured_sessions,
+      get_captured_session,
       websocket::commands::ws_connect,
       websocket::commands::ws_send,
       websocket::commands::ws_disconnect,

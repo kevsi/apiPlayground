@@ -64,6 +64,68 @@ export async function invokeTauriFetch(
 }
 
 /**
+ * Mirrors `src-tauri/src/capture.rs` `CapturedRequest` (serde camelCase).
+ * `responseHeaders` / `responseBody` / `status` are populated after forwarding.
+ */
+export interface CapturedRequest {
+  id: string;
+  method: string;
+  url: string;
+  headers: Array<[string, string]>;
+  body: string | null;
+  timestamp: number;
+  status: number | null;
+  responseHeaders: Array<[string, string]> | null;
+  responseBody: string | null;
+  durationMs: number | null;
+  error: string | null;
+}
+
+/** Lightweight view returned by `list_captured_sessions`. */
+export interface CapturedSummary {
+  id: string;
+  method: string;
+  url: string;
+  timestamp: number;
+}
+
+/** Lists the requests retained from the current/last capture session. */
+export async function listCapturedSessions(): Promise<CapturedSummary[]> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<CapturedSummary[]>("list_captured_sessions");
+}
+
+/** Returns the full request + response for a single captured session id. */
+export async function getCapturedSession(id: string): Promise<CapturedRequest | null> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<CapturedRequest | null>("get_captured_session", { id });
+}
+
+/** Starts the local capture proxy on the given port. */
+export async function startCaptureProxy(port: number): Promise<void> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("start_capture_proxy", { port });
+}
+
+/** Stops the local capture proxy if it is running. */
+export async function stopCaptureProxy(): Promise<void> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("stop_capture_proxy");
+}
+
+/**
  * Saves a Blob to disk using Tauri's native "Save As" dialog.
  *
  * The browser's `showSaveFilePicker` / `<a download>` don't work inside a
