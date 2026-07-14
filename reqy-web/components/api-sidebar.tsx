@@ -13,6 +13,7 @@ import {
   ChevronsRight,
   FolderKanban,
   Play,
+  Smartphone,
 } from "lucide-react";
 import { AppIcon } from "@/components/app-icon";
 import { ToolsSection } from "@/components/sidebar/tools-section";
@@ -30,6 +31,7 @@ const navItems = [
   { icon: FolderCode, label: "Projects", href: "/my-projects/", key: "projects" },
   { icon: FolderKanban, label: "Workspaces", href: "/workspaces/", key: "workspaces" },
   { icon: Play, label: "Runner", href: "/runner/", key: "runner" },
+  { icon: Smartphone, label: "Mobile Money", href: "/mobile-money/", key: "mobile-money" },
   { icon: Sparkles, label: "AI Assistant", href: "/ai-insights/", key: "ai-insights" },
   { icon: Settings, label: "Settings", href: "/settings/", key: "settings" },
 ];
