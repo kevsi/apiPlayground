@@ -17,8 +17,37 @@ import { useRequestStore, type RequestItem } from "@/hooks/use-request-store";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { getMethodPanelClass, recordToHeaderArray } from "@/lib/request-tab-utils";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RequestTab } from "@/lib/request-executor";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+import { saveRestSnapshot, compareRestSnapshot, getRestSnapshot } from "@/lib/rest-snapshot/store";
+import type { FieldChange } from "@/lib/schema-diff";
+
+/** Parse a response body string into JSON; returns undefined when not JSON. */
+function parseResponseBody(body: string | undefined): unknown | undefined {
+  if (body === undefined || body === null) return undefined;
+  const trimmed = body.trim();
+  if (trimmed === "") return undefined;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Human-readable French description of a single schema change. */
+function describeChange(c: FieldChange): string {
+  switch (c.kind) {
+    case "added":
+      return `Champ '${c.path}' ajouté (${c.to})`;
+    case "removed":
+      return `Champ '${c.path}' retiré (${c.from})`;
+    case "type-changed":
+    case "type-changed:null":
+      return `Champ '${c.path}' type changé : ${c.from} → ${c.to}`;
+  }
+}
 
 export function RequestTabsManager() {
   const tabState = useRequestTabsState();
@@ -148,6 +177,37 @@ export function RequestTabsManager() {
   const lastResponse = useRequestStore((s) => s.lastResponse);
   const lastReqJson = useRef("");
   const lastRespJson = useRef("");
+
+  // REST contract-testing snapshots (Task 4) — kept localized to the response area.
+  const [restDiff, setRestDiff] = useState<{ name: string; changes: FieldChange[] } | null>(null);
+
+  const handleSaveSnapshot = () => {
+    const name = window.prompt("Nom du snapshot :");
+    if (!name || !name.trim()) return;
+    const parsed = parseResponseBody(activeTab.responseBody);
+    if (parsed === undefined) {
+      toast({ title: "Réponse non-JSON", variant: "destructive" });
+      return;
+    }
+    saveRestSnapshot(name.trim(), parsed);
+    toast({ title: `Snapshot « ${name.trim()} » sauvegardé` });
+    setRestDiff(null);
+  };
+
+  const handleCompareSnapshot = () => {
+    const name = window.prompt("Nom du snapshot à comparer :");
+    if (!name || !name.trim()) return;
+    if (!getRestSnapshot(name.trim())) {
+      toast({ title: `Snapshot « ${name.trim()} » introuvable`, variant: "destructive" });
+      return;
+    }
+    const parsed = parseResponseBody(activeTab.responseBody);
+    if (parsed === undefined) {
+      toast({ title: "Réponse non-JSON", variant: "destructive" });
+      return;
+    }
+    setRestDiff({ name: name.trim(), changes: compareRestSnapshot(name.trim(), parsed) });
+  };
 
   useEffect(() => {
     if (!currentRequest) return;
@@ -387,6 +447,69 @@ export function RequestTabsManager() {
                 authToken={activeTab.authToken}
                 history={history}
               />
+
+              {/* Snapshots REST (contract testing) — localized to the response area */}
+              <div
+                className="border-t border-border/50 bg-card/40 p-2 space-y-2"
+                data-testid="rest-snapshot-controls"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={handleSaveSnapshot}
+                    disabled={!activeTab.responseBody}
+                    data-testid="rest-snapshot-save"
+                  >
+                    Sauvegarder un snapshot
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={handleCompareSnapshot}
+                    disabled={!activeTab.responseBody}
+                    data-testid="rest-snapshot-compare"
+                  >
+                    Comparer à un snapshot
+                  </Button>
+                  {restDiff && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs"
+                      onClick={() => setRestDiff(null)}
+                      data-testid="rest-snapshot-clear"
+                    >
+                      Fermer
+                    </Button>
+                  )}
+                </div>
+
+                {restDiff && (
+                  <div
+                    className="text-xs font-mono bg-muted/30 p-2 rounded space-y-1 max-h-64 overflow-auto"
+                    data-testid="rest-snapshot-diff"
+                  >
+                    <div className="text-muted-foreground">
+                      Comparaison avec « {restDiff.name} »
+                    </div>
+                    {restDiff.changes.length === 0 ? (
+                      <div className="text-success">✅ Aucun changement détecté.</div>
+                    ) : (
+                      restDiff.changes.map((c, i) => (
+                        <div
+                          key={`${c.path}-${i}`}
+                          className={c.kind === "removed" ? "text-destructive" : "text-warning"}
+                        >
+                          {describeChange(c)}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
