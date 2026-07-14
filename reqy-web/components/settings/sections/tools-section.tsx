@@ -172,6 +172,14 @@ export function ToolsSection() {
           <Button size="sm" variant="default" onClick={copyMcpConfig}>
             Copier la config MCP
           </Button>
+          <a
+            href="/mcp-setup.md"
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Documentation MCP
+          </a>
           {copied ? (
             <span className="text-sm font-medium text-success" role="status" aria-live="polite">
               Copié !
