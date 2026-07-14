@@ -19,3 +19,4 @@ node_modules
 
 # Test results (auto-generated)
 test-results/
+coverage/
