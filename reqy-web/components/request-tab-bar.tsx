@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,6 +9,7 @@ import {
   Copy,
   Folder,
   List,
+  Pencil,
   Plus,
   Save,
   X,
@@ -24,7 +26,7 @@ import type { RequestTab } from "@/lib/request-executor";
 import { methodColors, getMethodDotClass } from "@/lib/request-tab-utils";
 import type { TabContextMenu } from "@/hooks/use-request-tabs-state";
 
-interface RequestTabBarProps {
+export interface RequestTabBarProps {
   tabs: RequestTab[];
   activeTabId: string;
   canScrollLeft: boolean;
@@ -49,6 +51,7 @@ interface RequestTabBarProps {
   onDuplicateActive: () => void;
   onSaveActive: () => void;
   onOpenHistory: () => void;
+  onRenameTab?: (tabId: string, name: string) => void;
 }
 
 export function RequestTabBar({
@@ -74,8 +77,28 @@ export function RequestTabBar({
   onDuplicateActive,
   onSaveActive,
   onOpenHistory,
+  onRenameTab,
 }: RequestTabBarProps) {
   const hasActiveTab = tabs.some((t) => t.id === activeTabId);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const committedRef = useRef(false);
+  const startEdit = (tab: RequestTab) => {
+    committedRef.current = false;
+    setEditingId(tab.id);
+    setDraft(tab.name);
+  };
+  const commit = (tabId: string) => {
+    if (committedRef.current) return;
+    const name = draft.trim();
+    if (name && onRenameTab) onRenameTab(tabId, name);
+    committedRef.current = true;
+    setEditingId(null);
+  };
+  const cancel = () => {
+    committedRef.current = true;
+    setEditingId(null);
+  };
 
   return (
     <>
@@ -126,7 +149,27 @@ export function RequestTabBar({
               <span
                 className={cn("size-1.5 rounded-full shrink-0", getMethodDotClass(tab.method))}
               />
-              <span className="max-w-[200px] truncate text-sm font-medium">{tab.name}</span>
+              {editingId === tab.id ? (
+                <input
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => commit(tab.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commit(tab.id);
+                    else if (e.key === "Escape") cancel();
+                  }}
+                  className="max-w-[200px] truncate rounded bg-background px-1 text-sm font-medium outline-none ring-1 ring-primary"
+                />
+              ) : (
+                <span
+                  onDoubleClick={() => startEdit(tab)}
+                  title="Double-click to rename"
+                  className="max-w-[200px] cursor-text truncate text-sm font-medium"
+                >
+                  {tab.name}
+                </span>
+              )}
               {!tab.isSaved && (
                 <span
                   title="Unsaved — Ctrl+S to save"
@@ -273,6 +316,17 @@ export function RequestTabBar({
           >
             <Copy className="size-3.5" />
             Duplicate
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              const tab = tabs.find((t) => t.id === contextMenu.tabId);
+              if (tab) startEdit(tab);
+              onCloseContextMenu();
+            }}
+          >
+            <Pencil className="size-3.5" />
+            Rename
           </button>
           <div className="my-1 border-t border-border" />
           <button

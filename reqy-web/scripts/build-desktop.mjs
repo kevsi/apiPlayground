@@ -18,7 +18,10 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const WEB_VALUE = "export const dynamic = 'force-dynamic';"
+// Route files declare `force-dynamic` with either single or double quotes
+// (the codebase is inconsistent), so match both. The optional trailing
+// semicolon and surrounding whitespace keep the regex forgiving.
+const DYNAMIC_RE = /export const dynamic\s*=\s*['"]force-dynamic["'];?/
 const DESKTOP_VALUE = "export const dynamic = 'force-static';"
 
 // Clean stale build artifacts before each run. On Windows, `.next/` files are
@@ -69,11 +72,13 @@ let buildStatus
 try {
   for (const file of routeFiles) {
     const original = backups.get(file)
-    if (!original.includes(WEB_VALUE)) {
-      console.warn(`[build-desktop] Skipping ${path.relative(process.cwd(), file)}: expected "${WEB_VALUE}" not found.`)
+    if (!DYNAMIC_RE.test(original)) {
+      console.warn(
+        `[build-desktop] Skipping ${path.relative(process.cwd(), file)}: no force-dynamic export found.`,
+      )
       continue
     }
-    fs.writeFileSync(file, original.replace(WEB_VALUE, DESKTOP_VALUE))
+    fs.writeFileSync(file, original.replace(DYNAMIC_RE, DESKTOP_VALUE))
   }
 
   console.log('[build-desktop] Running next build --webpack...')

@@ -61,6 +61,7 @@ function describeChange(c: FieldChange): string {
 
 export function RequestTabsManager() {
   const tabState = useRequestTabsState();
+  const updateRequestById = useRequestStore((s) => s.updateRequestById);
 
   // "Mode simple" (Task 13): when enabled, hide the raw request editor and show
   // the natural-language guided builder instead. Persisted via the existing
@@ -329,6 +330,19 @@ export function RequestTabsManager() {
     });
   }, [lastResponse, activeTab.id, updateTab]);
 
+  // Rename a request: keep the tab label in sync and persist to the saved
+  // request in the collection when the tab is backed by one.
+  const renameTab = useCallback(
+    (tabId: string, name: string) => {
+      const tab = tabs.find((t) => t.id === tabId);
+      if (!tab) return;
+      const finalName = name.trim() || tab.name;
+      updateTab(tabId, { name: finalName });
+      if (tab.savedRequestId) updateRequestById(tab.savedRequestId, { name: finalName });
+    },
+    [tabs, updateTab, updateRequestById],
+  );
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div data-testid="request-tabs">
@@ -355,6 +369,7 @@ export function RequestTabsManager() {
           onDuplicateActive={() => duplicateTab(activeTab)}
           onSaveActive={saveActiveTab}
           onOpenHistory={() => setHistoryOpen(true)}
+          onRenameTab={renameTab}
         />
       </div>
 
