@@ -17,6 +17,8 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useRequestStore, type Workspace } from "@/hooks/use-request-store";
 import { workspaceFetch } from "@/lib/workspace-api";
+import { SyncSignedOutBanner } from "@/components/sync-signed-out-banner";
+import { useSessionStore } from "@/lib/session-store";
 
 interface MemberData {
   id: string;
@@ -50,6 +52,7 @@ export default function WorkspacesPage() {
   const workspaces = useRequestStore((s) => s.workspaces);
   const fetchWorkspacesFromApi = useRequestStore((s) => s.fetchWorkspacesFromApi);
   const router = useRouter();
+  const isAuthenticated = useSessionStore((s) => s.status === "authenticated");
 
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -186,6 +189,8 @@ export default function WorkspacesPage() {
       </div>
 
       <div className="mt-6 space-y-6">
+        {!isAuthenticated && <SyncSignedOutBanner />}
+
         {loading ? (
           <div className="flex items-center justify-center py-24 text-muted-foreground">
             Loading workspaces...
