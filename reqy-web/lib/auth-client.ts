@@ -75,5 +75,6 @@ export async function authMe(token: string): Promise<AuthUser> {
   if (!res.ok) {
     throw new Error(`Not authenticated: ${res.status}`);
   }
-  return (await res.json()) as AuthUser;
+  const data = (await res.json()) as { user: AuthUser };
+  return data.user;
 }
