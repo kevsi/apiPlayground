@@ -7,9 +7,11 @@
 //! async methods via `rt.block_on`). A shutdown atomic flag is shared
 //! between the proxy thread and the Tauri command that stops it.
 
+use std::fs;
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -26,8 +28,13 @@ pub struct CaptureProxyState {
   pub server_thread: Option<std::thread::JoinHandle<()>>,
   /// Retained captured requests for the current (or last) capture session.
   /// Populated by the proxy thread after each forwarded request so the
-  /// frontend can list/get them via Tauri commands.
+  /// frontend can list/get them via Tauri commands. Persisted to disk (see
+  /// `CAPTURE_FILE_PATH`) so captures survive an app restart.
   pub captured: Vec<CapturedRequest>,
+  /// `true` once persisted captures have been loaded into `captured` (either
+  /// from disk on first access, or because a capture session has started).
+  /// Prevents `ensure_loaded` from clobbering in-memory captures mid-session.
+  pub persisted_loaded: bool,
   /// Optional bandwidth cap (in ko/s) applied to forwarded response bodies.
   /// `None` disables throttling (default). Set via `set_bandwidth_limit`.
   pub bandwidth_limit_kbps: Option<u32>,
@@ -72,6 +79,70 @@ pub struct CapturedSummary {
 }
 
 pub type ManagedCaptureProxyState = Arc<Mutex<CaptureProxyState>>;
+
+// ── On-disk persistence (mirrors `store.rs` offline queue) ──────────────────
+//
+// Captured requests are persisted to `<app_data_dir>/captures.json` so they
+// survive an app restart. We use a plain JSON file (serde camelCase) rather
+// than a DB: capture volume is modest and the format stays trivially
+// inspectable. The proxy thread writes the file after every captured request
+// (cheap for typical volumes); `clear_captured_sessions` resets it.
+
+static CAPTURE_FILE_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+/// Point the capture store at the app's data directory. Call from Tauri
+/// `setup` (next to `init_queue_store`) before any command runs.
+pub fn init_capture_store(app_data_dir: PathBuf) {
+  let _ = CAPTURE_FILE_PATH.set(app_data_dir.join("captures.json"));
+}
+
+fn read_captures_from(path: &Path) -> Vec<CapturedRequest> {
+  match fs::read_to_string(path) {
+    Ok(s) if !s.trim().is_empty() => serde_json::from_str(&s).unwrap_or_default(),
+    _ => Vec::new(),
+  }
+}
+
+fn write_captures_to(reqs: &[CapturedRequest], path: &Path) -> Result<(), AppError> {
+  if let Some(parent) = path.parent() {
+    let _ = fs::create_dir_all(parent);
+  }
+  let json = serde_json::to_string_pretty(reqs)?;
+  fs::write(path, json)?;
+  Ok(())
+}
+
+/// Read persisted captures (empty if uninitialised or the file is missing).
+pub fn read_captures() -> Vec<CapturedRequest> {
+  match CAPTURE_FILE_PATH.get() {
+    Some(p) => read_captures_from(p),
+    None => Vec::new(),
+  }
+}
+
+/// Persist captures to disk (no-op if uninitialised).
+pub fn write_captures(reqs: &[CapturedRequest]) -> Result<(), AppError> {
+  match CAPTURE_FILE_PATH.get() {
+    Some(p) => write_captures_to(reqs, p),
+    None => Ok(()),
+  }
+}
+
+/// Lazily load persisted captures into memory exactly once. Safe to call
+/// before listing/getting so captures are visible even before the proxy is
+/// started (e.g. after an app restart). No-op once `persisted_loaded` is set,
+/// so in-memory captures are never clobbered during an active session.
+fn ensure_loaded(state: &ManagedCaptureProxyState) {
+  let mut guard = match state.lock() {
+    Ok(g) => g,
+    Err(_) => return,
+  };
+  if guard.persisted_loaded {
+    return;
+  }
+  guard.captured = read_captures();
+  guard.persisted_loaded = true;
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -292,9 +363,11 @@ fn start_proxy_server(
 
       let _ = handle.emit("captured-request-updated", &captured);
 
-      // Retain the full request+response so it can be listed/gotten later.
+      // Retain the full request+response so it can be listed/gotten later,
+      // and persist to disk so captures survive an app restart.
       if let Ok(mut g) = captured_store.lock() {
         g.captured.push(captured.clone());
+        let _ = write_captures(&g.captured);
       }
 
       // Build tiny_http response headers — filter out invalid header entries
@@ -370,13 +443,15 @@ pub fn start_capture_proxy(
   }
 
   {
-    let mut guard = state.lock()?;
+    let guard = state.lock()?;
     if guard.shutdown_flag.is_some() {
       return Err(AppError::AlreadyRunning("Capture proxy is already running".into()));
     }
-    // Start each capture session from a clean slate.
-    guard.captured.clear();
   }
+
+  // Load any previously persisted captures so history survives a restart.
+  // Captures accumulate across sessions; use `clear_captured_sessions` to reset.
+  ensure_loaded(&state);
 
   start_proxy_server(app_handle, port, &state, client.0.clone())
 }
@@ -422,6 +497,7 @@ pub fn stop_capture_proxy(state: tauri::State<'_, ManagedCaptureProxyState>) -> 
 pub fn list_captured_sessions(
   state: tauri::State<'_, ManagedCaptureProxyState>,
 ) -> Result<Vec<CapturedSummary>, AppError> {
+  ensure_loaded(&state);
   let guard = state.lock()?;
   Ok(guard
     .captured
@@ -440,8 +516,22 @@ pub fn get_captured_session(
   id: String,
   state: tauri::State<'_, ManagedCaptureProxyState>,
 ) -> Result<Option<CapturedRequest>, AppError> {
+  ensure_loaded(&state);
   let guard = state.lock()?;
   Ok(guard.captured.iter().find(|c| c.id == id).cloned())
+}
+
+#[tauri::command]
+pub fn clear_captured_sessions(
+  state: tauri::State<'_, ManagedCaptureProxyState>,
+) -> Result<(), AppError> {
+  {
+    let mut guard = state.lock()?;
+    guard.captured.clear();
+    // Mark as loaded so `ensure_loaded` won't reload the just-cleared file.
+    guard.persisted_loaded = true;
+  }
+  write_captures(&[])
 }
 
 #[tauri::command]
@@ -508,5 +598,32 @@ mod tests {
     let state = CaptureProxyState::default();
     assert!(state.shutdown_flag.is_none());
     assert!(state.server_thread.is_none());
+  }
+
+  #[test]
+  fn captures_round_trip_to_disk() {
+    let dir = std::env::temp_dir()
+      .join("reqly-capture-test")
+      .join(uuid::Uuid::new_v4().to_string());
+    let path = dir.join("captures.json");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let req = CapturedRequest::from_http_request("GET", "http://x", &hdrs(), None);
+    write_captures_to(&[req.clone()], &path).expect("write captures");
+
+    let loaded = read_captures_from(&path);
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded[0].id, req.id);
+    assert_eq!(loaded[0].method, "GET");
+    assert_eq!(loaded[0].url, "http://x");
+  }
+
+  #[test]
+  fn read_captures_handles_missing_file() {
+    let missing = std::env::temp_dir()
+      .join("reqly-capture-test")
+      .join(uuid::Uuid::new_v4().to_string())
+      .join("does-not-exist.json");
+    assert!(read_captures_from(&missing).is_empty());
   }
 }

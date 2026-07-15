@@ -11,6 +11,7 @@ export default defineConfig({
       "src/ai/**/*.test.{ts,tsx}",
       "hooks/**/__tests__/**/*.test.{ts,tsx}",
       "components/**/__tests__/**/*.test.{ts,tsx}",
+      "app/**/__tests__/**/*.test.{ts,tsx}",
       "app/api/**/__tests__/**/*.test.ts",
       "modules/**/*.test.{ts,tsx}",
     ],

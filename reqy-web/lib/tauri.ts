@@ -126,6 +126,19 @@ export async function stopCaptureProxy(): Promise<void> {
 }
 
 /**
+ * Permanently deletes all persisted captures (both in memory and on disk).
+ *
+ * No-op / throws when Tauri is not available (web/preview context).
+ */
+export async function clearCapturedSessions(): Promise<void> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("clear_captured_sessions");
+}
+
+/**
  * Sets an optional bandwidth cap (in ko/s) applied to forwarded response
  * bodies in the capture proxy. Pass `null` to disable throttling.
  *

@@ -14,8 +14,8 @@ mod fetch;
 mod store;
 
 use crate::capture::{
-  get_captured_session, list_captured_sessions, set_bandwidth_limit, start_capture_proxy,
-  stop_capture_proxy, ManagedCaptureProxyState,
+  clear_captured_sessions, get_captured_session, list_captured_sessions, set_bandwidth_limit,
+  start_capture_proxy, stop_capture_proxy, ManagedCaptureProxyState,
 };
 use crate::fetch::{fetch_proxy, SharedClient};
 use crate::open::{export_json, open_external};
@@ -98,6 +98,7 @@ pub fn run() {
       stop_capture_proxy,
       list_captured_sessions,
       get_captured_session,
+      clear_captured_sessions,
       set_bandwidth_limit,
       websocket::commands::ws_connect,
       websocket::commands::ws_send,
@@ -127,7 +128,8 @@ pub fn run() {
       // Point the offline queue store at the app's data directory (falls back
       // to a temp dir if it cannot be resolved).
       if let Ok(app_data_dir) = app.path().app_data_dir() {
-        crate::store::init_queue_store(app_data_dir);
+        crate::store::init_queue_store(app_data_dir.clone());
+        crate::capture::init_capture_store(app_data_dir);
       }
       Ok(())
     })
