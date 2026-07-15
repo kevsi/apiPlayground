@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { WebSocketServer } from "ws";
 import workspaces from "./routes/workspaces.js";
 import memberships from "./routes/memberships.js";
+import auth from "./routes/auth.js";
 import sync from "./routes/sync.js";
 import { handleWsUpgrade } from "./routes/ws.js";
 import { closeAll } from "./ws-hub.js";
@@ -51,12 +52,14 @@ app.use("/api/*", async (c, next) => {
 // Apply API-wide rate limiting (non-sync endpoints)
 app.use("/api/workspaces/*", rateLimitMiddleware(apiLimiter));
 app.use("/api/memberships/*", rateLimitMiddleware(apiLimiter));
+app.use("/api/auth/*", rateLimitMiddleware(apiLimiter));
 
 // Sync endpoints have a lower rate limit (bursty polling)
 app.use("/api/sync/*", rateLimitMiddleware(syncLimiter));
 
 app.route("/api/workspaces", workspaces);
 app.route("/api/memberships", memberships);
+app.route("/api/auth", auth);
 app.route("/api/sync", sync);
 
 const port = Number(process.env.PORT ?? 4000);

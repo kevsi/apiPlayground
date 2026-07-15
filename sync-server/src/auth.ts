@@ -47,9 +47,19 @@ function createSignature(payloadBase64: string): string {
   return createHmac("sha256", getSecret()).update(payloadBase64).digest("base64url");
 }
 
-function parseSession(cookieValue: string | undefined): SessionPayload | null {
-  if (!cookieValue) return null;
-  const [payloadBase64, signature] = cookieValue.split(".");
+/**
+ * Build a signed session token (`<base64url(payload)>.<hmac>`). The same string
+ * is used both as the `auth_session` cookie value and as a `Bearer` token, so
+ * clients (web, desktop/Tauri) can present it either way.
+ */
+export function createSessionToken(payload: SessionPayload): string {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${createSignature(encoded)}`;
+}
+
+function parseSession(token: string | undefined): SessionPayload | null {
+  if (!token) return null;
+  const [payloadBase64, signature] = token.split(".");
   if (!payloadBase64 || !signature) return null;
   const expectedSignature = createSignature(payloadBase64);
   const sigBuf = Buffer.from(signature, "utf-8");
@@ -74,9 +84,17 @@ export interface AuthContext {
 export async function requireAuth(c: Context, next: Next) {
   const cookieHeader = c.req.header("cookie") ?? "";
   const match = cookieHeader.match(new RegExp(`${escapeRegex(COOKIE_NAME)}=([^;]+)`));
+  // Accept either the session cookie OR an `Authorization: Bearer <token>`
+  // (same signed format) so desktop/Tauri clients can authenticate without cookies.
+  let token = match?.[1];
+  if (!token) {
+    const authHeader = c.req.header("authorization");
+    if (authHeader?.startsWith("Bearer ")) token = authHeader.slice(7).trim();
+  }
+
   let session: SessionPayload | null = null;
   try {
-    session = parseSession(match?.[1]);
+    session = parseSession(token);
   } catch {
     // AUTH_SIGNING_SECRET may not be set in dev — that's fine
   }

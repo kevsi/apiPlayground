@@ -22,6 +22,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     name TEXT,
+    password_hash TEXT,
     created_at INTEGER NOT NULL
   );
 
@@ -101,5 +102,8 @@ for (const table of ["collections", "environments", "folders"]) {
   ensureColumn(table, "version", "INTEGER NOT NULL DEFAULT 1");
   ensureColumn(table, "deleted", "INTEGER NOT NULL DEFAULT 0");
 }
+
+// Password hash is optional: OAuth-based sessions don't set it.
+ensureColumn("users", "password_hash", "TEXT");
 
 export default db;
