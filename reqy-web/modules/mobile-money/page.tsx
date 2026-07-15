@@ -1,6 +1,6 @@
 "use client";
 
-import { CallbackSimulator } from "@/components/mobile-money/callback-simulator";
+import { CallbackSimulator } from "@/modules/mobile-money/callback-simulator";
 import { TunnelFacilitator } from "@/components/tunnel-facilitator";
 
 export default function MobileMoneyPage() {

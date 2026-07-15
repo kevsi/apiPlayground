@@ -6,7 +6,7 @@ import {
   sendCallbackPayload,
   type MomoProvider,
   type MomoScenario,
-} from "@/lib/mobile-money/templates";
+} from "@/modules/mobile-money/templates";
 
 const PROVIDERS: { value: MomoProvider; label: string }[] = [
   { value: "mtn-momo-collections", label: "MTN MoMo — Collections" },

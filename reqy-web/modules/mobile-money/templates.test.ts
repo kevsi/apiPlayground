@@ -3,7 +3,7 @@ import {
   buildCallbackPayload,
   sendCallbackPayload,
   type MomoProvider,
-} from "@/lib/mobile-money/templates";
+} from "@/modules/mobile-money/templates";
 
 const PROVIDERS: MomoProvider[] = [
   "mtn-momo-collections",

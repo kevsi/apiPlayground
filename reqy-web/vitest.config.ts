@@ -12,6 +12,7 @@ export default defineConfig({
       "hooks/**/__tests__/**/*.test.{ts,tsx}",
       "components/**/__tests__/**/*.test.{ts,tsx}",
       "app/api/**/__tests__/**/*.test.ts",
+      "modules/**/*.test.{ts,tsx}",
     ],
     exclude: ["node_modules", ".next"],
     coverage: {
