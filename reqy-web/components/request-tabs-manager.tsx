@@ -14,10 +14,12 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { useRequestTabsState } from "@/hooks/use-request-tabs-state";
 import { useRequestTabExecution } from "@/hooks/use-request-tab-execution";
 import { useRequestStore, type RequestItem } from "@/hooks/use-request-store";
+import { SimpleRequestBuilder } from "@/components/simple-mode/simple-request-builder";
+import { persistence } from "@/lib/persistence";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { getMethodPanelClass, recordToHeaderArray } from "@/lib/request-tab-utils";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { RequestTab } from "@/lib/request-executor";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -30,6 +32,7 @@ import {
 } from "@/lib/ai-engine/propose-correction";
 import { SYSTEM_PROMPT } from "@/lib/ai-engine";
 import type { TestResult } from "@/lib/types";
+import { formatDataSize } from "@/lib/network/format";
 
 /** Parse a response body string into JSON; returns undefined when not JSON. */
 function parseResponseBody(body: string | undefined): unknown | undefined {
@@ -58,6 +61,18 @@ function describeChange(c: FieldChange): string {
 
 export function RequestTabsManager() {
   const tabState = useRequestTabsState();
+
+  // "Mode simple" (Task 13): when enabled, hide the raw request editor and show
+  // the natural-language guided builder instead. Persisted via the existing
+  // persistence layer (the same store used by Settings).
+  const [simpleMode, setSimpleMode] = useState(false);
+  useEffect(() => {
+    try {
+      setSimpleMode(persistence.getItem<boolean>("reqly_simple_mode") === true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const execution = useRequestTabExecution(tabState);
 
   const {
@@ -184,6 +199,12 @@ export function RequestTabsManager() {
   const lastResponse = useRequestStore((s) => s.lastResponse);
   const lastReqJson = useRef("");
   const lastRespJson = useRef("");
+
+  // Real byte size of the request body, used to show "Taille : X Ko / Mo".
+  const requestByteSize = useMemo(() => {
+    const b = activeTab.body;
+    return typeof b === "string" && b.length > 0 ? new Blob([b]).size : 0;
+  }, [activeTab.body]);
 
   // REST contract-testing snapshots (Task 4) — kept localized to the response area.
   const [restDiff, setRestDiff] = useState<{ name: string; changes: FieldChange[] } | null>(null);
@@ -359,202 +380,217 @@ export function RequestTabsManager() {
         </div>
       )}
 
-      <div
-        className={cn(
-          "min-h-0 h-full flex-1 overflow-hidden transition-colors duration-200",
-          getMethodPanelClass(activeTab.method),
-        )}
-      >
-        <ResizablePanelGroup direction="horizontal" className="min-h-0 h-full">
-          <ResizablePanel
-            ref={requestPanelRef}
-            order={1}
-            defaultSize={55}
-            minSize={25}
-            collapsedSize={0}
-            collapsible
-            onCollapse={() => setIsRequestCollapsed(true)}
-            onExpand={() => setIsRequestCollapsed(false)}
-            className="min-w-0 min-h-0 overflow-hidden"
-          >
-            <div className="min-h-0 h-full overflow-auto hide-scrollbar border-r border-border max-[916px]:border-r-0 max-[916px]:border-b request-panel-scroll">
-              <RequestPanel
-                key={activeTab.id}
-                method={activeTab.method}
-                url={activeTab.url}
-                queryParams={activeTab.queryParams}
-                headers={activeTab.headers}
-                body={activeTab.body}
-                bodyType={activeTab.bodyType}
-                authType={activeTab.authType}
-                authToken={activeTab.authToken}
-                assertions={activeTab.assertions}
-                runnerAssertions={activeTab.runnerAssertions}
-                preRequestScript={activeTab.preRequestScript}
-                postResponseScript={activeTab.postResponseScript}
-                onMethodChange={(method) => updateTab(activeTab.id, { method })}
-                onUrlChange={(url) => {
-                  const endpoint = url.replace(/^https?:\/\/[^/]+/, "") || "/";
-                  updateTab(activeTab.id, { url, endpoint });
-                }}
-                onQueryParamsChange={(queryParams) => updateTab(activeTab.id, { queryParams })}
-                onHeadersChange={(headers) => updateTab(activeTab.id, { headers })}
-                onBodyChange={(body) => updateTab(activeTab.id, { body })}
-                onBodyTypeChange={(bodyType) => updateTab(activeTab.id, { bodyType })}
-                onAuthChange={(authType, authToken) =>
-                  updateTab(activeTab.id, { authType, authToken })
-                }
-                onAssertionsChange={(assertions) => updateTab(activeTab.id, { assertions })}
-                onRunnerAssertionsChange={(runnerAssertions) =>
-                  updateTab(activeTab.id, { runnerAssertions })
-                }
-                onPreRequestScriptChange={(preRequestScript) =>
-                  updateTab(activeTab.id, { preRequestScript })
-                }
-                onPostResponseScriptChange={(postResponseScript) =>
-                  updateTab(activeTab.id, { postResponseScript })
-                }
-                onRunTests={sendRequest}
-                onSend={sendRequest}
-                isLoading={isLoading}
-                variableNames={variableMappings
-                  .filter((m) => m.enabled && m.name.trim())
-                  .map((m) => m.name.trim())}
-              />
-            </div>
-          </ResizablePanel>
-
-          <ResizableHandle withHandle className="bg-border" />
-
-          <ResizablePanel
-            ref={responsePanelRef}
-            order={2}
-            defaultSize={45}
-            minSize={25}
-            collapsedSize={0}
-            collapsible
-            onCollapse={() => setIsResponseCollapsed(true)}
-            onExpand={() => setIsResponseCollapsed(false)}
-            className="min-w-0 min-h-0 overflow-hidden"
-          >
-            <div className="min-h-0 h-full overflow-auto flex-1 hide-scrollbar">
-              <ResponsePanel
-                key={activeTab.id}
-                responseBody={activeTab.responseBody}
-                responseData={activeTab.responseData}
-                responseStatus={activeTab.responseStatus}
-                responseTime={activeTab.responseTime}
-                responseTimings={activeTab.responseTimings}
-                responseSize={activeTab.responseSize}
-                responseHeaders={activeTab.responseHeaders}
-                testResults={activeTab.testResults}
-                isLoading={isLoading || aiEngine.isLoading}
-                aiIsLoading={aiEngine.isLoading}
-                onRun={sendRequest}
-                onRunAndSave={sendAndSave}
-                onRunAndDownload={sendAndDownload}
-                onAnalyze={handleAnalyzeRequest}
-                onGenerateTests={handleGenerateTests}
-                onPatchRequest={(patch) => {
-                  const tabPatch: Record<string, unknown> = {};
-                  if (patch.method !== undefined) tabPatch.method = patch.method;
-                  if (patch.url !== undefined) {
-                    tabPatch.url = patch.url;
-                    tabPatch.endpoint = patch.url.replace(/^https?:\/\/[^/]+/, "") || "/";
+      {simpleMode ? (
+        <div className="min-h-0 h-full flex-1 overflow-hidden">
+          <SimpleRequestBuilder />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "min-h-0 h-full flex-1 overflow-hidden transition-colors duration-200",
+            getMethodPanelClass(activeTab.method),
+          )}
+        >
+          <ResizablePanelGroup direction="horizontal" className="min-h-0 h-full">
+            <ResizablePanel
+              ref={requestPanelRef}
+              order={1}
+              defaultSize={55}
+              minSize={25}
+              collapsedSize={0}
+              collapsible
+              onCollapse={() => setIsRequestCollapsed(true)}
+              onExpand={() => setIsRequestCollapsed(false)}
+              className="min-w-0 min-h-0 overflow-hidden"
+            >
+              <div className="min-h-0 h-full overflow-auto hide-scrollbar border-r border-border max-[916px]:border-r-0 max-[916px]:border-b request-panel-scroll">
+                <RequestPanel
+                  key={activeTab.id}
+                  method={activeTab.method}
+                  url={activeTab.url}
+                  queryParams={activeTab.queryParams}
+                  headers={activeTab.headers}
+                  body={activeTab.body}
+                  bodyType={activeTab.bodyType}
+                  authType={activeTab.authType}
+                  authToken={activeTab.authToken}
+                  assertions={activeTab.assertions}
+                  runnerAssertions={activeTab.runnerAssertions}
+                  preRequestScript={activeTab.preRequestScript}
+                  postResponseScript={activeTab.postResponseScript}
+                  onMethodChange={(method) => updateTab(activeTab.id, { method })}
+                  onUrlChange={(url) => {
+                    const endpoint = url.replace(/^https?:\/\/[^/]+/, "") || "/";
+                    updateTab(activeTab.id, { url, endpoint });
+                  }}
+                  onQueryParamsChange={(queryParams) => updateTab(activeTab.id, { queryParams })}
+                  onHeadersChange={(headers) => updateTab(activeTab.id, { headers })}
+                  onBodyChange={(body) => updateTab(activeTab.id, { body })}
+                  onBodyTypeChange={(bodyType) => updateTab(activeTab.id, { bodyType })}
+                  onAuthChange={(authType, authToken) =>
+                    updateTab(activeTab.id, { authType, authToken })
                   }
-                  if (patch.headers !== undefined) {
-                    tabPatch.headers = Object.entries(patch.headers).map(([key, value]) => ({
-                      key,
-                      value,
-                    }));
+                  onAssertionsChange={(assertions) => updateTab(activeTab.id, { assertions })}
+                  onRunnerAssertionsChange={(runnerAssertions) =>
+                    updateTab(activeTab.id, { runnerAssertions })
                   }
-                  if (patch.body !== undefined)
-                    tabPatch.body =
-                      typeof patch.body === "string" ? patch.body : JSON.stringify(patch.body);
-                  if (patch.authType !== undefined) tabPatch.authType = patch.authType;
-                  updateTab(activeTab.id, tabPatch as Parameters<typeof updateTab>[1]);
-                }}
-                aiSummary={aiEngine.lastSummary ?? undefined}
-                aiError={aiEngine.error ?? undefined}
-                proposeAskAI={correctionAskAI}
-                onApplyCorrection={handleApplyCorrection}
-                method={activeTab.method}
-                url={activeTab.url}
-                queryParams={activeTab.queryParams}
-                requestHeaders={activeTab.headers}
-                body={activeTab.body}
-                bodyType={activeTab.bodyType}
-                authType={activeTab.authType}
-                authToken={activeTab.authToken}
-                history={history}
-              />
-
-              {/* Snapshots REST (contract testing) — localized to the response area */}
-              <div
-                className="border-t border-border/50 bg-card/40 p-2 space-y-2"
-                data-testid="rest-snapshot-controls"
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={handleSaveSnapshot}
-                    disabled={!activeTab.responseBody}
-                    data-testid="rest-snapshot-save"
-                  >
-                    Sauvegarder un snapshot
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={handleCompareSnapshot}
-                    disabled={!activeTab.responseBody}
-                    data-testid="rest-snapshot-compare"
-                  >
-                    Comparer à un snapshot
-                  </Button>
-                  {restDiff && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 text-xs"
-                      onClick={() => setRestDiff(null)}
-                      data-testid="rest-snapshot-clear"
-                    >
-                      Fermer
-                    </Button>
-                  )}
-                </div>
-
-                {restDiff && (
+                  onPreRequestScriptChange={(preRequestScript) =>
+                    updateTab(activeTab.id, { preRequestScript })
+                  }
+                  onPostResponseScriptChange={(postResponseScript) =>
+                    updateTab(activeTab.id, { postResponseScript })
+                  }
+                  onRunTests={sendRequest}
+                  onSend={sendRequest}
+                  isLoading={isLoading}
+                  variableNames={variableMappings
+                    .filter((m) => m.enabled && m.name.trim())
+                    .map((m) => m.name.trim())}
+                />
+                {/* Payload size — real byte count of the request body */}
+                {requestByteSize > 0 && (
                   <div
-                    className="text-xs font-mono bg-muted/30 p-2 rounded space-y-1 max-h-64 overflow-auto"
-                    data-testid="rest-snapshot-diff"
+                    className="px-4 py-1 text-[11px] font-mono text-muted-foreground border-t border-border/50 bg-card/40"
+                    data-testid="request-size"
                   >
-                    <div className="text-muted-foreground">
-                      Comparaison avec « {restDiff.name} »
-                    </div>
-                    {restDiff.changes.length === 0 ? (
-                      <div className="text-success">✅ Aucun changement détecté.</div>
-                    ) : (
-                      restDiff.changes.map((c, i) => (
-                        <div
-                          key={`${c.path}-${i}`}
-                          className={c.kind === "removed" ? "text-destructive" : "text-warning"}
-                        >
-                          {describeChange(c)}
-                        </div>
-                      ))
-                    )}
+                    Taille : {formatDataSize(requestByteSize)}
                   </div>
                 )}
               </div>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
+            </ResizablePanel>
+
+            <ResizableHandle withHandle className="bg-border" />
+
+            <ResizablePanel
+              ref={responsePanelRef}
+              order={2}
+              defaultSize={45}
+              minSize={25}
+              collapsedSize={0}
+              collapsible
+              onCollapse={() => setIsResponseCollapsed(true)}
+              onExpand={() => setIsResponseCollapsed(false)}
+              className="min-w-0 min-h-0 overflow-hidden"
+            >
+              <div className="min-h-0 h-full overflow-auto flex-1 hide-scrollbar">
+                <ResponsePanel
+                  key={activeTab.id}
+                  responseBody={activeTab.responseBody}
+                  responseData={activeTab.responseData}
+                  responseStatus={activeTab.responseStatus}
+                  responseTime={activeTab.responseTime}
+                  responseTimings={activeTab.responseTimings}
+                  responseSize={activeTab.responseSize}
+                  responseHeaders={activeTab.responseHeaders}
+                  testResults={activeTab.testResults}
+                  isLoading={isLoading || aiEngine.isLoading}
+                  aiIsLoading={aiEngine.isLoading}
+                  onRun={sendRequest}
+                  onRunAndSave={sendAndSave}
+                  onRunAndDownload={sendAndDownload}
+                  onAnalyze={handleAnalyzeRequest}
+                  onGenerateTests={handleGenerateTests}
+                  onPatchRequest={(patch) => {
+                    const tabPatch: Record<string, unknown> = {};
+                    if (patch.method !== undefined) tabPatch.method = patch.method;
+                    if (patch.url !== undefined) {
+                      tabPatch.url = patch.url;
+                      tabPatch.endpoint = patch.url.replace(/^https?:\/\/[^/]+/, "") || "/";
+                    }
+                    if (patch.headers !== undefined) {
+                      tabPatch.headers = Object.entries(patch.headers).map(([key, value]) => ({
+                        key,
+                        value,
+                      }));
+                    }
+                    if (patch.body !== undefined)
+                      tabPatch.body =
+                        typeof patch.body === "string" ? patch.body : JSON.stringify(patch.body);
+                    if (patch.authType !== undefined) tabPatch.authType = patch.authType;
+                    updateTab(activeTab.id, tabPatch as Parameters<typeof updateTab>[1]);
+                  }}
+                  aiSummary={aiEngine.lastSummary ?? undefined}
+                  aiError={aiEngine.error ?? undefined}
+                  proposeAskAI={correctionAskAI}
+                  onApplyCorrection={handleApplyCorrection}
+                  method={activeTab.method}
+                  url={activeTab.url}
+                  queryParams={activeTab.queryParams}
+                  requestHeaders={activeTab.headers}
+                  body={activeTab.body}
+                  bodyType={activeTab.bodyType}
+                  authType={activeTab.authType}
+                  authToken={activeTab.authToken}
+                  history={history}
+                />
+
+                {/* Snapshots REST (contract testing) — localized to the response area */}
+                <div
+                  className="border-t border-border/50 bg-card/40 p-2 space-y-2"
+                  data-testid="rest-snapshot-controls"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={handleSaveSnapshot}
+                      disabled={!activeTab.responseBody}
+                      data-testid="rest-snapshot-save"
+                    >
+                      Sauvegarder un snapshot
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={handleCompareSnapshot}
+                      disabled={!activeTab.responseBody}
+                      data-testid="rest-snapshot-compare"
+                    >
+                      Comparer à un snapshot
+                    </Button>
+                    {restDiff && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs"
+                        onClick={() => setRestDiff(null)}
+                        data-testid="rest-snapshot-clear"
+                      >
+                        Fermer
+                      </Button>
+                    )}
+                  </div>
+
+                  {restDiff && (
+                    <div
+                      className="text-xs font-mono bg-muted/30 p-2 rounded space-y-1 max-h-64 overflow-auto"
+                      data-testid="rest-snapshot-diff"
+                    >
+                      <div className="text-muted-foreground">
+                        Comparaison avec « {restDiff.name} »
+                      </div>
+                      {restDiff.changes.length === 0 ? (
+                        <div className="text-success">✅ Aucun changement détecté.</div>
+                      ) : (
+                        restDiff.changes.map((c, i) => (
+                          <div
+                            key={`${c.path}-${i}`}
+                            className={c.kind === "removed" ? "text-destructive" : "text-warning"}
+                          >
+                            {describeChange(c)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      )}
 
       <CollectionsModal
         open={collectionsDrawerOpen}

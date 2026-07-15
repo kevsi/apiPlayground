@@ -96,6 +96,19 @@ export default function SettingsPage() {
   const [ollamaModel, setOllamaModel] = useState(() =>
     typeof window !== "undefined" ? loadOllamaConfig().model || "llama2" : "llama2",
   );
+  const [simpleMode, setSimpleMode] = useState(() =>
+    typeof window !== "undefined"
+      ? persistence.getItem<boolean>("reqly_simple_mode") === true
+      : false,
+  );
+  const handleSimpleModeChange = (val: boolean) => {
+    setSimpleMode(val);
+    try {
+      void persistence.setItem("reqly_simple_mode", val);
+    } catch {
+      /* ignore */
+    }
+  };
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [githubStatus, setGithubStatus] = useState<
     "loading" | "connected" | "disconnected" | "error"
@@ -479,6 +492,8 @@ export default function SettingsPage() {
               setOllamaModel={setOllamaModel}
               setAiAutoApply={setAiAutoApply}
               setShowAiConfirm={setShowAiConfirm}
+              simpleMode={simpleMode}
+              setSimpleMode={handleSimpleModeChange}
             />
           ) : null}
           {activeSection === "notifications" ? (
