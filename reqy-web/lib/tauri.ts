@@ -150,6 +150,60 @@ export async function setBandwidthLimit(kbps: number | null): Promise<void> {
  * @returns `"saved"` on success, `"cancelled"` if the user dismissed the dialog.
  * @throws  on any write/invocation error.
  */
+/**
+ * A single request that failed to send (e.g. due to a network outage) and is
+ * waiting to be replayed when connectivity returns.
+ *
+ * Mirrors `src-tauri/src/store.rs` `QueuedRequest` (serde camelCase). The Rust
+ * side stores `body` as `Vec<u8>`, so we transmit it as a `number[]` (UTF-8
+ * bytes); a `string` body is accepted for convenience and normalised on send.
+ */
+export interface QueuedRequest {
+  id: string;
+  method: string;
+  url: string;
+  headers: Array<[string, string]>;
+  body?: number[] | string;
+  createdAt: number;
+  reason: string;
+}
+
+/** Enqueues a request on the persistent offline queue (Task 12b). */
+export async function enqueueRequest(req: QueuedRequest): Promise<void> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("enqueue_request", { req });
+}
+
+/** Lists the requests still awaiting delivery, in FIFO order. */
+export async function listPending(): Promise<QueuedRequest[]> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<QueuedRequest[]>("list_pending");
+}
+
+/** Peeks the oldest pending request without removing it. */
+export async function dequeueReady(): Promise<QueuedRequest | null> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<QueuedRequest | null>("dequeue_ready");
+}
+
+/** Marks a request as sent (removes it from the queue). */
+export async function markSent(id: string): Promise<void> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("mark_sent", { id });
+}
+
 export async function saveBlobToDisk(filename: string, blob: Blob): Promise<"saved" | "cancelled"> {
   const { save } = await import("@tauri-apps/plugin-dialog");
   const { invoke } = await import("@tauri-apps/api/core");

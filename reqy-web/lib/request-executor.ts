@@ -5,6 +5,7 @@ import { evaluateAssertions } from "@/lib/test-runner/assertions";
 import { interpolate, replaceLocalhostPort, parseJsonSafe } from "@/lib/utils";
 import { proxyAuthHeaders } from "@/lib/proxy-auth";
 import { invokeTauriFetch } from "@/lib/tauri";
+import { classifyError, enqueueOnNetworkFailure } from "@/lib/offline/queue";
 import type { ResponseTimings } from "@/components/response-timeline";
 export type BodyType = "json" | "form-data" | "x-www-form" | "raw" | "binary";
 export type AuthType = "none" | "bearer" | "basic" | "api-key" | "oauth2";
@@ -383,6 +384,23 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
     }
     responseData = responseBody;
     responseStatus = 0;
+
+    // Store-and-forward: a genuine network failure (no HTTP response was
+    // produced) is queued for automatic replay when connectivity returns.
+    // Application errors (4xx/5xx) keep a real status and are never queued.
+    if (classifyError(error) === "network") {
+      enqueueOnNetworkFailure(
+        {
+          method: tab.method,
+          url: finalUrl,
+          headers,
+          body: finalBody || undefined,
+        },
+        { error },
+      ).catch(() => {
+        /* queue hiccups must never break the request flow */
+      });
+    }
   } finally {
     clearTimeout(timeoutId);
   }

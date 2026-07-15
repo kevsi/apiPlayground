@@ -21,6 +21,8 @@ import {
   hasUnresolvedPlaceholders,
 } from "@/lib/utils";
 import { isSourcePathSyntaxValid } from "@/lib/variable-path";
+import { invokeTauriFetch, isTauriAvailable } from "@/lib/tauri";
+import { replayPending, type QueuedRequest } from "@/lib/offline/queue";
 import { generateFollowUpRequest } from "@/lib/ai-request-generator";
 import { runScript } from "@/lib/test-runner/scripts";
 import type { RunnerContext } from "@/lib/test-runner/types";
@@ -1027,6 +1029,59 @@ export function useRequestTabExecution(state: RequestTabsState) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [saveActiveTab]);
+
+  // Store-and-forward replay: when connectivity is restored, automatically
+  // replay any requests that were queued during the outage and notify the user.
+  // Only meaningful in the Tauri desktop runtime (the queue lives in Rust).
+  useEffect(() => {
+    if (!isTauriAvailable()) return;
+
+    const resend = async (req: QueuedRequest) => {
+      try {
+        const headers = Object.fromEntries(req.headers);
+        const body =
+          typeof req.body === "string"
+            ? req.body
+            : req.body
+              ? new TextDecoder().decode(Uint8Array.from(req.body))
+              : undefined;
+        // Re-send through the Tauri proxy (respects CSP / native network stack).
+        // "Delivered" means the network came back, regardless of HTTP status.
+        await invokeTauriFetch(
+          req.method,
+          req.url,
+          headers,
+          req.method !== "GET" && req.method !== "HEAD" ? body : undefined,
+        );
+        return { ok: true };
+      } catch {
+        return { ok: false }; // still offline — keep it queued
+      }
+    };
+
+    const onOnline = async () => {
+      try {
+        const { replayed, succeeded } = await replayPending({ execute: resend });
+        if (replayed === 0) return;
+        const noun = replayed > 1 ? "requêtes" : "requête";
+        toast({
+          title: "Reconnexion",
+          description: `${replayed} ${noun} rejouée${replayed > 1 ? "s" : ""}, ${succeeded} réussie${succeeded > 1 ? "s" : ""}.`,
+        });
+        pushInAppNotification({
+          title: "Requêtes rejouées",
+          body: `${replayed} requête(s) rejouée(s), ${succeeded} réussie(s).`,
+          type: succeeded === replayed ? "success" : "warning",
+          event: "offlineReplay",
+        });
+      } catch (e) {
+        console.error("[offline replay]", e);
+      }
+    };
+
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [toast]);
 
   return {
     aiEngine,
