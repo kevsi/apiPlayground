@@ -12,7 +12,13 @@
  */
 import type { AIProvider, Diagnostic, RequestContext } from "@/src/ai/types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/src/ai/cloud-engine/prompt";
-import { type ToolDefinition, type ToolCall, type ToolResult, executeToolCall } from "@/lib/llm-tools";
+import {
+  type ToolDefinition,
+  type ToolCall,
+  type ToolResult,
+  executeToolCall,
+} from "@/lib/llm-tools";
+import { proxyAuthHeaders } from "@/lib/proxy-auth";
 
 export interface StreamLLMOptions {
   provider: AIProvider;
@@ -48,14 +54,8 @@ export interface LLMTextEvent {
 
 export type LLMToken = LLMTextEvent | LLMToolCallEvent;
 
-export async function* streamLLM(
-  opts: StreamLLMOptions
-): AsyncIterable<LLMToken> {
-  const userPrompt = buildUserPrompt(
-    opts.question,
-    opts.ctx,
-    opts.diagnostics ?? []
-  );
+export async function* streamLLM(opts: StreamLLMOptions): AsyncIterable<LLMToken> {
+  const userPrompt = buildUserPrompt(opts.question, opts.ctx, opts.diagnostics ?? []);
 
   const body: Record<string, unknown> = {
     provider: opts.provider,
@@ -80,7 +80,10 @@ export async function* streamLLM(
 
   const res = await fetch("/api/proxy-ai", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...proxyAuthHeaders(),
+    },
     body: JSON.stringify(body),
     signal: opts.signal,
   });
@@ -89,8 +92,7 @@ export async function* streamLLM(
     let errMsg = `Proxy error ${res.status}`;
     try {
       const j: Record<string, unknown> = await res.json();
-      errMsg =
-        typeof j?.error === "string" ? j.error : errMsg;
+      errMsg = typeof j?.error === "string" ? j.error : errMsg;
     } catch {
       /* ignore non-JSON error body */
     }
@@ -101,7 +103,8 @@ export async function* streamLLM(
 
   // Si tools sont demandés, on ne fait PAS de passthrough SSE :
   // il faut parser delta.tool_calls au niveau du stream.
-  const canPassthrough = contentType.includes("text/event-stream") && res.body && !(opts.tools?.length);
+  const canPassthrough =
+    contentType.includes("text/event-stream") && res.body && !opts.tools?.length;
 
   if (canPassthrough) {
     const reader = res.body.getReader();
@@ -124,8 +127,7 @@ export async function* streamLLM(
           if (!payload || payload === "[DONE]") continue;
           try {
             const json: any = JSON.parse(payload);
-            const token: unknown =
-              json?.choices?.[0]?.delta?.content;
+            const token: unknown = json?.choices?.[0]?.delta?.content;
             if (typeof token === "string" && token.length > 0) {
               yield { type: "text", value: token };
             }
@@ -147,12 +149,15 @@ export async function* streamLLM(
     let buffer = "";
 
     // Accumulateurs pour tool_calls OpenAI/DeepSeek/Ollama
-    const toolCallAcc: Record<number, {
-      id?: string;
-      index: number;
-      functionName?: string;
-      arguments: string;
-    }> = {};
+    const toolCallAcc: Record<
+      number,
+      {
+        id?: string;
+        index: number;
+        functionName?: string;
+        arguments: string;
+      }
+    > = {};
     const toolCallOrder: number[] = [];
 
     while (true) {
@@ -246,7 +251,8 @@ export async function* streamLLM(
       calls: returnedToolCalls.map((tc: any) => ({
         id: typeof tc.id === "string" ? tc.id : `call_${Math.random().toString(36).slice(2)}`,
         name: typeof tc.name === "string" ? tc.name : "",
-        arguments: typeof tc.arguments === "string" ? tc.arguments : JSON.stringify(tc.arguments ?? {}),
+        arguments:
+          typeof tc.arguments === "string" ? tc.arguments : JSON.stringify(tc.arguments ?? {}),
       })),
     };
     return;
