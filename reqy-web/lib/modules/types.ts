@@ -1,15 +1,18 @@
 /**
- * Module contract — shared types for first-party Reqly modules.
+ * Module contract — shared types for Reqly modules.
  *
- * A module is a self-contained feature (UI, lib logic, or both) that is NOT
- * part of the generic international app core. Modules are declared through a
- * {@link ModuleManifest} and collected by the registry in `lib/modules/registry.ts`.
+ * A module is a self-contained feature that is NOT part of the generic
+ * international app core. Every module — MTN MoMo, SDK generator, Templates,
+ * CSP monitor, Capture, … — is described by the SAME {@link ModuleManifest}
+ * and managed uniformly through the registry (available → installed → enabled).
+ * There is no special case for any module.
  *
- * Wiring (showing a module in the nav, mounting its route, loading its code)
- * is driven by the `enabled` flag + the app reading the registry. Until a
- * module is wired, its code stays out of the app bundle and its manifest is
- * simply not surfaced.
+ * The manifest declares WHAT the module is and what it contributes (nav,
+ * routes). Whether it is actually surfaced in the app is a separate
+ * install/enabled state held by the registry — not by the manifest.
  */
+
+export type ModuleKind = "feature" | "content" | "integration";
 
 export interface ModuleNavItem {
   /** Sidebar label, e.g. "Mobile Money". */
@@ -18,6 +21,13 @@ export interface ModuleNavItem {
   href: string;
   /** Icon key (resolved by the sidebar when wiring happens). */
   icon?: string;
+}
+
+export interface ModuleRouteContribution {
+  /** Route path the module owns, e.g. "/mobile-money/" or "/api/sdk-generate". */
+  path: string;
+  /** "page" = a UI route (app page); "api" = an API route handler. */
+  type: "page" | "api";
 }
 
 export interface ModuleManifest {
@@ -29,12 +39,14 @@ export interface ModuleManifest {
   version: string;
   /** Short description for the module catalog / marketplace. */
   description?: string;
-  /**
-   * Master switch. When false the module is registered but NOT surfaced in
-   * the app (nav, routes, code loading). Flip to true (and wire the app to
-   * read the registry) to activate it.
-   */
-  enabled: boolean;
-  /** Optional sidebar contribution, shown only when `enabled`. */
-  nav?: ModuleNavItem;
+  /** Module author / maintainer. */
+  author?: string;
+  /** What kind of module this is (drives how the app surfaces it). */
+  kind: ModuleKind;
+  /** Sidebar contributions (feature modules). Shown only when enabled. */
+  nav?: ModuleNavItem[];
+  /** Routes (pages and/or API handlers) this module owns. */
+  routes?: ModuleRouteContribution[];
+  /** i18n namespace key for the module's translations. */
+  i18nNamespace?: string;
 }

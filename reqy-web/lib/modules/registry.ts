@@ -1,33 +1,70 @@
-import type { ModuleManifest, ModuleNavItem } from "./types";
+import type { ModuleManifest, ModuleNavItem, ModuleRouteContribution } from "./types";
 import { mobileMoneyManifest } from "@/modules/mobile-money/manifest";
 
 /**
- * Central registry of first-party Reqly modules.
+ * Central registry of Reqly modules.
  *
- * Each module contributes a {@link ModuleManifest} (see `modules/<id>/manifest.ts`).
- * Add a module by appending its manifest to `MODULES` below — the app later
- * reads this registry to surface enabled modules (nav items, routes, code).
+ * The lifecycle is uniform for EVERY module (MTN MoMo included — no special
+ * case):
+ *   1. AVAILABLE  — the module manifest is known and can be installed.
+ *   2. INSTALLED  — the user installed it (added to `installState`).
+ *   3. ENABLED    — installed AND toggled on; the app surfaces it (nav/routes).
  *
- * Modules are statically imported so their code can be tree-shaken and gated
- * by the `enabled` flag. This keeps disabled modules (e.g. MTN MoMo, not yet
- * wired) out of the shipped app bundle.
+ * `AVAILABLE` seeds first-party modules via static import. A marketplace would
+ * push additional manifests through `registerAvailableModule` at runtime. The
+ * install state is in-memory here; the app will back it with the global store
+ * + persistence when wiring happens.
+ *
+ * Modules are statically imported so their code can be tree-shaken; only
+ * enabled modules are surfaced by the app (nav, routes, code loading).
  */
-const MODULES: ModuleManifest[] = [mobileMoneyManifest];
+const AVAILABLE: ModuleManifest[] = [mobileMoneyManifest];
 
-export function getAllModules(): ModuleManifest[] {
-  return MODULES;
+const installState = new Map<string, boolean>();
+
+/** Register an additional available module (marketplace / dynamic install). */
+export function registerAvailableModule(manifest: ModuleManifest): void {
+  if (!AVAILABLE.some((m) => m.id === manifest.id)) {
+    AVAILABLE.push(manifest);
+  }
+}
+
+export function getAvailableModules(): ModuleManifest[] {
+  return AVAILABLE;
+}
+
+export function installModule(id: string): void {
+  if (AVAILABLE.some((m) => m.id === id)) installState.set(id, true);
+}
+
+export function uninstallModule(id: string): void {
+  installState.delete(id);
+}
+
+export function isInstalled(id: string): boolean {
+  return installState.has(id);
+}
+
+export function setModuleEnabled(id: string, enabled: boolean): void {
+  if (installState.has(id)) installState.set(id, enabled);
+}
+
+export function getInstalledModules(): ModuleManifest[] {
+  return AVAILABLE.filter((m) => installState.has(m.id));
 }
 
 export function getEnabledModules(): ModuleManifest[] {
-  return MODULES.filter((m) => m.enabled);
+  return getInstalledModules().filter((m) => installState.get(m.id) === true);
 }
 
 export function getModuleNavItems(): ModuleNavItem[] {
-  return getEnabledModules()
-    .filter((m) => m.nav)
-    .map((m) => m.nav as ModuleNavItem);
+  return getEnabledModules().flatMap((m) => m.nav ?? []);
+}
+
+export function getModuleRoutes(): ModuleRouteContribution[] {
+  return getEnabledModules().flatMap((m) => m.routes ?? []);
 }
 
 export function getModuleById(id: string): ModuleManifest | undefined {
-  return MODULES.find((m) => m.id === id);
+  return AVAILABLE.find((m) => m.id === id);
 }
