@@ -1,174 +1,35 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { isIP } from "node:net";
-import { InMemoryRateLimiter } from "@/lib/rate-limiter";
-import { isBlockedIp } from "@/lib/security/ssrf";
+import { rateLimiter, getRateLimitKey } from "./lib/rate-limit";
+import { structuredError } from "./lib/errors";
+import { handleOpenAICompat } from "./handlers/openai-compat";
+import { handleAnthropic } from "./handlers/anthropic";
+import { handleGemini } from "./handlers/gemini";
+import { handleDeepSeek } from "./handlers/deepseek";
+import { handleOllama } from "./handlers/ollama";
 
-const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 });
+const SUPPORTED_PROVIDERS = new Set([
+  "openai",
+  "openrouter",
+  "opencode-zen",
+  "custom",
+  "grok",
+  "anthropic",
+  "gemini",
+  "deepseek",
+  "ollama",
+]);
 
-function getRateLimitKey(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1";
-}
-
-function structuredError(message: string, code: string, status: number): NextResponse {
-  return NextResponse.json({ error: message, code }, { status });
-}
-
-type ProviderBody = {
-  provider: string;
-  apiKey?: string;
-  model?: string;
-  system?: string;
-  message?: string;
-  stream?: boolean;
-  tools?: Record<string, unknown>[];
-  tool_choice?: string | Record<string, unknown>;
-};
-
-type PreviousTurn = {
-  assistantToolCalls: Array<{ id: string; name: string; arguments: string }>;
-  toolResults: Array<{ callId: string; name: string; content: string; error?: string }>;
-};
-
-interface OllamaBody extends ProviderBody {
-  host?: string;
-  port?: string | number;
-}
-
-type GeminiChunk = {
-  candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }>; text?: string };
-    text?: string;
-  }>;
-  text?: string;
-};
-
-// Phase 2.5: SSE streaming helper for OpenAI-compatible providers
-function passthroughSSE(upstreamRes: Response): Response {
-  if (!upstreamRes.body) {
-    return new Response("Upstream returned no body", { status: 502 });
-  }
-  return new Response(upstreamRes.body, {
-    status: upstreamRes.status,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
-  });
-}
-
-function tryParseGeminiError(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed.error?.message ?? parsed.error ?? raw;
-  } catch {
-    return raw;
-  }
-}
-
-function getCustomUrl(body: Record<string, unknown>): string {
-  const raw = typeof body.openaiUrl === "string" ? body.openaiUrl.trim() : "";
-  if (!raw) {
-    throw new Error("Custom provider requires a base URL");
-  }
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    throw new Error("Invalid custom provider URL");
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new Error("URL must use http or https");
-  }
-  if (
-    parsed.hostname === "localhost" ||
-    parsed.hostname === "127.0.0.1" ||
-    parsed.hostname === "0.0.0.0" ||
-    (isIP(parsed.hostname) && isBlockedIp(parsed.hostname))
-  ) {
-    throw new Error("Custom provider URL cannot point to localhost or private IP");
-  }
-  return raw.replace(/\/+$/, "") + "/chat/completions";
-}
-
-function buildOpenAIToolHistory(prev?: PreviousTurn[]): Record<string, unknown>[] {
-  if (!prev || prev.length === 0) return [];
-  const msgs: Record<string, unknown>[] = [];
-  for (const turn of prev) {
-    msgs.push({
-      role: "assistant",
-      content: null,
-      tool_calls: turn.assistantToolCalls.map((tc) => ({
-        id: tc.id,
-        type: "function",
-        function: { name: tc.name, arguments: tc.arguments },
-      })),
-    });
-    for (const r of turn.toolResults) {
-      msgs.push({ role: "tool", tool_call_id: r.callId, content: r.error ?? r.content });
-    }
-  }
-  return msgs;
-}
-
-function buildAnthropicToolHistory(prev?: PreviousTurn[]): Record<string, unknown>[] {
-  if (!prev || prev.length === 0) return [];
-  const msgs: Record<string, unknown>[] = [];
-  for (const turn of prev) {
-    msgs.push({
-      role: "assistant",
-      content: turn.assistantToolCalls.map((tc) => {
-        let input: Record<string, unknown> = {};
-        try {
-          input = JSON.parse(tc.arguments);
-        } catch {
-          /* ignore */
-        }
-        return { type: "tool_use", id: tc.id, name: tc.name, input };
-      }),
-    });
-    msgs.push({
-      role: "user",
-      content: turn.toolResults.map((r) => ({
-        type: "tool_result",
-        tool_use_id: r.callId,
-        content: r.error ?? r.content,
-      })),
-    });
-  }
-  return msgs;
-}
-
-function buildGeminiToolHistory(prev?: PreviousTurn[]): Record<string, unknown>[] {
-  if (!prev || prev.length === 0) return [];
-  const contents: Record<string, unknown>[] = [];
-  for (const turn of prev) {
-    contents.push({
-      role: "model",
-      parts: turn.assistantToolCalls.map((tc) => {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(tc.arguments);
-        } catch {
-          /* ignore */
-        }
-        return { functionCall: { name: tc.name, args } };
-      }),
-    });
-    for (const r of turn.toolResults) {
-      contents.push({
-        role: "function",
-        parts: [
-          { functionResponse: { name: r.name, response: { content: r.error ?? r.content } } },
-        ],
-      });
-    }
-  }
-  return contents;
-}
+const PROVIDERS_WITH_API_KEY = new Set([
+  "openai",
+  "openrouter",
+  "anthropic",
+  "gemini",
+  "deepseek",
+  "opencode-zen",
+  "custom",
+  "grok",
+]);
 
 export async function POST(req: NextRequest) {
   const rateKey = getRateLimitKey(req);
@@ -190,516 +51,56 @@ export async function POST(req: NextRequest) {
 
   const body = rawBody as Record<string, unknown>;
   const provider = typeof body.provider === "string" ? body.provider.trim() : "";
-  const message = typeof body.message === "string" ? body.message.trim() : "";
-  const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
-  const model = typeof body.model === "string" ? body.model.trim() : "";
-  const system = typeof body.system === "string" ? body.system : "";
-  const rawHost = typeof body.host === "string" ? body.host.trim() : "";
-  const host = rawHost || "127.0.0.1";
-  const tools = Array.isArray(body.tools) ? (body.tools as Record<string, unknown>[]) : undefined;
-  const toolChoice = body.tool_choice as string | Record<string, unknown> | undefined;
-  const previousTurns = body.previousTurns as PreviousTurn[] | undefined;
-
-  function isOllamaHostAllowed(host: string): boolean {
-    const lower = host.toLowerCase();
-    if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(lower)) return false;
-    if (isIP(lower) && isBlockedIp(lower)) return false;
-    return true;
-  }
-
-  const port =
-    typeof body.port === "string"
-      ? body.port.trim()
-      : typeof body.port === "number"
-        ? String(body.port)
-        : "";
-  const ollamaPort = port || process.env.OLLAMA_PORT || "11434";
 
   if (!provider) {
-    return NextResponse.json({ error: "Missing provider" }, { status: 400 });
+    return structuredError("Missing provider", "MISSING_PROVIDER", 400);
   }
+
+  if (!SUPPORTED_PROVIDERS.has(provider)) {
+    return structuredError("Unknown provider", "UNKNOWN_PROVIDER", 400);
+  }
+
+  const message = typeof body.message === "string" ? body.message.trim() : "";
 
   if (!message && provider !== "ollama") {
-    return NextResponse.json({ error: "Missing message" }, { status: 400 });
+    return structuredError("Missing message", "MISSING_MESSAGE", 400);
   }
 
-  const PROVIDERS_WITH_API_KEY = new Set([
-    "openai",
-    "openrouter",
-    "anthropic",
-    "gemini",
-    "deepseek",
-    "opencode-zen",
-    "custom",
-    "grok",
-  ]);
-  if (PROVIDERS_WITH_API_KEY.has(provider) && !apiKey) {
-    return NextResponse.json({ error: "Missing API key" }, { status: 400 });
+  if (PROVIDERS_WITH_API_KEY.has(provider)) {
+    const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+    if (!apiKey) {
+      return structuredError("Missing API key", "MISSING_API_KEY", 400);
+    }
   }
 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60000);
-    const abortableFetch = (url: string, init: RequestInit) =>
-      fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timeout));
+    const extra = { signal: controller.signal };
 
-    if (provider === "anthropic") {
-      const anthropicTools = tools?.map((t) => {
-        const fn = (t as any).function ?? t;
-        return {
-          name: fn.name,
-          description: fn.description,
-          input_schema: fn.parameters ?? fn.input_schema ?? {},
-        };
-      });
+    let response: NextResponse;
 
-      const res = await abortableFetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: model || "claude-sonnet-4-20250514",
-          max_tokens: 4096,
-          system,
-          messages: [
-            { role: "user", content: message },
-            ...buildAnthropicToolHistory(previousTurns),
-          ],
-          ...(anthropicTools?.length ? { tools: anthropicTools } : {}),
-        }),
-      });
-      const data: unknown = await res.json();
-      if (!res.ok) {
-        const err =
-          data && typeof data === "object" ? (data as Record<string, unknown>).error : undefined;
-        return NextResponse.json(
-          {
-            error:
-              typeof err === "string"
-                ? err
-                : typeof err === "object"
-                  ? (((err as Record<string, unknown>).message as string) ?? "Anthropic error")
-                  : "Anthropic error",
-          },
-          { status: res.status },
-        );
-      }
-
-      // Format unifié : on extrait le texte et les tool_use pour le client
-      const contentData =
-        data && typeof data === "object" ? (data as Record<string, unknown>).content : undefined;
-      const contentArray = Array.isArray(contentData) ? contentData : [];
-      const textContent = contentArray
-        .filter(
-          (item: unknown): item is { type?: string; text?: string } =>
-            typeof item === "object" && item !== null,
-        )
-        .reduce((acc: string, item) => (item.type === "text" ? acc + (item.text || "") : acc), "");
-
-      const toolUses = contentArray
-        .filter(
-          (
-            item: unknown,
-          ): item is {
-            type?: string;
-            id?: string;
-            name?: string;
-            input?: Record<string, unknown>;
-          } => typeof item === "object" && item !== null && (item as any).type === "tool_use",
-        )
-        .map((item) => ({
-          id: (item as any).id,
-          name: (item as any).name,
-          arguments: JSON.stringify((item as any).input ?? {}),
-        }));
-
-      if (toolUses.length > 0) {
-        // Pour Anthropic, on renvoie les tool_calls au client pour exécution + boucle multi-turn côté frontend
-        return NextResponse.json({
-          content: textContent,
-          tool_calls: toolUses,
-          provider_tool_format: "anthropic",
-          stop_reason: (data as Record<string, unknown>).stop_reason,
-        });
-      }
-
-      return NextResponse.json({ content: textContent });
+    switch (provider) {
+      case "anthropic":
+        response = await handleAnthropic(body, extra);
+        break;
+      case "gemini":
+        response = await handleGemini(body, extra);
+        break;
+      case "deepseek":
+        response = await handleDeepSeek(body, extra);
+        break;
+      case "ollama":
+        response = await handleOllama(body, extra);
+        break;
+      // openai, openrouter, opencode-zen, custom, grok
+      default:
+        response = await handleOpenAICompat(body, extra);
+        break;
     }
 
-    if (
-      provider === "openai" ||
-      provider === "openrouter" ||
-      provider === "opencode-zen" ||
-      provider === "custom" ||
-      provider === "grok"
-    ) {
-      const url =
-        provider === "openai"
-          ? "https://api.openai.com/v1/chat/completions"
-          : provider === "openrouter"
-            ? "https://openrouter.ai/api/v1/chat/completions"
-            : provider === "opencode-zen"
-              ? "https://opencode.ai/zen/v1/chat/completions"
-              : provider === "grok"
-                ? "https://api.x.ai/v1/chat/completions"
-                : provider === "custom"
-                  ? getCustomUrl(body)
-                  : "https://api.openai.com/v1/chat/completions";
-
-      const res = await abortableFetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model:
-            model ||
-            (provider === "openrouter"
-              ? "openai/gpt-5.2"
-              : provider === "opencode-zen"
-                ? "gpt-5"
-                : provider === "grok"
-                  ? "grok-2"
-                  : "gpt-4o-mini"),
-          stream: Boolean(body.stream),
-          ...(tools?.length ? { tools } : {}),
-          ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: message },
-          ],
-        }),
-      });
-      if (!res.ok) {
-        const rawText = await res.text();
-        let data: unknown;
-        try {
-          data = JSON.parse(rawText);
-        } catch {
-          data = { error: rawText };
-        }
-        const err =
-          data && typeof data === "object" ? (data as Record<string, unknown>).error : undefined;
-        return NextResponse.json(
-          {
-            error:
-              typeof err === "string"
-                ? err
-                : typeof err === "object"
-                  ? (((err as Record<string, unknown>).message as string) ?? `${provider} error`)
-                  : `${provider} error`,
-          },
-          { status: res.status },
-        );
-      }
-      // Phase 2.5: stream passthrough
-      // Désactivé si des tools sont présents : on doit parser tool_calls.
-      if (body.stream && res.body && !tools?.length) return passthroughSSE(res);
-
-      const rawText = await res.text();
-      let data: unknown;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = {};
-      }
-      const choices =
-        data && typeof data === "object" ? (data as Record<string, unknown>).choices : undefined;
-      const firstChoice =
-        Array.isArray(choices) && choices.length > 0
-          ? (choices[0] as Record<string, unknown>)
-          : undefined;
-      const msg = firstChoice?.message as Record<string, unknown> | undefined;
-      const firstText = firstChoice?.text;
-
-      // Extraction des tool_calls pour le mode non-streamé
-      const rawToolCalls = msg?.tool_calls;
-      const toolCalls = Array.isArray(rawToolCalls)
-        ? rawToolCalls.map((tc: any) => ({
-            id: typeof tc?.id === "string" ? tc.id : `call_${Math.random().toString(36).slice(2)}`,
-            name: typeof tc?.function?.name === "string" ? tc.function.name : "",
-            arguments: typeof tc?.function?.arguments === "string" ? tc.function.arguments : "{}",
-          }))
-        : [];
-
-      return NextResponse.json({
-        content:
-          typeof msg?.content === "string"
-            ? msg.content
-            : typeof firstText === "string"
-              ? firstText
-              : "",
-        ...(toolCalls.length > 0 ? { tool_calls: toolCalls, provider_tool_format: "openai" } : {}),
-      });
-    }
-
-    if (provider === "deepseek") {
-      const res = await abortableFetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: model || "deepseek-chat",
-          stream: Boolean(body.stream),
-          ...(tools?.length ? { tools } : {}),
-          ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: message },
-            ...buildOpenAIToolHistory(previousTurns),
-          ],
-        }),
-      });
-      if (!res.ok) {
-        const rawText = await res.text();
-        let data: unknown;
-        try {
-          data = JSON.parse(rawText);
-        } catch {
-          data = { error: rawText };
-        }
-        const err =
-          data && typeof data === "object" ? (data as Record<string, unknown>).error : undefined;
-        return NextResponse.json(
-          {
-            error:
-              typeof err === "string"
-                ? err
-                : typeof err === "object"
-                  ? (((err as Record<string, unknown>).message as string) ?? "DeepSeek error")
-                  : "DeepSeek error",
-          },
-          { status: res.status },
-        );
-      }
-      // Phase 2.5: stream passthrough
-      // Désactivé si des tools sont présents.
-      if (body.stream && res.body && !tools?.length) return passthroughSSE(res);
-
-      const rawText = await res.text();
-      let data: unknown;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = {};
-      }
-      const choices =
-        data && typeof data === "object" ? (data as Record<string, unknown>).choices : undefined;
-      const firstChoice =
-        Array.isArray(choices) && choices.length > 0
-          ? (choices[0] as Record<string, unknown>)
-          : undefined;
-      const msg = firstChoice?.message as Record<string, unknown> | undefined;
-      const firstText = firstChoice?.text;
-
-      // Extraction des tool_calls pour le mode non-streamé
-      const rawToolCalls = msg?.tool_calls;
-      const toolCalls = Array.isArray(rawToolCalls)
-        ? rawToolCalls.map((tc: any) => ({
-            id: typeof tc?.id === "string" ? tc.id : `call_${Math.random().toString(36).slice(2)}`,
-            name: typeof tc?.function?.name === "string" ? tc.function.name : "",
-            arguments: typeof tc?.function?.arguments === "string" ? tc.function.arguments : "{}",
-          }))
-        : [];
-
-      return NextResponse.json({
-        content:
-          typeof msg?.content === "string"
-            ? msg.content
-            : typeof firstText === "string"
-              ? firstText
-              : "",
-        ...(toolCalls.length > 0 ? { tool_calls: toolCalls, provider_tool_format: "openai" } : {}),
-      });
-    }
-
-    if (provider === "gemini") {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.0-flash"}:generateContent`;
-      const geminiTools = tools?.length
-        ? [
-            {
-              functionDeclarations: tools.map((t) => {
-                const fn = (t as any).function ?? t;
-                return {
-                  name: fn.name,
-                  description: fn.description,
-                  parameters: fn.parameters ?? {},
-                };
-              }),
-            },
-          ]
-        : undefined;
-
-      const res = await abortableFetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: system }] },
-          contents: [{ parts: [{ text: message }] }, ...buildGeminiToolHistory(previousTurns)],
-          ...(geminiTools?.length ? { tools: geminiTools } : {}),
-        }),
-      });
-
-      const contentType = res.headers.get("content-type") || "";
-
-      if (contentType.includes("text/event-stream")) {
-        const rawText = await res.text();
-        let combined = "";
-        const functionCallCalls: Array<{ id?: string; name?: string; arguments: string }> = [];
-        for (const line of rawText.split("\n")) {
-          if (line.startsWith("data: ")) {
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr || jsonStr === "[DONE]") continue;
-            try {
-              const chunk: GeminiChunk & {
-                candidates?: Array<{
-                  functionCall?: { name?: string; args?: Record<string, unknown>; id?: string };
-                }>;
-              } = JSON.parse(jsonStr);
-              const text =
-                chunk.candidates?.[0]?.content?.parts?.[0]?.text ||
-                chunk.candidates?.[0]?.content?.text ||
-                chunk.text ||
-                "";
-              if (text) combined += text;
-
-              const fc = chunk.candidates?.[0]?.functionCall;
-              if (fc?.name) {
-                functionCallCalls.push({
-                  id: fc.id,
-                  name: fc.name,
-                  arguments: JSON.stringify(fc.args ?? {}),
-                });
-              }
-            } catch {
-              // skip malformed chunks
-            }
-          }
-        }
-        if (!res.ok && !combined && functionCallCalls.length === 0) {
-          const errData = tryParseGeminiError(rawText);
-          return NextResponse.json({ error: errData }, { status: res.status });
-        }
-
-        if (functionCallCalls.length > 0) {
-          return NextResponse.json({
-            content: combined,
-            tool_calls: functionCallCalls,
-            provider_tool_format: "gemini",
-          });
-        }
-
-        return NextResponse.json({ content: combined });
-      }
-
-      const rawText = await res.text();
-      let data: Record<string, unknown>;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = {};
-      }
-
-      if (!res.ok) {
-        const err = data.error;
-        const errMsg =
-          typeof err === "string"
-            ? err
-            : err && typeof err === "object"
-              ? (((err as Record<string, unknown>).message as string) ??
-                tryParseGeminiError(rawText))
-              : (tryParseGeminiError(rawText) ?? "Gemini error");
-        return NextResponse.json({ error: errMsg }, { status: res.status });
-      }
-
-      const promptFeedback = data.promptFeedback as Record<string, unknown> | undefined;
-      if (promptFeedback?.blockReason) {
-        return NextResponse.json({
-          content: "",
-          blocked: true,
-          reason: promptFeedback.blockReason,
-        });
-      }
-
-      const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
-      const firstCandidate =
-        Array.isArray(candidates) && candidates.length > 0 ? candidates[0] : undefined;
-      const candidateContent = firstCandidate?.content as Record<string, unknown> | undefined;
-      const parts = candidateContent?.parts as Array<Record<string, unknown>> | undefined;
-      const firstPart = Array.isArray(parts) && parts.length > 0 ? parts[0] : undefined;
-      const content = (firstPart?.text as string) ?? (candidateContent?.text as string) ?? "";
-
-      // Détecter functionCall dans la réponse non-streamée
-      const functionCall = firstCandidate?.functionCall as
-        { name?: string; args?: Record<string, unknown>; id?: string } | undefined;
-      if (functionCall?.name) {
-        return NextResponse.json({
-          content,
-          tool_calls: [
-            {
-              id: functionCall.id,
-              name: functionCall.name,
-              arguments: JSON.stringify(functionCall.args ?? {}),
-            },
-          ],
-          provider_tool_format: "gemini",
-        });
-      }
-
-      return NextResponse.json({ content });
-    }
-
-    if (provider === "ollama") {
-      if (!isOllamaHostAllowed(host)) {
-        return structuredError(
-          "Invalid host: localhost and private IPs are not allowed",
-          "SSRF_BLOCKED",
-          403,
-        );
-      }
-      const res = await abortableFetch(`http://${host}:${ollamaPort}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Connection: "keep-alive" },
-        redirect: "manual",
-        body: JSON.stringify({
-          model: model || "llama2",
-          stream: Boolean(body.stream),
-          ...(tools?.length ? { tools } : {}),
-          ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: message },
-            ...buildOpenAIToolHistory(previousTurns),
-          ],
-        }),
-      });
-      const data: unknown = await res.json();
-      if (!res.ok) {
-        const err =
-          data && typeof data === "object" ? (data as Record<string, unknown>).error : undefined;
-        return NextResponse.json(
-          { error: typeof err === "string" ? err : "Ollama error" },
-          { status: res.status },
-        );
-      }
-      const choices =
-        data && typeof data === "object" ? (data as Record<string, unknown>).choices : undefined;
-      const firstChoice =
-        Array.isArray(choices) && choices.length > 0
-          ? (choices[0] as Record<string, unknown>)
-          : undefined;
-      const msg = firstChoice?.message as Record<string, unknown> | undefined;
-      const content = typeof msg?.content === "string" ? msg.content : "";
-      return NextResponse.json({ content });
-    }
-
-    return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
+    clearTimeout(timeout);
+    return response;
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
