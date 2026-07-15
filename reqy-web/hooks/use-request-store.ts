@@ -2,7 +2,14 @@
 
 import { workspaceFetch } from "@/lib/workspace-api";
 import { getPublicEnv } from "@/lib/env";
-import { mergeChangesIntoStore, pullAndMerge, type SyncChange } from "@/lib/sync/store-sync";
+import {
+  mergeChangesIntoStore,
+  pullAndMerge,
+  computePushChanges,
+  type SyncChange,
+} from "@/lib/sync/store-sync";
+import { pushChanges } from "@/lib/sync-client";
+import { connectSyncWs, type SyncWsController } from "@/lib/sync/sync-ws";
 
 // Re-export all types for backward compatibility
 export type {
@@ -376,6 +383,35 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     return res;
   };
 
+  // Debounced push of local changes to the server. Tracks the last pushed
+  // snapshot per workspace so only the delta is sent.
+  const lastPushed: Record<string, Pick<RequestStore, "collections" | "environments">> = {};
+  let pushTimer: ReturnType<typeof setTimeout> | null = null;
+  const schedulePush = (workspaceId: string) => {
+    if (workspaceId === WORKSPACE_PERSONAL_ID) return;
+    const syncUrl = getPublicEnv().NEXT_PUBLIC_SYNC_URL;
+    if (!syncUrl) return;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => {
+      pushTimer = null;
+      const current = get();
+      const snapshot = { collections: current.collections, environments: current.environments };
+      const base = lastPushed[workspaceId] ?? { collections: [], environments: [] };
+      const changes = computePushChanges(base, snapshot);
+      if (changes.length === 0) return;
+      pushChanges(workspaceId, changes)
+        .then((res) => {
+          if (res.conflicts.length === 0) {
+            lastPushed[workspaceId] = snapshot;
+          } else {
+            // A conflict means the server has a newer version; reconcile.
+            void pullWorkspace(workspaceId);
+          }
+        })
+        .catch((e) => console.warn("[sync] push failed:", e));
+    }, 500);
+  };
+
   async function initStore() {
     let loaded = await loadFromStorageAsync();
 
@@ -416,6 +452,9 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
         console.warn("[sync] initial pull failed:", e);
       }
     }
+
+    // Subscribe to live changes via WebSocket.
+    startSyncWs(ws);
   }
 
   const commit = (updater: (prev: RequestStore) => RequestStore) => {
@@ -424,6 +463,8 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
       storeGen++;
       saveToStorageAsync(next);
       syncMiddleware.broadcast({ type: "update", gen: storeGen });
+      const ws = prev.activeWorkspaceId ?? WORKSPACE_PERSONAL_ID;
+      if (ws !== WORKSPACE_PERSONAL_ID) schedulePush(ws);
       return next;
     });
   };
@@ -553,10 +594,42 @@ export const getStore = () => requestStore.getState();
 
 export const useRequestStore = requestStore;
 
-// When the active workspace changes, pull its latest server state.
+// --- WebSocket sync (module-level, one connection at a time) ---
+let syncWsController: SyncWsController | null = null;
+
+/** Start (or restart) a WS sync subscription for the given workspace. */
+function startSyncWs(workspaceId: string | null) {
+  // Disconnect any previous connection
+  if (syncWsController) {
+    syncWsController.disconnect();
+    syncWsController = null;
+  }
+  if (!workspaceId || workspaceId === WORKSPACE_PERSONAL_ID) return;
+  const syncUrl = getPublicEnv().NEXT_PUBLIC_SYNC_URL;
+  if (!syncUrl) return;
+
+  syncWsController = connectSyncWs({
+    workspaceId,
+    syncUrl,
+    onChange: () => {
+      // Broadcast hint: pull the latest changes
+      const store = requestStore.getState();
+      void store.pullWorkspace(workspaceId);
+    },
+    onError: (err) => {
+      console.warn("[sync] WS error:", err.message);
+    },
+  });
+}
+
+// When the active workspace changes, pull its latest server state
+// and switch the WebSocket subscription.
 requestStore.subscribe((state, prev) => {
   if (state.activeWorkspaceId && state.activeWorkspaceId !== prev.activeWorkspaceId) {
     void state.pullWorkspace(state.activeWorkspaceId);
+    // Restart WS for the new workspace
+    const store = requestStore.getState();
+    startSyncWs(state.activeWorkspaceId);
   }
 });
 
