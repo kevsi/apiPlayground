@@ -8,6 +8,7 @@ import { workspaceFetch } from "@/lib/workspace-api";
 import { isTauriAvailable } from "@/lib/tauri";
 import { getPublicEnv } from "@/lib/env";
 import { proxyAuthHeaders } from "@/lib/proxy-auth";
+import { useSessionStore } from "@/lib/session-store";
 
 const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
 vi.stubGlobal("fetch", fetchMock);
@@ -17,6 +18,7 @@ beforeEach(() => {
   vi.mocked(isTauriAvailable).mockReset();
   vi.mocked(getPublicEnv).mockReset();
   vi.mocked(proxyAuthHeaders).mockReset();
+  useSessionStore.setState({ user: null, token: null, status: "unauthenticated" });
 });
 
 describe("workspaceFetch", () => {
@@ -45,6 +47,20 @@ describe("workspaceFetch", () => {
     const headers = fetchMock.mock.calls[0][1].headers as Headers;
     expect(headers.get("authorization")).toBe("Bearer tok");
     expect(headers.get("content-type")).toBe("application/json");
+  });
+
+  it("desktop: uses the session token when authenticated (overrides proxy auth)", async () => {
+    vi.mocked(isTauriAvailable).mockReturnValue(true);
+    vi.mocked(getPublicEnv).mockReturnValue({
+      NEXT_PUBLIC_SYNC_URL: "https://sync.example.com/",
+    } as never);
+    useSessionStore.setState({ token: "sess-tok", status: "authenticated" });
+    await workspaceFetch("/api/workspaces", { method: "GET" });
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("authorization")).toBe("Bearer sess-tok");
+    // The service token must NOT be applied when a user session exists.
+    expect(vi.mocked(proxyAuthHeaders)).not.toHaveBeenCalled();
+    useSessionStore.setState({ token: null, status: "unauthenticated" });
   });
 
   it("maps join asymmetrically: desktop -> /api/workspaces/invitations/accept, web -> /api/workspaces/join", async () => {

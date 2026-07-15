@@ -1,6 +1,7 @@
 import { isTauriAvailable } from "@/lib/tauri";
 import { getPublicEnv } from "@/lib/env";
 import { proxyAuthHeaders } from "@/lib/proxy-auth";
+import { useSessionStore } from "@/lib/session-store";
 
 /**
  * Unified workspace API client.
@@ -35,8 +36,15 @@ export async function workspaceFetch(
       );
     }
     const headers = new Headers(init.headers);
-    for (const [key, value] of Object.entries(proxyAuthHeaders())) {
-      headers.set(key, value);
+    // Prefer the real user session token when the user is authenticated;
+    // otherwise fall back to the service token (dev / unauthenticated).
+    const sessionToken = useSessionStore.getState().token;
+    if (sessionToken) {
+      headers.set("Authorization", `Bearer ${sessionToken}`);
+    } else {
+      for (const [key, value] of Object.entries(proxyAuthHeaders())) {
+        headers.set(key, value);
+      }
     }
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
