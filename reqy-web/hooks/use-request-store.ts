@@ -1,6 +1,8 @@
 "use client";
 
 import { workspaceFetch } from "@/lib/workspace-api";
+import { getPublicEnv } from "@/lib/env";
+import { mergeChangesIntoStore, pullAndMerge, type SyncChange } from "@/lib/sync/store-sync";
 
 // Re-export all types for backward compatibility
 export type {
@@ -48,6 +50,28 @@ import { createDatasetsMutations } from "./store/datasets";
 import { createAiActionsMutations } from "./store/ai-actions";
 
 const STORAGE_KEY = "reqly-request-store";
+
+// Per-workspace "since" cursors so a reload only pulls the delta since last sync.
+const SYNC_CURSOR_KEY = "reqly-sync-cursors";
+function loadSyncCursors(): Record<string, number> {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(SYNC_CURSOR_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+function saveSyncCursor(ws: string, ts: number) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const c = loadSyncCursors();
+    c[ws] = ts;
+    localStorage.setItem(SYNC_CURSOR_KEY, JSON.stringify(c));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Lit la permission système de notification directement depuis le navigateur. */
 function getBrowserNotificationPermission(): string {
@@ -331,6 +355,27 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     saveTimeout = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
   }
 
+  /** Apply server changes into local state and persist — does NOT trigger a push. */
+  const mergeRemote = (changes: SyncChange[]) => {
+    const current = get();
+    const next = mergeChangesIntoStore(current, changes);
+    set(next);
+    saveToStorageAsync(next);
+  };
+
+  /** Pull all changes since the last sync cursor and merge them. */
+  const pullWorkspace = async (
+    workspaceId: string | null = get().activeWorkspaceId,
+  ): Promise<{ applied: number }> => {
+    if (!workspaceId || workspaceId === WORKSPACE_PERSONAL_ID) return { applied: 0 };
+    const syncUrl = getPublicEnv().NEXT_PUBLIC_SYNC_URL;
+    if (!syncUrl) return { applied: 0 };
+    const since = loadSyncCursors()[workspaceId] ?? 0;
+    const res = await pullAndMerge(workspaceId, since, { apply: mergeRemote });
+    if (res.applied > 0) saveSyncCursor(workspaceId, Date.now());
+    return res;
+  };
+
   async function initStore() {
     let loaded = await loadFromStorageAsync();
 
@@ -354,11 +399,23 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
       await saveToStorageAsync(loaded);
     }
 
+    // Capture the active workspace before the load overwrites it (storage may
+    // reset it to the personal default when empty).
+    const ws = get().activeWorkspaceId ?? WORKSPACE_PERSONAL_ID;
     const currentState = get();
     set({
       ...loaded,
       isLoaded: true,
     } satisfies Partial<RequestStoreState>);
+
+    // Pull remote changes for the workspace that was active before load.
+    if (ws !== WORKSPACE_PERSONAL_ID && getPublicEnv().NEXT_PUBLIC_SYNC_URL) {
+      try {
+        await pullWorkspace(ws);
+      } catch (e) {
+        console.warn("[sync] initial pull failed:", e);
+      }
+    }
   }
 
   const commit = (updater: (prev: RequestStore) => RequestStore) => {
@@ -481,6 +538,8 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     },
     initStore,
     fetchWorkspacesFromApi,
+    mergeRemote,
+    pullWorkspace,
     ...mutations,
     getFoldersForCollection,
     notify: (message: string) =>
@@ -493,6 +552,13 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
 export const getStore = () => requestStore.getState();
 
 export const useRequestStore = requestStore;
+
+// When the active workspace changes, pull its latest server state.
+requestStore.subscribe((state, prev) => {
+  if (state.activeWorkspaceId && state.activeWorkspaceId !== prev.activeWorkspaceId) {
+    void state.pullWorkspace(state.activeWorkspaceId);
+  }
+});
 
 export function moduleLevelCommit(updater: (prev: RequestStore) => RequestStore) {
   requestStore.getState().commit(updater);
