@@ -1,25 +1,26 @@
-"use client"
+"use client";
 
-import { useMemo, useCallback } from "react"
-import dynamic from "next/dynamic"
-import { EditorView } from "@uiw/react-codemirror"
-import { graphql } from "cm6-graphql"
-import { autocompletion, type CompletionContext } from "@codemirror/autocomplete"
-import { buildClientSchema, type GraphQLSchema } from "graphql"
+import { useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { EditorView } from "@uiw/react-codemirror";
+import { graphql } from "cm6-graphql";
+import { autocompletion, type CompletionContext } from "@codemirror/autocomplete";
+import { buildClientSchema, type GraphQLSchema } from "graphql";
+import { useTheme } from "@/components/theme-provider";
 
 // Lazy-load CodeMirror (default export) — EditorView stays static because
 // it's used in extensions below.
-const CodeMirror = dynamic(
-  () => import("@uiw/react-codemirror").then((m) => m.default),
-  { ssr: false, loading: () => null },
-)
+const CodeMirror = dynamic(() => import("@uiw/react-codemirror").then((m) => m.default), {
+  ssr: false,
+  loading: () => null,
+});
 
 interface Props {
-  value: string
-  onChange: (v: string) => void
-  schema?: unknown
-  placeholder?: string
-  readOnly?: boolean
+  value: string;
+  onChange: (v: string) => void;
+  schema?: unknown;
+  placeholder?: string;
+  readOnly?: boolean;
 }
 
 /**
@@ -30,35 +31,32 @@ interface Props {
  * `{ data: { __schema: ... } }` — we unwrap to the schema object.
  */
 function toGraphQLSchema(schema: unknown): GraphQLSchema | undefined {
-  if (!schema) return undefined
+  if (!schema) return undefined;
   try {
     // Already a GraphQLSchema instance
     if (typeof (schema as { getQueryType?: unknown }).getQueryType === "function") {
-      return schema as GraphQLSchema
+      return schema as GraphQLSchema;
     }
     // Introspection result wrapper
-    const introspection = (schema as { data?: unknown }).data ?? schema
-    return buildClientSchema(introspection as Parameters<typeof buildClientSchema>[0])
+    const introspection = (schema as { data?: unknown }).data ?? schema;
+    return buildClientSchema(introspection as Parameters<typeof buildClientSchema>[0]);
   } catch {
-    return undefined
+    return undefined;
   }
 }
 
-export function GraphqlQueryEditor({
-  value,
-  onChange,
-  schema,
-  placeholder,
-  readOnly,
-}: Props) {
+export function GraphqlQueryEditor({ value, onChange, schema, placeholder, readOnly }: Props) {
+  const { theme: appTheme } = useTheme();
+  const cmTheme = appTheme === "dark" || appTheme === "midnight" ? "dark" : "light";
+
   const extensions = useMemo(() => {
-    const gqlSchema = toGraphQLSchema(schema)
+    const gqlSchema = toGraphQLSchema(schema);
     const baseExtensions = gqlSchema
       ? graphql(gqlSchema, {
           // Show an indicator when schema is invalid
           showErrorOnInvalidSchema: true,
         })
-      : graphql()
+      : graphql();
 
     return [
       ...baseExtensions,
@@ -73,15 +71,15 @@ export function GraphqlQueryEditor({
       EditorView.theme({
         "&": { fontSize: "13px" },
       }),
-    ]
-  }, [schema])
+    ];
+  }, [schema]);
 
   const handleChange = useCallback(
     (v: string) => {
-      onChange(v)
+      onChange(v);
     },
     [onChange],
-  )
+  );
 
   return (
     <div className="border-b bg-muted/10" data-testid="graphql-query-editor">
@@ -90,9 +88,9 @@ export function GraphqlQueryEditor({
         height="300px"
         extensions={extensions}
         onChange={handleChange}
+        theme={cmTheme}
         placeholder={
-          placeholder ??
-          "# Write your GraphQL query here\nquery GetUsers {\n  users { id name }\n}"
+          placeholder ?? "# Write your GraphQL query here\nquery GetUsers {\n  users { id name }\n}"
         }
         readOnly={readOnly}
         basicSetup={{
@@ -106,8 +104,8 @@ export function GraphqlQueryEditor({
         className="text-sm"
       />
     </div>
-  )
+  );
 }
 
 // Re-export CompletionContext type for downstream consumers (e.g. unit tests).
-export type { CompletionContext }
+export type { CompletionContext };
