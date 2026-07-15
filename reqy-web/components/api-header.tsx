@@ -7,6 +7,7 @@ import { EnvironmentSelector } from "@/components/environment-selector";
 import { VariablesPanel } from "@/components/variables-panel";
 import { WorkspaceSelector } from "@/components/workspace-selector";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { AccountMenu } from "@/components/account-menu";
 
 import {
   DropdownMenu,
@@ -160,6 +161,7 @@ export function ApiHeader() {
         <EnvironmentSelector />
         <VariablesPanel />
         <ThemeSwitcher />
+        <AccountMenu />
 
         {/* AI Sidebar Toggle */}
         <AiSidebarToggle />
