@@ -246,4 +246,97 @@ describe("routes/sync", () => {
       }
     });
   });
+
+  describe("e2e: push → poll → verify cycle", () => {
+    it("adds, updates, deletes and returns the latest version of each entity", async () => {
+      const cookie = makeSessionCookie(USER_A);
+      const app = buildApp();
+
+      // 1. Push a new collection
+      const now = Date.now();
+      const push1 = await app.request(`/sync/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: `auth_session=${cookie}` },
+        body: JSON.stringify({
+          workspaceId: WS,
+          changes: [
+            {
+              entityType: "collection",
+              id: "col-e2e",
+              data: { id: "col-e2e", name: "E2E", requests: [] },
+              updatedAt: now,
+              updatedBy: USER_A,
+            },
+          ],
+        }),
+      });
+      expect(push1.status).toBe(200);
+      const r1 = (await push1.json()) as { accepted: string[] };
+      expect(r1.accepted).toEqual(["col-e2e"]);
+
+      // Poll for the add — we should see it
+      const poll1 = await app.request(`/sync/poll?workspaceId=${WS}&since=${now - 1000}`, {
+        headers: { cookie: `auth_session=${cookie}` },
+      });
+      const b1 = (await poll1.json()) as { changes: Array<{ id: string; data: { name: string } }> };
+      expect(b1.changes.some((c) => c.id === "col-e2e" && c.data.name === "E2E")).toBe(true);
+
+      // 2. Push an update to the same collection
+      const push2 = await app.request(`/sync/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: `auth_session=${cookie}` },
+        body: JSON.stringify({
+          workspaceId: WS,
+          changes: [
+            {
+              entityType: "collection",
+              id: "col-e2e",
+              data: { id: "col-e2e", name: "E2E-Updated", requests: [] },
+              updatedAt: now + 100,
+              updatedBy: USER_A,
+            },
+          ],
+        }),
+      });
+      expect(push2.status).toBe(200);
+
+      // Poll — should see the updated name
+      const poll2 = await app.request(`/sync/poll?workspaceId=${WS}&since=${now - 1000}`, {
+        headers: { cookie: `auth_session=${cookie}` },
+      });
+      const b2 = (await poll2.json()) as { changes: Array<{ id: string; data: { name: string } }> };
+      const colAfterUpdate = b2.changes.find((c) => c.id === "col-e2e");
+      expect(colAfterUpdate).toBeDefined();
+      expect(colAfterUpdate!.data.name).toBe("E2E-Updated");
+
+      // 3. Push a deletion
+      const push3 = await app.request(`/sync/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: `auth_session=${cookie}` },
+        body: JSON.stringify({
+          workspaceId: WS,
+          changes: [
+            {
+              entityType: "collection",
+              id: "col-e2e",
+              data: { id: "col-e2e", name: "E2E-Updated", requests: [] },
+              updatedAt: now + 200,
+              updatedBy: USER_A,
+              deleted: true,
+            },
+          ],
+        }),
+      });
+      expect(push3.status).toBe(200);
+
+      // Poll — should see the deletion flag
+      const poll3 = await app.request(`/sync/poll?workspaceId=${WS}&since=${now - 1000}`, {
+        headers: { cookie: `auth_session=${cookie}` },
+      });
+      const b3 = (await poll3.json()) as { changes: Array<{ id: string; deleted: boolean }> };
+      const colAfterDelete = b3.changes.find((c) => c.id === "col-e2e");
+      expect(colAfterDelete).toBeDefined();
+      expect(colAfterDelete!.deleted).toBe(true);
+    });
+  });
 });

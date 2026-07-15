@@ -405,6 +405,12 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
             lastPushed[workspaceId] = snapshot;
           } else {
             // A conflict means the server has a newer version; reconcile.
+            const store = get();
+            store.addNotification?.({
+              title: "Sync Conflict",
+              body: `${res.conflicts.length} change(s) conflicted with the server. Server version applied.`,
+              type: "warning",
+            });
             void pullWorkspace(workspaceId);
           }
         })
