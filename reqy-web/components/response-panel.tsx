@@ -46,6 +46,7 @@ import {
   getContentType,
 } from "@/components/response-utils";
 import type { HistoryItem, TestResult } from "@/lib/types";
+import { formatDataSize } from "@/lib/network/format";
 import {
   getStatusBorderAccentClass,
   getStatusWatermarkClass,
@@ -191,6 +192,13 @@ export function ResponsePanel({
   }, [responseBody]);
 
   const hasResponse = Boolean(responseBody) || responseStatus !== undefined;
+
+  // Real byte size of the response body, used to show "Taille : X Ko / Mo".
+  const responseByteSize = useMemo(() => {
+    if (responseData instanceof Blob) return responseData.size;
+    if (typeof responseBody === "string") return new Blob([responseBody]).size;
+    return 0;
+  }, [responseBody, responseData]);
 
   // ── Timing gauge animation ─────────────────────────────────────
   const [timingGaugeWidth, setTimingGaugeWidth] = useState(0);
@@ -387,6 +395,16 @@ export function ResponsePanel({
           data-testid="response-body"
           className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-auto"
         >
+          {/* Payload size — real byte count of the response body */}
+          {hasResponse && responseByteSize > 0 && (
+            <div
+              className="px-4 py-1 text-[11px] font-mono text-muted-foreground border-b border-border/50"
+              data-testid="response-size"
+            >
+              Taille : {formatDataSize(responseByteSize)}
+            </div>
+          )}
+
           {/* Giant floating status code background */}
           {hasResponse && responseStatus != null && !isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">

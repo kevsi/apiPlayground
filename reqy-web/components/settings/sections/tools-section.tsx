@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { ToolAssociationModal, type Tool } from "./tool-association-modal";
 import { buildMcpClientConfig } from "@/lib/mcp/config";
+import { isTauriAvailable, setBandwidthLimit } from "@/lib/tauri";
 
 const TOOLS: Tool[] = [
   {
@@ -124,6 +127,31 @@ export function ToolsSection() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
 
+  // Bandwidth throttle (capture proxy) — optional, desktop-only.
+  const tauriAvailable = isTauriAvailable();
+  const [throttleEnabled, setThrottleEnabled] = useState(false);
+  const [throttleKbps, setThrottleKbps] = useState("50");
+  const [throttleStatus, setThrottleStatus] = useState<string | null>(null);
+
+  const applyThrottle = async () => {
+    try {
+      if (!throttleEnabled) {
+        await setBandwidthLimit(null);
+        setThrottleStatus("Débit non limité");
+      } else {
+        const kbps = Number(throttleKbps);
+        if (!Number.isFinite(kbps) || kbps <= 0) {
+          setThrottleStatus("Valeur invalide (ko/s > 0)");
+          return;
+        }
+        await setBandwidthLimit(kbps);
+        setThrottleStatus(`Débit limité à ${kbps} ko/s`);
+      }
+    } catch {
+      setThrottleStatus("Non disponible hors de l'application desktop");
+    }
+  };
+
   const copyMcpConfig = async () => {
     const config = buildMcpClientConfig("claude-desktop");
     await navigator.clipboard.writeText(config);
@@ -183,6 +211,52 @@ export function ToolsSection() {
           {copied ? (
             <span className="text-sm font-medium text-success" role="status" aria-live="polite">
               Copié !
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div className="space-y-3 rounded-lg border border-border p-4">
+        <div>
+          <h3 className="text-lg font-semibold">Réseau</h3>
+          <p className="text-sm text-muted-foreground">
+            Limitez le débit des réponses capturées pour simuler un réseau contraint (proxy de
+            capture, application desktop uniquement).
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Switch
+            id="throttle-toggle"
+            checked={throttleEnabled}
+            onCheckedChange={setThrottleEnabled}
+            disabled={!tauriAvailable}
+          />
+          <label htmlFor="throttle-toggle" className="text-sm">
+            Limiter le débit (ko/s)
+          </label>
+          <Input
+            type="number"
+            min={1}
+            value={throttleKbps}
+            onChange={(e) => setThrottleKbps(e.target.value)}
+            disabled={!throttleEnabled || !tauriAvailable}
+            className="h-8 w-24"
+            aria-label="Débit en ko/s"
+          />
+          <Button size="sm" variant="outline" onClick={applyThrottle} disabled={!tauriAvailable}>
+            Appliquer
+          </Button>
+          {throttleStatus ? (
+            <span
+              className="text-xs font-medium text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              {throttleStatus}
+            </span>
+          ) : null}
+          {!tauriAvailable ? (
+            <span className="text-xs text-muted-foreground/70">
+              Disponible uniquement dans l'application desktop.
             </span>
           ) : null}
         </div>

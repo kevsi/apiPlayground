@@ -14,7 +14,7 @@ mod fetch;
 mod store;
 
 use crate::capture::{
-  get_captured_session, list_captured_sessions, start_capture_proxy,
+  get_captured_session, list_captured_sessions, set_bandwidth_limit, start_capture_proxy,
   stop_capture_proxy, ManagedCaptureProxyState,
 };
 use crate::fetch::{fetch_proxy, SharedClient};
@@ -98,6 +98,7 @@ pub fn run() {
       stop_capture_proxy,
       list_captured_sessions,
       get_captured_session,
+      set_bandwidth_limit,
       websocket::commands::ws_connect,
       websocket::commands::ws_send,
       websocket::commands::ws_disconnect,

@@ -28,6 +28,37 @@ pub struct CaptureProxyState {
   /// Populated by the proxy thread after each forwarded request so the
   /// frontend can list/get them via Tauri commands.
   pub captured: Vec<CapturedRequest>,
+  /// Optional bandwidth cap (in ko/s) applied to forwarded response bodies.
+  /// `None` disables throttling (default). Set via `set_bandwidth_limit`.
+  pub bandwidth_limit_kbps: Option<u32>,
+}
+
+/// A reader that yields the given bytes but sleeps between reads to emulate a
+/// constrained network link (bandwidth throttle). Used by `set_bandwidth_limit`.
+///
+/// The capture proxy runs on a dedicated std thread, so blocking sleeps here
+/// are acceptable — they shape the rate at which the upstream response is
+/// streamed back to the original caller.
+struct ThrottledReader {
+  data: Vec<u8>,
+  pos: usize,
+  bytes_per_sec: f64,
+}
+
+impl std::io::Read for ThrottledReader {
+  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    if self.pos >= self.data.len() {
+      return Ok(0);
+    }
+    let to_copy = std::cmp::min(buf.len(), self.data.len() - self.pos);
+    if self.bytes_per_sec > 0.0 {
+      let secs = (to_copy as f64) / self.bytes_per_sec;
+      std::thread::sleep(std::time::Duration::from_secs_f64(secs));
+    }
+    buf[..to_copy].copy_from_slice(&self.data[self.pos..self.pos + to_copy]);
+    self.pos += to_copy;
+    Ok(to_copy)
+  }
 }
 
 /// Lightweight view of a captured request, returned by `list_captured_sessions`.
@@ -278,13 +309,46 @@ fn start_proxy_server(
         })
         .collect();
 
-      let _ = request.respond({
-        let mut response = Response::from_string(resp_body.unwrap_or_default()).with_status_code(status);
-        for header in http_resp_headers {
-          response = response.with_header(header);
-        }
-        response
-      });
+      // Read the current bandwidth cap (set via `set_bandwidth_limit`).
+      // `captured_store` is the proxy state Arc shared with this thread.
+      let limit_bps = captured_store
+        .lock()
+        .ok()
+        .and_then(|g| g.bandwidth_limit_kbps)
+        .map(|k| (k as f64) * 1024.0); // ko/s -> bytes/sec
+
+      if let (Some(bps), Some(body)) = (limit_bps, resp_body.clone()) {
+        // Throttled path — stream the response body with a sleep between chunks.
+        let bytes = body.into_bytes();
+        let total = bytes.len();
+        let reader = ThrottledReader {
+          data: bytes,
+          pos: 0,
+          bytes_per_sec: bps,
+        };
+        let _ = request.respond({
+          let mut response = Response::new(
+            tiny_http::StatusCode(status),
+            Vec::new(),
+            reader,
+            Some(total),
+            None,
+          );
+          for header in http_resp_headers.iter().cloned() {
+            response = response.with_header(header);
+          }
+          response
+        });
+      } else {
+        // Default path — unchanged behaviour.
+        let _ = request.respond({
+          let mut response = Response::from_string(resp_body.unwrap_or_default()).with_status_code(status);
+          for header in http_resp_headers.iter().cloned() {
+            response = response.with_header(header);
+          }
+          response
+        });
+      }
     }
   });
 
@@ -378,6 +442,23 @@ pub fn get_captured_session(
 ) -> Result<Option<CapturedRequest>, AppError> {
   let guard = state.lock()?;
   Ok(guard.captured.iter().find(|c| c.id == id).cloned())
+}
+
+#[tauri::command]
+pub fn set_bandwidth_limit(
+  kbps: Option<u32>,
+  state: tauri::State<'_, ManagedCaptureProxyState>,
+) -> Result<(), AppError> {
+  if let Some(k) = kbps {
+    if k == 0 {
+      return Err(AppError::InvalidInput(
+        "La limite de débit doit être > 0 ko/s ou null pour la désactiver".into(),
+      ));
+    }
+  }
+  let mut guard = state.lock()?;
+  guard.bandwidth_limit_kbps = kbps;
+  Ok(())
 }
 
 #[cfg(test)]

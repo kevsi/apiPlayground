@@ -126,6 +126,20 @@ export async function stopCaptureProxy(): Promise<void> {
 }
 
 /**
+ * Sets an optional bandwidth cap (in ko/s) applied to forwarded response
+ * bodies in the capture proxy. Pass `null` to disable throttling.
+ *
+ * No-op / throws when Tauri is not available (web/preview context).
+ */
+export async function setBandwidthLimit(kbps: number | null): Promise<void> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri is not available in this environment");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_bandwidth_limit", { kbps });
+}
+
+/**
  * Saves a Blob to disk using Tauri's native "Save As" dialog.
  *
  * The browser's `showSaveFilePicker` / `<a download>` don't work inside a
