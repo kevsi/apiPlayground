@@ -25,7 +25,7 @@ function JoinWorkspaceInner() {
     setMessage("");
     try {
       const res = await workspaceFetch(
-        "/api/workspaces/invitations/accept",
+        "/api/memberships",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

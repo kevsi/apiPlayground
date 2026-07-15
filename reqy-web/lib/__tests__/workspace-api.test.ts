@@ -63,29 +63,21 @@ describe("workspaceFetch", () => {
     useSessionStore.setState({ token: null, status: "unauthenticated" });
   });
 
-  it("maps join asymmetrically: desktop -> /api/workspaces/invitations/accept, web -> /api/workspaces/join", async () => {
+  it("maps join asymmetrically: desktop -> /api/memberships, web -> /api/workspaces/join", async () => {
     vi.mocked(isTauriAvailable).mockReturnValue(true);
     vi.mocked(getPublicEnv).mockReturnValue({
       NEXT_PUBLIC_SYNC_URL: "https://sync.example.com",
     } as never);
     vi.mocked(proxyAuthHeaders).mockReturnValue({});
-    await workspaceFetch(
-      "/api/workspaces/invitations/accept",
-      { method: "POST" },
-      "/api/workspaces/join",
-    );
+    await workspaceFetch("/api/memberships", { method: "POST" }, "/api/workspaces/join");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://sync.example.com/api/workspaces/invitations/accept",
+      "https://sync.example.com/api/memberships",
       expect.objectContaining({ method: "POST" }),
     );
 
     fetchMock.mockClear();
     vi.mocked(isTauriAvailable).mockReturnValue(false);
-    await workspaceFetch(
-      "/api/workspaces/invitations/accept",
-      { method: "POST" },
-      "/api/workspaces/join",
-    );
+    await workspaceFetch("/api/memberships", { method: "POST" }, "/api/workspaces/join");
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/workspaces/join",
       expect.objectContaining({ method: "POST" }),

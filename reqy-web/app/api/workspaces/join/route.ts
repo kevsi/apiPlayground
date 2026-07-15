@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.text();
   try {
-    const res = await fetch(`${SYNC_URL}/api/workspaces/invitations/accept`, {
+    const res = await fetch(`${SYNC_URL}/api/memberships`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

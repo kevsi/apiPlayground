@@ -14,12 +14,12 @@ import { useSessionStore } from "@/lib/session-store";
  * export where Next API routes are not available.
  *
  * @param syncPath  Path on the sync backend, e.g. `/api/workspaces` or
- *                  `/api/workspaces/invitations/accept`.
+ *                  `/api/memberships` (join).
  * @param init      Standard fetch init (method, body, headers, ...).
  * @param webPath   Path used on the web build (Next proxy). Defaults to
  *                  `syncPath`; differs only for the join endpoint, whose Next
- *                  route (`/api/workspaces/join`) proxies to a different sync
- *                  path (`/api/workspaces/invitations/accept`).
+ *                  route (`/api/workspaces/join`) proxies to `/api/memberships`
+ *                  on the sync backend.
  */
 export async function workspaceFetch(
   syncPath: string,
