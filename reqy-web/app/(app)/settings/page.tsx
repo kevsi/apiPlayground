@@ -37,6 +37,7 @@ import type { SettingsSection } from "@/components/settings/settings-sidebar";
 import { ApparenceSection } from "@/components/settings/sections/apparence-section";
 import { ToolsSection } from "@/components/settings/sections/tools-section";
 import { KeyboardSection } from "@/components/settings/sections/keyboard-section";
+import { ModulesSection } from "@/components/settings/sections/modules-section";
 import McpSection from "@/components/settings/mcp-section";
 
 const AISection = dynamic(() => import("@/components/settings/ai-section"), { ssr: false });
@@ -65,6 +66,7 @@ const SECTION_KEYS: SectionKey[] = [
   "integrations",
   "keyboard",
   "mcp",
+  "modules",
 ];
 
 export default function SettingsPage() {
@@ -512,6 +514,7 @@ export default function SettingsPage() {
           {activeSection === "integrations" ? <ToolsSection /> : null}
           {activeSection === "keyboard" ? <KeyboardSection /> : null}
           {activeSection === "mcp" ? <McpSection /> : null}
+          {activeSection === "modules" ? <ModulesSection /> : null}
         </SettingsLayout>
       </div>
 

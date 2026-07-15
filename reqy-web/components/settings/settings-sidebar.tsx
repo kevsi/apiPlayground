@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   Palette,
@@ -9,23 +9,19 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Server,
+  Blocks,
   type LucideIcon,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type SettingsSection =
-  | "apparence"
-  | "ai"
-  | "notifications"
-  | "integrations"
-  | "keyboard"
-  | "mcp"
+  "apparence" | "ai" | "notifications" | "integrations" | "keyboard" | "mcp" | "modules";
 
 interface SectionDef {
-  key: SettingsSection
-  label: string
-  icon: LucideIcon
-  destructive?: boolean
+  key: SettingsSection;
+  label: string;
+  icon: LucideIcon;
+  destructive?: boolean;
 }
 
 const SECTIONS: SectionDef[] = [
@@ -35,28 +31,34 @@ const SECTIONS: SectionDef[] = [
   { key: "integrations", label: "Outils connectés", icon: Plug },
   { key: "keyboard", label: "Raccourcis clavier", icon: Keyboard },
   { key: "mcp", label: "Serveur MCP", icon: Server },
-]
+  { key: "modules", label: "Modules", icon: Blocks },
+];
 
 interface SettingsSidebarProps {
-  active: SettingsSection
-  onChange: (s: SettingsSection) => void
-  collapsed: boolean
-  onToggleCollapse: () => void
+  active: SettingsSection;
+  onChange: (s: SettingsSection) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export function SettingsSidebar({ active, onChange, collapsed, onToggleCollapse }: SettingsSidebarProps) {
+export function SettingsSidebar({
+  active,
+  onChange,
+  collapsed,
+  onToggleCollapse,
+}: SettingsSidebarProps) {
   return (
     <aside
       className={cn(
         "sticky top-0 flex h-full shrink-0 flex-col border-r bg-card transition-[width] duration-200",
-        collapsed ? "w-[60px]" : "w-60"
+        collapsed ? "w-[60px]" : "w-60",
       )}
       aria-label="Sections des paramètres"
     >
       <nav className="flex-1 overflow-y-auto p-2">
         <ul className="space-y-1">
           {SECTIONS.map(({ key, label, icon: Icon, destructive }) => {
-            const isActive = active === key
+            const isActive = active === key;
             return (
               <li key={key} className="relative">
                 {isActive && (
@@ -73,15 +75,15 @@ export function SettingsSidebar({ active, onChange, collapsed, onToggleCollapse 
                     isActive
                       ? "bg-primary/10 text-primary"
                       : destructive
-                      ? "text-destructive hover:bg-destructive/5"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ? "text-destructive hover:bg-destructive/5"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <Icon className="size-[18px] shrink-0" aria-hidden="true" />
                   {!collapsed && <span className="truncate">{label}</span>}
                 </button>
               </li>
-            )
+            );
           })}
         </ul>
       </nav>
@@ -94,5 +96,5 @@ export function SettingsSidebar({ active, onChange, collapsed, onToggleCollapse 
         {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
       </button>
     </aside>
-  )
+  );
 }
