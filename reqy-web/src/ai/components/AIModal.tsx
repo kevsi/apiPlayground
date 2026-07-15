@@ -84,6 +84,23 @@ import {
 
 type AiTab = "analyse" | "assistant" | "explain";
 
+/** Messages d'erreur typiques quand le provider IA ne supporte pas les tools/function calling. */
+function isToolUnsupportedError(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("tools") ||
+    lower.includes("functions") ||
+    lower.includes("function calling") ||
+    lower.includes("tool_calls") ||
+    lower.includes("unrecognized") ||
+    lower.includes("upstream request failed") ||
+    lower.includes("not supported") ||
+    lower.includes("not available") ||
+    lower.includes("invalid parameter") ||
+    lower.includes("unknown parameter")
+  );
+}
+
 export interface AIModalContext {
   method: string;
   url: string;
@@ -148,6 +165,8 @@ export function AIModal(props: AIModalProps) {
   >([]);
   const turnCountRef = useRef(0);
   const baseOptsRef = useRef<Omit<StreamLLMOptions, "previousTurns"> | null>(null);
+  /** Flag pour éviter une boucle infinie si le provider ne supporte pas les outils. */
+  const retriedWithoutToolsRef = useRef(false);
   const MAX_TOOL_TURNS = 5;
 
   // Inline AI config state (shown when no API key is set)
@@ -273,6 +292,21 @@ export function AIModal(props: AIModalProps) {
         }
       }
     } catch (e: any) {
+      // Si l'erreur ressemble à un rejet des tools/function calling et
+      // qu'on n'a pas déjà retenté, on relance sans outils.
+      if (
+        baseOptsRef.current?.tools &&
+        !retriedWithoutToolsRef.current &&
+        isToolUnsupportedError(e?.message ?? "")
+      ) {
+        retriedWithoutToolsRef.current = true;
+        baseOptsRef.current = { ...baseOptsRef.current, tools: undefined, tool_choice: undefined };
+        // Reset output pour ce nouvel essai
+        setLlmOutput("");
+        setLlmError(null);
+        runOneTurn(); // retry sans tools
+        return;
+      }
       setLlmError(e?.message ?? "Erreur de communication avec l'IA");
       setLlmLoading(false);
       return;
@@ -475,6 +509,7 @@ export function AIModal(props: AIModalProps) {
     accRef.current = "";
     previousTurnsRef.current = [];
     turnCountRef.current = 0;
+    retriedWithoutToolsRef.current = false;
     baseOptsRef.current = {
       provider: provider as any,
       apiKey: apiKey || "",
