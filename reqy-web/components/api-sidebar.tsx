@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { AppIcon } from "@/components/app-icon";
 import { ToolsSection } from "@/components/sidebar/tools-section";
+import { ModuleNavList } from "@/components/modules/module-nav-list";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -149,6 +150,7 @@ export function ApiSidebar({
               </li>
             );
           })}
+          <ModuleNavList activePage={activePage} collapsed={collapsed} />
         </ul>
         <ToolsSection />
       </nav>

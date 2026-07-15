@@ -5,7 +5,7 @@ import {
   uninstallModule as regUninstall,
   setModuleEnabled as regSetEnabled,
 } from "@/lib/modules/registry";
-import type { ModuleManifest } from "@/lib/modules/types";
+import type { ModuleManifest, ModuleNavItem } from "@/lib/modules/types";
 
 /**
  * Reactive + persisted install state for modules.
@@ -113,4 +113,17 @@ export function useAvailableModules(): AvailableModuleView[] {
     installed: s[m.id] !== undefined,
     enabled: s[m.id] === true,
   }));
+}
+
+/** Reactive list of nav items for every *enabled* module (surfaced in the app). */
+export function useEnabledModuleNav(): ModuleNavItem[] {
+  return useAvailableModules()
+    .filter((m) => m.enabled)
+    .flatMap((m) => m.nav ?? []);
+}
+
+/** Reactive flag: is the given module currently installed AND enabled? */
+export function useIsModuleEnabled(id: string): boolean {
+  const s = useModuleInstallState();
+  return s[id] === true;
 }

@@ -9,6 +9,7 @@ import { AiSidebarContext } from "@/contexts/ai-sidebar-context";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ShortcutsRegistrar } from "@/hooks/use-shortcuts";
+import { getModuleRoutes } from "@/lib/modules/registry";
 
 // Maps URL segment → ApiSidebar `activePage` value.
 // Centralised here so adding a new page only requires updating one mapping.
@@ -31,7 +32,13 @@ const ACTIVE_PAGE_MAP: Record<string, string> = {
 
 function getActivePage(pathname: string): string {
   const segment = pathname.split("/")[1] ?? "";
-  return ACTIVE_PAGE_MAP[segment] ?? "api-endpoints";
+  if (ACTIVE_PAGE_MAP[segment]) return ACTIVE_PAGE_MAP[segment];
+  // Module page routes: the first path segment is the nav key the sidebar
+  // uses, so highlight the module entry when its route is active.
+  const modulePage = getModuleRoutes().find(
+    (r) => r.type === "page" && r.path.startsWith(`/${segment}/`),
+  );
+  return modulePage ? segment : "api-endpoints";
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
