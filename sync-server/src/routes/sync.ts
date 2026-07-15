@@ -18,6 +18,7 @@ const PushSchema = z.object({
       updatedAt: z.number(),
       updatedBy: z.string(),
       baseVersion: z.number().optional(),
+      deleted: z.boolean().optional(),
     }),
   ),
 });
