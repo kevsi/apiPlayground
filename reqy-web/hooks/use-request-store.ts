@@ -1,5 +1,7 @@
 "use client";
 
+import { workspaceFetch } from "@/lib/workspace-api";
+
 // Re-export all types for backward compatibility
 export type {
   HttpMethod,
@@ -380,7 +382,7 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
   /** Fetch workspaces from the sync server API and merge with local metadata */
   const fetchWorkspacesFromApi = async () => {
     try {
-      const res = await fetch("/api/workspaces");
+      const res = await workspaceFetch("/api/workspaces");
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = (await res.json()) as {
         workspaces: Array<{

@@ -1,5 +1,6 @@
 "use client";
 
+import { workspaceFetch } from "@/lib/workspace-api";
 import { useState, useCallback, useEffect } from "react";
 import {
   Plus,
@@ -93,7 +94,7 @@ export function WorkspaceSelector() {
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
     try {
-      const res = await fetch("/api/workspaces", {
+      const res = await workspaceFetch("/api/workspaces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName.trim() }),
@@ -130,7 +131,7 @@ export function WorkspaceSelector() {
     // If this is a server workspace with ownerId, try the API first
     if (renamingWorkspace.ownerId) {
       try {
-        const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}`, {
+        const res = await workspaceFetch(`/api/workspaces/${encodeURIComponent(id)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name }),
@@ -161,7 +162,7 @@ export function WorkspaceSelector() {
       if (w.ownerId) {
         // Server workspace — try API first
         try {
-          const res = await fetch(`/api/workspaces/${encodeURIComponent(w.id)}`, {
+          const res = await workspaceFetch(`/api/workspaces/${encodeURIComponent(w.id)}`, {
             method: "DELETE",
           });
           if (res.ok) {

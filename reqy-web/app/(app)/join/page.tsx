@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { workspaceFetch } from "@/lib/workspace-api";
 
 function JoinWorkspaceInner() {
   const router = useRouter();
@@ -23,11 +24,15 @@ function JoinWorkspaceInner() {
     setStatus("loading");
     setMessage("");
     try {
-      const res = await fetch("/api/workspaces/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
+      const res = await workspaceFetch(
+        "/api/workspaces/invitations/accept",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        },
+        "/api/workspaces/join",
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setStatus("error");

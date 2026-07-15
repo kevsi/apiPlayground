@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useRequestStore, type Workspace } from "@/hooks/use-request-store";
+import { workspaceFetch } from "@/lib/workspace-api";
 
 interface MemberData {
   id: string;
@@ -75,7 +76,7 @@ export default function WorkspacesPage() {
     if (!workspaceName.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch("/api/workspaces", {
+      const res = await workspaceFetch("/api/workspaces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: workspaceName.trim() }),
@@ -97,7 +98,7 @@ export default function WorkspacesPage() {
     if (!selected) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/workspaces/${encodeURIComponent(selected.id)}`, {
+      const res = await workspaceFetch(`/api/workspaces/${encodeURIComponent(selected.id)}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("delete failed");
@@ -116,7 +117,7 @@ export default function WorkspacesPage() {
     setSelected(ws);
     setMembersOpen(true);
     try {
-      const res = await fetch(`/api/workspaces/${encodeURIComponent(ws.id)}/members`);
+      const res = await workspaceFetch(`/api/workspaces/${encodeURIComponent(ws.id)}/members`);
       if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
       setMembers(data.members ?? []);
@@ -136,11 +137,14 @@ export default function WorkspacesPage() {
     if (!selected) return;
     setInviting(true);
     try {
-      const res = await fetch(`/api/workspaces/${encodeURIComponent(selected.id)}/invitations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
+      const res = await workspaceFetch(
+        `/api/workspaces/${encodeURIComponent(selected.id)}/invitations`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
       if (!res.ok) throw new Error("invite failed");
       const data = await res.json();
       setInvitation(data);
