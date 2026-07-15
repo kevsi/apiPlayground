@@ -12,6 +12,21 @@ if (!AUTH_SIGNING_SECRET || AUTH_SIGNING_SECRET.length < 32) {
   }
 }
 
+// Allow the configured sync backend as a `connect-src` target. In dev this is
+// the local http/ws server (e.g. http://localhost:4000, used for auth + live
+// sync); in prod it is https/wss which is already covered, but listing the
+// explicit origin keeps the policy correct if NEXT_PUBLIC_SYNC_URL is
+// overridden to a non-https host.
+const SYNC_URL = (process.env.NEXT_PUBLIC_SYNC_URL || "http://localhost:4000").replace(/\/$/, "")
+let syncConnectTargets = "http://localhost:4000 ws://localhost:4000"
+try {
+  const syncOrigin = new URL(SYNC_URL).origin
+  const wsScheme = syncOrigin.startsWith("https") ? "wss:" : "ws:"
+  syncConnectTargets = `${syncOrigin} ${syncOrigin.replace(/^https?:/, wsScheme)}`
+} catch {
+  // keep the dev fallback above if the URL is malformed
+}
+
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -30,7 +45,10 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https: wss:",
+      // `ipc:`, `http://ipc.localhost` and `tauri:` let Tauri's IPC work without
+      // falling back to the postMessage interface (the webview CSP is enforced
+      // alongside tauri.conf.json's, so it must allow the same IPC origins).
+      `connect-src 'self' https: wss: ipc: http://ipc.localhost tauri: https://tauri.localhost ${syncConnectTargets}`,
       "font-src 'self' data:",
       "frame-ancestors 'none'",
       "object-src 'none'",

@@ -1,3 +1,6 @@
+// Load environment variables from sync-server/.env (dev) before any module
+// reads process.env (db path, AUTH_SIGNING_SECRET, CORS origins, ...).
+import "dotenv/config";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
