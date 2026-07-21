@@ -1,39 +1,86 @@
-"use client"
+"use client";
 
-import { useState, useCallback, useRef, useEffect } from "react"
-import { init, add, commit, log, statusMatrix, readCommit, readBlob, resolveRef, getConfig, setConfig } from "isomorphic-git"
-import { getGitFs, getGitDir, syncCollectionsToFs } from "@/lib/git-fs"
-import type { Collection } from "@/hooks/use-request-store"
+import { useState, useCallback, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { isTauriAvailable } from "@/lib/tauri";
+import type { Collection } from "@/hooks/use-request-store";
+
+// ── Types (same shape as before, enriched) ──────────────────────────────
 
 export interface GitCommit {
-  oid: string
-  message: string
-  author: { name: string; email: string; timestamp: number }
-  committer: { name: string; email: string; timestamp: number }
+  oid: string;
+  message: string;
+  author: { name: string; email: string; timestamp: number };
+  committer: { name: string; email: string; timestamp: number };
+  timestamp: number;
 }
 
 export interface FileStatus {
-  filepath: string
-  head: 0 | 1
-  workdir: 0 | 1 | 2
-  stage: 0 | 1 | 2 | 3
+  filepath: string;
+  head: 0 | 1;
+  workdir: 0 | 1 | 2;
+  staged: 0 | 1 | 2 | 3;
 }
 
-export interface DiffEntry {
-  filepath: string
-  lines: Array<{ type: "add" | "remove" | "context"; text: string }>
+export interface DiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: Array<{
+    origin: string;
+    content: string;
+    oldLineno: number | null;
+    newLineno: number | null;
+  }>;
+}
+
+export interface DiffFile {
+  filepath: string;
+  hunks: DiffHunk[];
+}
+
+export interface BranchInfo {
+  name: string;
+  isCurrent: boolean;
+  oid: string;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+}
+
+export interface RemoteInfo {
+  name: string;
+  url: string;
 }
 
 export interface GitState {
-  isInitialized: boolean
-  currentBranch: string
-  commits: GitCommit[]
-  status: FileStatus[]
-  error: string | null
+  isInitialized: boolean;
+  currentBranch: string;
+  commits: GitCommit[];
+  status: FileStatus[];
+  branches: BranchInfo[];
+  remotes: RemoteInfo[];
+  error: string | null;
+  repoPath: string | null;
 }
 
-const DEFAULT_AUTHOR_NAME = "Reqly User"
-const DEFAULT_AUTHOR_EMAIL = "user@reqly.local"
+const DEFAULT_REPO_PATH = "reqly-repo";
+
+function getRepoDir(): string {
+  // En environnement Tauri, utiliser appDataDir
+  if (isTauriAvailable()) {
+    return DEFAULT_REPO_PATH; // Le Rust utilisera app_data_dir
+  }
+  throw new Error("Git is only available in Tauri desktop mode");
+}
+
+async function saveCollectionsToFs(collections: Collection[]): Promise<void> {
+  await invoke("git_sync_collections", {
+    collectionsJson: JSON.stringify(collections),
+    repoDir: getRepoDir(),
+  });
+}
 
 export function useGit(collections: Collection[]) {
   const [state, setState] = useState<GitState>({
@@ -41,312 +88,288 @@ export function useGit(collections: Collection[]) {
     currentBranch: "main",
     commits: [],
     status: [],
+    branches: [],
+    remotes: [],
     error: null,
-  })
-  const loadingRef = useRef(false)
-  const collectionsRef = useRef(collections)
-
-  useEffect(() => {
-    collectionsRef.current = collections
-  }, [collections])
+    repoPath: null,
+  });
 
   const updateState = useCallback((partial: Partial<GitState>) => {
-    setState((prev) => ({ ...prev, ...partial }))
-  }, [])
+    setState((prev) => ({ ...prev, ...partial }));
+  }, []);
 
   const checkInitialized = useCallback(async (): Promise<boolean> => {
     try {
-      const fs = getGitFs()
-      const dir = getGitDir()
-      await fs.readdir(`${dir}/.git`)
-      return true
+      const branches = await invoke<BranchInfo[]>("git_branch_list");
+      return branches.length > 0;
     } catch {
-      return false
+      return false;
     }
-  }, [])
+  }, []);
 
-  const refreshLog = useCallback(async () => {
-    const dir = getGitDir()
-    const fs = getGitFs()
+  const refreshAll = useCallback(async () => {
     try {
-      const commits = await log({ fs, dir, depth: 50 })
-      updateState({
-        commits: commits.map((c) => ({
-          oid: c.oid,
-          message: c.commit.message,
-          author: c.commit.author,
-          committer: c.commit.committer,
-        })),
-      })
-    } catch {
-      updateState({ commits: [] })
-    }
-  }, [updateState])
-
-  const refreshStatus = useCallback(async () => {
-    const dir = getGitDir()
-    const fs = getGitFs()
-    try {
-      const matrix = await statusMatrix({ fs, dir })
-      updateState({
-        status: matrix.map((row) => ({
-          filepath: row[0] as string,
-          head: row[1] as 0 | 1,
-          workdir: row[2] as 0 | 1 | 2,
-          stage: row[3] as 0 | 1 | 2 | 3,
-        })),
-      })
-    } catch {
-      updateState({ status: [] })
-    }
-  }, [updateState])
-
-  const refreshBranch = useCallback(async () => {
-    const dir = getGitDir()
-    const fs = getGitFs()
-    try {
-      const branch = await resolveRef({ fs, dir, ref: "HEAD", depth: 1 })
-      // HEAD may be detached; in that case keep 'main' as fallback
-      const configBranch = await getConfig({ fs, dir, path: "init.defaultBranch" })
-      updateState({ currentBranch: (configBranch as string | undefined) || "main" })
-    } catch {
-      updateState({ currentBranch: "main" })
-    }
-  }, [updateState])
-
-  const initRepo = useCallback(async () => {
-    if (loadingRef.current) return
-    loadingRef.current = true
-    updateState({ error: null })
-    try {
-      const fs = getGitFs()
-      const dir = getGitDir()
-      await init({ fs, dir, defaultBranch: "main" })
-      await setConfig({ fs, dir, path: "user.name", value: DEFAULT_AUTHOR_NAME })
-      await setConfig({ fs, dir, path: "user.email", value: DEFAULT_AUTHOR_EMAIL })
-      updateState({ isInitialized: true })
-      await refreshLog()
-      await refreshStatus()
-      await refreshBranch()
+      const [commits, status, branches, remotes] = await Promise.all([
+        invoke<GitCommit[]>("git_log", { maxCount: 50 }).catch(() => []),
+        invoke<FileStatus[]>("git_status").catch(() => []),
+        invoke<BranchInfo[]>("git_branch_list").catch(() => []),
+        invoke<RemoteInfo[]>("git_remote_list").catch(() => []),
+      ]);
+      const currentBranch = branches.find((b) => b.isCurrent)?.name ?? "main";
+      updateState({ commits, status, branches, remotes, currentBranch });
     } catch (err: unknown) {
-      updateState({ error: err instanceof Error ? err.message : String(err) })
-    } finally {
-      loadingRef.current = false
+      updateState({
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
-  }, [updateState, refreshLog, refreshStatus, refreshBranch])
+  }, [updateState]);
+
+  const initRepo = useCallback(
+    async (repoPath?: string) => {
+      updateState({ error: null });
+      try {
+        const path = repoPath || getRepoDir();
+        await invoke("git_init", { path });
+        updateState({ isInitialized: true, repoPath: path });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const openRepo = useCallback(
+    async (repoPath: string) => {
+      updateState({ error: null });
+      try {
+        await invoke("git_open", { path: repoPath });
+        updateState({ isInitialized: true, repoPath });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
 
   const doCommit = useCallback(
-    async (message: string) => {
-      if (loadingRef.current) return
-      loadingRef.current = true
-      updateState({ error: null })
+    async (message: string, authorName?: string, authorEmail?: string) => {
+      updateState({ error: null });
       try {
-        const fs = getGitFs()
-        const dir = getGitDir()
-
-        // Sync current collections to virtual FS
-        await syncCollectionsToFs(collectionsRef.current as any)
-
-        // Stage all changes
-        await add({ fs, dir, filepath: "." })
-
-        // Commit
-        const sha = await commit({
-          fs,
-          dir,
+        await saveCollectionsToFs(collections);
+        await invoke("git_stage_all");
+        const oid = await invoke<string>("git_commit", {
           message,
-          author: {
-            name: DEFAULT_AUTHOR_NAME,
-            email: DEFAULT_AUTHOR_EMAIL,
-          },
-        })
-
-        if (!sha) {
-          throw new Error("Nothing to commit")
-        }
-
-        await refreshLog()
-        await refreshStatus()
+          authorName: authorName || null,
+          authorEmail: authorEmail || null,
+        });
+        await refreshAll();
+        return oid;
       } catch (err: unknown) {
-        updateState({ error: err instanceof Error ? err.message : String(err) })
-      } finally {
-        loadingRef.current = false
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+        return null;
       }
     },
-    [updateState, refreshLog, refreshStatus]
-  )
+    [updateState, refreshAll, collections],
+  );
 
-  const diffCommits = useCallback(
-    async (oidA: string, oidB: string): Promise<DiffEntry[]> => {
-      const fs = getGitFs()
-      const dir = getGitDir()
+  // ── Stage operations ──────────────────────────────────────────
 
-      const readTree = async (oid: string): Promise<Record<string, Uint8Array>> => {
-        const commitObj = await readCommit({ fs, dir, oid })
-        const tree = commitObj.commit.tree
-        const { readTree: gitReadTree } = await import("isomorphic-git")
-        const treeObj = await gitReadTree({ fs, dir, oid: tree })
-        const files: Record<string, Uint8Array> = {}
-        for (const entry of treeObj.tree) {
-          if (entry.type === "blob") {
-            const blob = await readBlob({ fs, dir, oid: entry.oid })
-            files[entry.path] = blob.blob as Uint8Array
-          }
-        }
-        return files
+  const stage = useCallback(
+    async (filepath: string) => {
+      try {
+        await invoke("git_stage", { filepath });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
       }
-
-      const [filesA, filesB] = await Promise.all([readTree(oidA), readTree(oidB)])
-      const allPaths = new Set([...Object.keys(filesA), ...Object.keys(filesB)])
-      const entries: DiffEntry[] = []
-
-      for (const path of allPaths) {
-        const aText = filesA[path] ? new TextDecoder().decode(filesA[path]) : ""
-        const bText = filesB[path] ? new TextDecoder().decode(filesB[path]) : ""
-        if (aText === bText) continue
-
-        const aLines = aText.split("\n")
-        const bLines = bText.split("\n")
-        const lines: DiffEntry["lines"] = []
-
-        // Simple LCS-based diff
-        const lcs = computeLcs(aLines, bLines)
-        let i = 0
-        let j = 0
-        for (const [ai, bj] of lcs) {
-          while (i < ai) {
-            lines.push({ type: "remove", text: aLines[i] })
-            i++
-          }
-          while (j < bj) {
-            lines.push({ type: "add", text: bLines[j] })
-            j++
-          }
-          if (ai < aLines.length && bj < bLines.length) {
-            lines.push({ type: "context", text: aLines[ai] })
-          }
-          i = ai + 1
-          j = bj + 1
-        }
-        while (i < aLines.length) {
-          lines.push({ type: "remove", text: aLines[i] })
-          i++
-        }
-        while (j < bLines.length) {
-          lines.push({ type: "add", text: bLines[j] })
-          j++
-        }
-
-        entries.push({ filepath: path, lines })
-      }
-
-      return entries
     },
-    []
-  )
+    [updateState, refreshAll],
+  );
 
-  // Auto-detect initialized repo on mount
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const initialized = await checkInitialized()
-      if (!cancelled) {
-        updateState({ isInitialized: initialized })
-        if (initialized) {
-          await refreshLog()
-          await refreshStatus()
-          await refreshBranch()
-        }
-      }
-    })()
-    return () => {
-      cancelled = true
+  const stageAll = useCallback(async () => {
+    try {
+      await invoke("git_stage_all");
+      await refreshAll();
+    } catch (err: unknown) {
+      updateState({ error: err instanceof Error ? err.message : String(err) });
     }
-  }, [checkInitialized, refreshLog, refreshStatus, refreshBranch, updateState])
+  }, [updateState, refreshAll]);
+
+  const unstage = useCallback(
+    async (filepath: string) => {
+      try {
+        await invoke("git_unstage", { filepath });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  // ── Branch operations ─────────────────────────────────────────
+
+  const branchCreate = useCallback(
+    async (name: string, fromOid?: string) => {
+      try {
+        await invoke("git_branch_create", { name, fromOid: fromOid || null });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const branchDelete = useCallback(
+    async (name: string) => {
+      try {
+        await invoke("git_branch_delete", { name });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const branchSwitch = useCallback(
+    async (name: string) => {
+      try {
+        await invoke("git_branch_switch", { name });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  // ── Remote operations ─────────────────────────────────────────
+
+  const remoteAdd = useCallback(
+    async (name: string, url: string) => {
+      try {
+        await invoke("git_remote_add", { name, url });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const remoteRemove = useCallback(
+    async (name: string) => {
+      try {
+        await invoke("git_remote_remove", { name });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const push = useCallback(
+    async (remote: string, branch: string) => {
+      try {
+        await invoke("git_push", { remote, branch });
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState],
+  );
+
+  const fetch = useCallback(
+    async (remote: string) => {
+      try {
+        await invoke("git_fetch", { remote });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const pull = useCallback(
+    async (remote: string, branch: string) => {
+      try {
+        await invoke("git_pull", { remote, branchName: branch });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const clone = useCallback(
+    async (url: string, destPath: string) => {
+      updateState({ error: null });
+      try {
+        await invoke("git_clone", { url, destPath });
+        updateState({ isInitialized: true, repoPath: destPath });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
+  );
+
+  const diff = useCallback(async (oidA: string, oidB: string): Promise<DiffFile[]> => {
+    try {
+      return await invoke<DiffFile[]>("git_diff", { oldOid: oidA, newOid: oidB });
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Auto-detect on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const initialized = await checkInitialized();
+        if (!cancelled) {
+          updateState({ isInitialized: initialized });
+          if (initialized) {
+            await refreshAll();
+          }
+        }
+      } catch {
+        // Pas de repo
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkInitialized, refreshAll, updateState]);
 
   return {
     ...state,
     init: initRepo,
+    open: openRepo,
     commit: doCommit,
-    log: refreshLog,
-    refreshStatus,
-    diff: diffCommits,
-  }
-}
-
-function computeLcs(a: string[], b: string[]): Array<[number, number]> {
-  const m = a.length
-  const n = b.length
-  // To keep memory bounded, use a 2-column DP
-  const prev = new Array(n + 1).fill(0)
-  const curr = new Array(n + 1).fill(0)
-  let maxLen = 0
-  let maxI = 0
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (a[i - 1] === b[j - 1]) {
-        curr[j] = prev[j - 1] + 1
-      } else {
-        curr[j] = Math.max(prev[j], curr[j - 1])
-      }
-      if (curr[j] > maxLen) {
-        maxLen = curr[j]
-        maxI = i
-      }
-    }
-    for (let k = 0; k <= n; k++) {
-      prev[k] = curr[k]
-    }
-    curr.fill(0)
-  }
-
-  // If sequences are small enough, reconstruct exact LCS; otherwise greedy fallback
-  if (m * n < 1_000_000) {
-    return reconstructLcs(a, b)
-  }
-
-  // Greedy fallback for large files: return matches starting from maxI
-  const result: Array<[number, number]> = []
-  let i = maxI - maxLen
-  let j = 0
-  while (i < maxI) {
-    const idx = b.indexOf(a[i], j)
-    if (idx !== -1) {
-      result.push([i, idx])
-      j = idx + 1
-    }
-    i++
-  }
-  return result
-}
-
-function reconstructLcs(a: string[], b: string[]): Array<[number, number]> {
-  const m = a.length
-  const n = b.length
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (a[i - 1] === b[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
-      }
-    }
-  }
-  const result: Array<[number, number]> = []
-  let i = m
-  let j = n
-  while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
-      result.unshift([i - 1, j - 1])
-      i--
-      j--
-    } else if (dp[i - 1][j] > dp[i][j - 1]) {
-      i--
-    } else {
-      j--
-    }
-  }
-  return result
+    log: refreshAll,
+    refreshStatus: refreshAll,
+    diff,
+    stage,
+    stageAll,
+    unstage,
+    branchCreate,
+    branchDelete,
+    branchSwitch,
+    remoteAdd,
+    remoteRemove,
+    push,
+    fetch,
+    pull,
+    clone,
+  };
 }
