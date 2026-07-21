@@ -31,6 +31,7 @@ import {
   type DiffFile,
 } from "@/hooks/use-git";
 import { GitStatusRow } from "@/components/git/git-status-row";
+import { GitBranchBar } from "@/components/git/git-branch-bar";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Collection } from "@/hooks/use-request-store";
 
@@ -80,9 +81,19 @@ export function GitPanel({ collections }: GitPanelProps) {
             <h3 className="text-sm font-semibold text-foreground tracking-tight leading-none">
               Git
             </h3>
-            <p className="text-[10px] text-muted-foreground/40 leading-none mt-1">
-              {git.isInitialized ? `Branch: ${git.currentBranch}` : "Repository not initialized"}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              {git.isInitialized ? (
+                <GitBranchBar
+                  branches={git.branches}
+                  currentBranch={git.currentBranch}
+                  onSwitch={git.branchSwitch}
+                  onCreate={git.branchCreate}
+                  onDelete={git.branchDelete}
+                />
+              ) : (
+                <p className="text-[10px] text-muted-foreground/40">Repository not initialized</p>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
