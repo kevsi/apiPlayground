@@ -6,12 +6,10 @@ import {
   GitCommit,
   GitCommitHorizontal,
   Loader2,
-  Plus,
   FileText,
   AlertCircle,
   Diff,
   CheckCircle2,
-  Circle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,8 +28,10 @@ import {
   useGit,
   type GitCommit as GitCommitType,
   type FileStatus,
-  type DiffEntry,
+  type DiffFile,
 } from "@/hooks/use-git";
+import { GitStatusRow } from "@/components/git/git-status-row";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Collection } from "@/hooks/use-request-store";
 
 interface GitPanelProps {
@@ -43,7 +43,7 @@ export function GitPanel({ collections }: GitPanelProps) {
   const [commitMessage, setCommitMessage] = useState("");
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
   const [diffOids, setDiffOids] = useState<[string, string] | null>(null);
-  const [diffResult, setDiffResult] = useState<DiffEntry[] | null>(null);
+  const [diffResult, setDiffResult] = useState<DiffFile[] | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
 
   const handleCommit = async () => {
@@ -173,7 +173,31 @@ export function GitPanel({ collections }: GitPanelProps) {
                     <p className="text-xs text-muted-foreground/60 mt-1">No changes to commit</p>
                   </div>
                 ) : (
-                  statusFiles.map((s) => <StatusRow key={s.filepath} status={s} />)
+                  <>
+                    {statusFiles.length > 0 && (
+                      <div className="flex items-center justify-between px-1 mb-2">
+                        <span className="text-xs text-muted-foreground">
+                          {statusFiles.length} files changed
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs gap-1"
+                          onClick={() => git.stageAll()}
+                        >
+                          Stage all
+                        </Button>
+                      </div>
+                    )}
+                    {statusFiles.map((s) => (
+                      <GitStatusRow
+                        key={s.filepath}
+                        status={s}
+                        onStage={git.stage}
+                        onUnstage={git.unstage}
+                      />
+                    ))}
+                  </>
                 )}
               </div>
             </ScrollArea>
@@ -329,28 +353,6 @@ function CommitRow({ commit, onDiff }: { commit: GitCommitType; onDiff: (oid: st
       >
         <Diff className="size-3" />
       </Button>
-    </div>
-  );
-}
-
-function StatusRow({ status }: { status: FileStatus }) {
-  let label = "modified";
-  let icon = <Circle className="size-3 text-warning" />;
-  if (status.head === 0 && status.workdir === 1) {
-    label = "new";
-    icon = <Plus className="size-3 text-success" />;
-  } else if (status.head === 1 && status.workdir === 0) {
-    label = "deleted";
-    icon = <FileText className="size-3 text-destructive" />;
-  }
-
-  return (
-    <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-accent/50 transition-colors">
-      {icon}
-      <span className="flex-1 min-w-0 text-xs text-foreground truncate">{status.filepath}</span>
-      <Badge variant="outline" className="text-[9px] h-4 px-1.5">
-        {label}
-      </Badge>
     </div>
   );
 }
