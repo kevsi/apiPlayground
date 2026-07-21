@@ -1,8 +1,9 @@
 use std::path::PathBuf;
+use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
 use tauri::State;
-use git2::{Repository, DiffOptions, StatusOptions, StatusEntry, Signature};
+use git2::{Repository, DiffOptions, StatusOptions, Signature};
 
 use crate::error::AppError;
 use crate::git::types::*;
@@ -95,7 +96,8 @@ pub async fn git_log(
         .map_err(|e| AppError::Internal(e.to_string()))?;
     revwalk.push_head()
         .map_err(|_| AppError::InvalidInput("No commits yet".into()))?;
-    revwalk.set_sorting(git2::Sort::TIME)?;
+    revwalk.set_sorting(git2::Sort::TIME)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let count = max_count.unwrap_or(50);
     let mut commits = Vec::new();
@@ -243,7 +245,7 @@ pub async fn git_diff(
         Some(&mut DiffOptions::new()),
     ).map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let mut files: Vec<DiffFile> = Vec::new();
+    let files = RefCell::new(Vec::<DiffFile>::new());
 
     diff.foreach(
         &mut |delta, _| {
@@ -251,14 +253,15 @@ pub async fn git_diff(
                 .or_else(|| delta.old_file().path())
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default();
-            files.push(DiffFile {
+            files.borrow_mut().push(DiffFile {
                 filepath,
                 hunks: Vec::new(),
             });
             true
         },
-        &mut |_delta, hunk| {
-            if let Some(file) = files.last_mut() {
+        None,
+        Some(&mut |_delta, hunk: git2::DiffHunk<'_>| {
+            if let Some(file) = files.borrow_mut().last_mut() {
                 file.hunks.push(DiffHunk {
                     old_start: hunk.old_start(),
                     old_lines: hunk.old_lines(),
@@ -268,9 +271,9 @@ pub async fn git_diff(
                 });
             }
             true
-        },
-        &mut |_delta, _hunk, line| {
-            if let Some(file) = files.last_mut() {
+        }),
+        Some(&mut |_delta, _hunk: Option<git2::DiffHunk<'_>>, line: git2::DiffLine<'_>| {
+            if let Some(file) = files.borrow_mut().last_mut() {
                 if let Some(hunk) = file.hunks.last_mut() {
                     hunk.lines.push(DiffLine {
                         origin: match line.origin() {
@@ -285,10 +288,10 @@ pub async fn git_diff(
                 }
             }
             true
-        },
+        }),
     ).map_err(|e| AppError::Internal(e.to_string()))?;
 
-    Ok(files)
+    Ok(files.into_inner())
 }
 
 #[tauri::command]
@@ -306,7 +309,7 @@ pub async fn git_branch_list(
         let (branch, _kind) = branch_result
             .map_err(|e| AppError::Internal(e.to_string()))?;
         let name = branch.name()
-            .ok_or_else(|| AppError::Internal("Invalid branch name".into()))?
+            .map_err(|e| AppError::Internal(e.to_string()))?
             .unwrap_or("unknown")
             .to_string();
         let oid = branch.get().target()
@@ -401,7 +404,7 @@ pub async fn git_branch_switch(
     let tree = commit.tree()
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    repo.checkout_tree(&tree, None)
+    repo.checkout_tree(tree.as_object(), None)
         .map_err(|e| AppError::Internal(format!("Checkout failed: {e}")))?;
     repo.set_head_bytes(format!("refs/heads/{name}").as_bytes())
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -522,7 +525,7 @@ pub async fn git_pull(
             // Fast-forward possible
             let tree = remote_commit.tree()
                 .map_err(|e| AppError::Internal(e.to_string()))?;
-            repo.checkout_tree(&tree, None)
+            repo.checkout_tree(tree.as_object(), None)
                 .map_err(|e| AppError::Internal(format!("Checkout failed: {e}")))?;
             // Avancer HEAD
             repo.reference("HEAD", remote_oid, true, "pull: fast-forward")
@@ -543,7 +546,7 @@ pub async fn git_clone(
     dest_path: String,
     state: State<'_, GitRepoState>,
 ) -> Result<(), AppError> {
-    let repo = Repository::clone(&url, &dest_path)
+    let _repo = Repository::clone(&url, &dest_path)
         .map_err(|e| AppError::Network(format!("Clone failed: {e}")))?;
     state.set_path(PathBuf::from(&dest_path));
     Ok(())

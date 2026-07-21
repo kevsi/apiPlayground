@@ -12,6 +12,8 @@ mod capture;
 mod open;
 mod fetch;
 mod store;
+pub mod grpc;
+pub mod git;
 
 use crate::capture::{
   clear_captured_sessions, get_captured_session, list_captured_sessions, set_bandwidth_limit,
@@ -75,35 +77,72 @@ pub fn run() {
 
   let http_client = reqwest::Client::builder()
     .timeout(std::time::Duration::from_secs(30))
+    .cookie_store(true)
     .gzip(true)
     .brotli(true)
     .deflate(true)
     .build()
     .expect("failed to create HTTP client");
 
+  let insecure_client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(30))
+    .cookie_store(true)
+    .gzip(true)
+    .brotli(true)
+    .deflate(true)
+    .danger_accept_invalid_certs(true)
+    .build()
+    .expect("failed to create insecure HTTP client");
+
   builder
     .plugin(tauri_plugin_deep_link::init())
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
-    .manage(websocket::manager::ConnectionManager::new())
-    .manage(SharedClient(http_client))
-    .manage::<ManagedCaptureProxyState>(Arc::new(Mutex::new(capture::CaptureProxyState::default())))
-    .manage::<mcp::ManagedMcpState>(Arc::new(Mutex::new(mcp::McpProcessState::default())))
-    .invoke_handler(tauri::generate_handler![
-      fetch_proxy,
-      export_json,
-      open_external,
-      start_capture_proxy,
-      stop_capture_proxy,
-      list_captured_sessions,
-      get_captured_session,
-      clear_captured_sessions,
-      set_bandwidth_limit,
-      websocket::commands::ws_connect,
-      websocket::commands::ws_send,
-      websocket::commands::ws_disconnect,
-      websocket::commands::ws_get_status,
+      .manage(websocket::manager::ConnectionManager::new())
+      .manage(SharedClient { normal: http_client, insecure: insecure_client })
+      .manage::<ManagedCaptureProxyState>(Arc::new(Mutex::new(capture::CaptureProxyState::default())))
+      .manage::<mcp::ManagedMcpState>(Arc::new(Mutex::new(mcp::McpProcessState::default())))
+      .manage::<grpc::GrpcManager>(grpc::GrpcManager::new())
+      .manage::<git::commands::GitRepoState>(git::commands::GitRepoState::new())
+      .invoke_handler(tauri::generate_handler![
+        fetch_proxy,
+        export_json,
+        open_external,
+        start_capture_proxy,
+        stop_capture_proxy,
+        list_captured_sessions,
+        get_captured_session,
+        clear_captured_sessions,
+        set_bandwidth_limit,
+        websocket::commands::ws_connect,
+        websocket::commands::ws_send,
+        websocket::commands::ws_disconnect,
+        websocket::commands::ws_get_status,
+        grpc::grpc_connect,
+        grpc::grpc_disconnect,
+        grpc::grpc_invoke,
+        git::commands::git_init,
+        git::commands::git_open,
+        git::commands::git_status,
+        git::commands::git_log,
+        git::commands::git_commit,
+        git::commands::git_stage,
+        git::commands::git_stage_all,
+        git::commands::git_unstage,
+        git::commands::git_diff,
+        git::commands::git_branch_list,
+        git::commands::git_branch_create,
+        git::commands::git_branch_delete,
+        git::commands::git_branch_switch,
+        git::commands::git_remote_list,
+        git::commands::git_remote_add,
+        git::commands::git_remote_remove,
+        git::commands::git_push,
+        git::commands::git_fetch,
+        git::commands::git_pull,
+        git::commands::git_clone,
+        git::commands::git_sync_collections,
       mcp::start_mcp_server,
       mcp::stop_mcp_server,
       mcp::get_mcp_server_status,
