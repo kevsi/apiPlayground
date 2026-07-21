@@ -32,6 +32,7 @@ import {
 } from "@/hooks/use-git";
 import { GitStatusRow } from "@/components/git/git-status-row";
 import { GitBranchBar } from "@/components/git/git-branch-bar";
+import { GitRemoteBar } from "@/components/git/git-remote-bar";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Collection } from "@/hooks/use-request-store";
 
@@ -120,6 +121,21 @@ export function GitPanel({ collections }: GitPanelProps) {
         <div className="flex items-center gap-2 border-b border-destructive/20 bg-destructive/5 px-4 py-2 text-xs text-destructive">
           <AlertCircle className="size-3.5 shrink-0" />
           <span>{git.error}</span>
+        </div>
+      )}
+
+      {git.isInitialized && (
+        <div className="px-4 py-1 shrink-0">
+          <GitRemoteBar
+            remotes={git.remotes}
+            currentBranch={git.currentBranch}
+            onAdd={git.remoteAdd}
+            onRemove={git.remoteRemove}
+            onPush={git.push}
+            onPull={git.pull}
+            onFetch={git.fetch}
+            onClone={git.clone}
+          />
         </div>
       )}
 
