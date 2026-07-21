@@ -22,7 +22,7 @@ tokio = { version = "1", features = ["time", "rt", "macros", "sync", "net"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-reqwest = { version = "0.11", features = ["rustls-tls", "gzip", "brotli", "deflate"] }
+reqwest = { version = "0.11", features = ["rustls-tls", "gzip", "brotli", "deflate", "cookies"] }
 tauri = { version = "2.11.1", features = [] }
 tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
@@ -39,6 +39,15 @@ tauri-plugin-notification = "2"
 open = "5.3"
 base64 = "0.22"
 tiny_http = "0.12"
+hyper = { version = "1", features = ["http2", "client"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+tonic = "0.11"
+tonic-reflection = "0.11"
+prost = "0.12"
+prost-types = "0.12"
+git2 = { version = "0.19", features = ["vendored-libgit2"] }
 
 [dev-dependencies]
 tauri = { version = "2.11.1", features = ["test"] }
