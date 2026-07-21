@@ -5,8 +5,6 @@ import {
   GitBranch,
   GitCommit,
   GitCommitHorizontal,
-  Loader2,
-  FileText,
   AlertCircle,
   Diff,
   CheckCircle2,
@@ -33,6 +31,7 @@ import {
 import { GitStatusRow } from "@/components/git/git-status-row";
 import { GitBranchBar } from "@/components/git/git-branch-bar";
 import { GitRemoteBar } from "@/components/git/git-remote-bar";
+import { GitDiffViewer } from "@/components/git/git-diff-viewer";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Collection } from "@/hooks/use-request-store";
 
@@ -245,57 +244,13 @@ export function GitPanel({ collections }: GitPanelProps) {
                     {git.commits.map((c, i) =>
                       git.commits.slice(i + 1).map((d) => (
                         <option key={`${d.oid}..${c.oid}`} value={`${d.oid}..${c.oid}`}>
-                          {d.message.slice(0, 30)}... → {c.message.slice(0, 30)}...
+                          {d.message.slice(0, 30)} → {c.message.slice(0, 30)}
                         </option>
                       )),
                     )}
                   </select>
                 </div>
-
-                {diffLoading && (
-                  <div className="flex items-center justify-center py-8 gap-2">
-                    <Loader2 className="size-4 animate-spin text-primary" />
-                    <span className="text-xs text-muted-foreground">Computing diff…</span>
-                  </div>
-                )}
-
-                {!diffLoading && diffResult && diffResult.length === 0 && (
-                  <p className="text-xs text-muted-foreground py-4">No differences found.</p>
-                )}
-
-                {!diffLoading &&
-                  diffResult?.map((entry) => (
-                    <div
-                      key={entry.filepath}
-                      className="rounded-lg border border-border/60 overflow-hidden"
-                    >
-                      <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 border-b border-border/40">
-                        <FileText className="size-3.5 text-muted-foreground" />
-                        {entry.filepath}
-                      </div>
-                      <div className="p-2 space-y-0.5 bg-background">
-                        {entry.lines.slice(0, 200).map((line, idx) => (
-                          <div
-                            key={idx}
-                            className={cn(
-                              "text-[11px] font-mono px-1.5 py-0.5 rounded",
-                              line.type === "add" && "bg-success/10 text-success",
-                              line.type === "remove" && "bg-destructive/10 text-destructive",
-                              line.type === "context" && "text-muted-foreground",
-                            )}
-                          >
-                            {line.type === "add" ? "+ " : line.type === "remove" ? "- " : "  "}
-                            {line.text}
-                          </div>
-                        ))}
-                        {entry.lines.length > 200 && (
-                          <p className="text-[10px] text-muted-foreground px-1.5 py-1">
-                            +{entry.lines.length - 200} more lines…
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <GitDiffViewer files={diffResult ?? []} loading={diffLoading} />
               </div>
             </ScrollArea>
           </TabsContent>
