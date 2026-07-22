@@ -22,6 +22,9 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::fetch::SharedClient;
 
+/// Maximum response body size the capture proxy will forward (50 MB).
+const MAX_RESPONSE_SIZE: usize = 50 * 1024 * 1024;
+
 #[derive(Default)]
 pub struct CaptureProxyState {
   pub shutdown_flag: Option<Arc<AtomicBool>>,
@@ -219,7 +222,16 @@ async fn forward_request_async(
     .iter()
     .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
     .collect();
-  let body_str = response.text().await.map_err(|e| AppError::Network(e.to_string()))?;
+  let response_body = response.bytes().await.map_err(|e| AppError::Network(e.to_string()))?;
+  if response_body.len() > MAX_RESPONSE_SIZE {
+    return Err(AppError::Network(format!(
+      "Response body too large: {} bytes (max: {} bytes)",
+      response_body.len(),
+      MAX_RESPONSE_SIZE
+    )));
+  }
+  let body_str = String::from_utf8(response_body.to_vec())
+    .map_err(|e| AppError::Internal(format!("Response body is not valid UTF-8: {}", e)))?;
 
   Ok((status, resp_headers, body_str))
 }
