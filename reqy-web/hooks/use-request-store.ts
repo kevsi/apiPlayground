@@ -40,6 +40,8 @@ import type {
 import type { CurrentRequest, LastResponse } from "@/lib/ai-engine";
 import type { SavedProject } from "@/lib/types";
 import { create } from "zustand";
+import { toast } from "@/hooks/use-toast";
+import { downloadJson } from "@/lib/utils";
 
 import { runProactiveAnalysis } from "./store-analysis";
 import { withCrossTabSync } from "@/hooks/store/middleware/with-cross-tab-sync";
@@ -230,6 +232,16 @@ type RequestStoreState = RequestStore & {
   initStore: () => Promise<void>;
   fetchWorkspacesFromApi: () => Promise<void>;
   notify?: (message: string) => void;
+  exportActiveRequest: (data: {
+    method: string;
+    url: string;
+    requestHeaders: unknown;
+    body: string;
+    bodyType: string;
+    authType: string;
+    authToken: string;
+    assertions: unknown;
+  }) => Promise<void>;
 } & MutationMethods;
 
 type MergedState = ReturnType<typeof computeMergedState>;
@@ -591,6 +603,31 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     getFoldersForCollection,
     notify: (message: string) =>
       storeApi.addNotification?.({ title: "Notification", body: String(message), type: "info" }),
+    exportActiveRequest: async (requestData) => {
+      const isTauri =
+        !!(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ ||
+        !!(window as unknown as { __TAURI__?: unknown }).__TAURI__;
+
+      const jsonContent = JSON.stringify(requestData, null, 2);
+
+      if (isTauri) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const savedPath = await invoke<string>("export_json", {
+            content: jsonContent,
+            defaultName: "request.json",
+          });
+          toast({ title: `File saved: ${savedPath}` });
+        } catch (error: unknown) {
+          if (error === "cancelled") return;
+          toast({ title: `Export error: ${String(error)}`, variant: "destructive" });
+          downloadJson(requestData, "request.json");
+        }
+      } else {
+        downloadJson(requestData, "request.json");
+        toast({ title: "Download started" });
+      }
+    },
   };
 
   return storeApi;

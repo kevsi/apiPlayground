@@ -14,12 +14,7 @@ import {
 } from "@/lib/variable-mapping";
 import { toast } from "@/hooks/use-toast";
 import { fireSystemNotification, pushInAppNotification } from "@/lib/system-notifications";
-import {
-  downloadJson,
-  interpolate,
-  replaceLocalhostPort,
-  hasUnresolvedPlaceholders,
-} from "@/lib/utils";
+import { interpolate, replaceLocalhostPort, hasUnresolvedPlaceholders } from "@/lib/utils";
 import { isSourcePathSyntaxValid } from "@/lib/variable-path";
 import { invokeTauriFetch, isTauriAvailable } from "@/lib/tauri";
 import { replayPending, type QueuedRequest } from "@/lib/offline/queue";
@@ -871,13 +866,8 @@ export function useRequestTabExecution(state: RequestTabsState) {
   );
 
   const exportActiveRequest = useCallback(async () => {
-    const isTauri =
-      !!(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ ||
-      !!(window as unknown as { __TAURI__?: unknown }).__TAURI__;
-
     if (!activeTab) return;
-
-    const requestData = {
+    await useRequestStore.getState().exportActiveRequest({
       method: activeTab.method,
       url: activeTab.url,
       requestHeaders: activeTab.headers,
@@ -886,26 +876,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
       authType: activeTab.authType,
       authToken: activeTab.authToken,
       assertions: activeTab.assertions,
-    };
-
-    if (isTauri) {
-      const jsonContent = JSON.stringify(requestData, null, 2);
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const savedPath = await invoke<string>("export_json", {
-          content: jsonContent,
-          defaultName: "request.json",
-        });
-        toast({ title: `File saved: ${savedPath}` });
-      } catch (error: unknown) {
-        if (error === "cancelled") return;
-        toast({ title: `Export error: ${String(error)}`, variant: "destructive" });
-        downloadJson(requestData, "request.json");
-      }
-    } else {
-      downloadJson(requestData, "request.json");
-      toast({ title: "Download started" });
-    }
+    });
   }, [activeTab]);
 
   const createNewRequestInCollection = useCallback(
