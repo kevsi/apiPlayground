@@ -304,7 +304,7 @@ export default function RunnerPage() {
     <main className="flex-1 overflow-auto p-6 hide-scrollbar">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Runner</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Runner</h1>
         <p className="text-sm text-muted-foreground">
           Execute an entire collection and verify every assertion in one pass.
         </p>

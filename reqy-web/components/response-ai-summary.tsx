@@ -3,6 +3,7 @@
 import { memo } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Text } from "@/components/ui/text";
 
 interface ResponseAiSummaryProps {
   aiSummary?: string;
@@ -44,9 +45,9 @@ export const ResponseAiSummary = memo(function ResponseAiSummary({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+            <Text variant="label" className="text-muted-foreground/70">
               AI Summary
-            </span>
+            </Text>
             {aiIsLoading && (
               <span className="flex items-center gap-1 text-[10px] text-primary">
                 <span className="size-1.5 rounded-full bg-primary animate-pulse" />

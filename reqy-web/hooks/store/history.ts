@@ -173,6 +173,7 @@ export function createHistoryMutations(commit: CommitFn) {
         durationMs: result.responseTime ?? 0,
         headers: result.responseHeaders ?? {},
         body: result.responseBody ?? "",
+        cookies: result.responseCookies ?? [],
       });
 
       _addHistoryAndNotify({

@@ -4,6 +4,7 @@
 
 import type { HttpMethod } from "@/lib/types";
 import type { AIProvider as AIProviderType } from "@/lib/types";
+import type { TauriCookie } from "@/lib/tauri";
 
 export type { HttpMethod as HTTPMethod };
 
@@ -28,6 +29,7 @@ export type LastResponse = {
   durationMs?: number;
   headers: KeyValue;
   body?: unknown;
+  cookies?: TauriCookie[];
 };
 
 export type AIContext = {

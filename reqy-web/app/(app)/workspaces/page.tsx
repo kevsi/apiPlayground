@@ -167,7 +167,7 @@ export default function WorkspacesPage() {
     <main className="flex-1 overflow-auto p-6">
       <div className="flex flex-col gap-4 border-b border-border bg-background/80 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Workspaces</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Workspaces</h1>
           <p className="text-sm text-muted-foreground">
             Organize your team, share collections, and manage access.
           </p>

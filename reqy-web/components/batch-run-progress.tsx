@@ -257,7 +257,7 @@ export function BatchRunProgress({
                 <span className="text-xs text-primary animate-pulse">Sending...</span>
               )}
               {state.status === "success" && state.timeMs !== undefined && (
-                <span className="text-xs text-success">
+                <span className="text-xs text-success tabular-nums">
                   {state.statusCode} · {formatTime(state.timeMs)}
                 </span>
               )}

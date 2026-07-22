@@ -326,6 +326,7 @@ export function RequestTabsManager() {
       responseStatus: lastResponse.status,
       responseTime: lastResponse.durationMs,
       responseHeaders: lastResponse.headers,
+      responseCookies: lastResponse.cookies,
       responseBody: lastResponse.body as string | undefined,
     });
   }, [lastResponse, activeTab.id, updateTab]);
@@ -497,6 +498,7 @@ export function RequestTabsManager() {
                   responseTimings={activeTab.responseTimings}
                   responseSize={activeTab.responseSize}
                   responseHeaders={activeTab.responseHeaders}
+                  responseCookies={activeTab.responseCookies}
                   testResults={activeTab.testResults}
                   isLoading={isLoading || aiEngine.isLoading}
                   aiIsLoading={aiEngine.isLoading}

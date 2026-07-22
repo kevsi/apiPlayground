@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToolAssociationModal, type Tool } from "./tool-association-modal";
 import { buildMcpClientConfig } from "@/lib/mcp/config";
 import { isTauriAvailable, setBandwidthLimit } from "@/lib/tauri";
+import { persistence } from "@/lib/persistence";
 
 const TOOLS: Tool[] = [
   {
@@ -133,6 +134,22 @@ export function ToolsSection() {
   const [throttleKbps, setThrottleKbps] = useState("50");
   const [throttleStatus, setThrottleStatus] = useState<string | null>(null);
 
+  // SSL verification (desktop only): when off, the Tauri fetch uses the
+  // insecure reqwest client that skips certificate validation.
+  const [sslEnabled, setSslEnabled] = useState(true);
+  useEffect(() => {
+    const v = persistence.getItem<boolean>("reqly_ssl_verification_enabled");
+    if (typeof v === "boolean") setSslEnabled(v);
+  }, []);
+  const setSslVerification = async (value: boolean) => {
+    setSslEnabled(value);
+    try {
+      await persistence.setItem("reqly_ssl_verification_enabled", value);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const applyThrottle = async () => {
     try {
       if (!throttleEnabled) {
@@ -222,6 +239,22 @@ export function ToolsSection() {
             Limitez le débit des réponses capturées pour simuler un réseau contraint (proxy de
             capture, application desktop uniquement).
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Switch
+            id="ssl-toggle"
+            checked={sslEnabled}
+            onCheckedChange={setSslVerification}
+            disabled={!tauriAvailable}
+          />
+          <label htmlFor="ssl-toggle" className="text-sm">
+            Vérification SSL/TLS (désactiver pour les certificats auto-signés)
+          </label>
+          {!tauriAvailable ? (
+            <span className="text-xs text-muted-foreground/70">
+              Disponible uniquement dans l'application desktop.
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Switch

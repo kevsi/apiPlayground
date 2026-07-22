@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Text } from "@/components/ui/text";
 import {
   Globe,
   BookOpen,
@@ -129,9 +130,9 @@ export default function DocumentationPage() {
       <nav className="hidden lg:flex w-56 shrink-0 flex-col border-r border-border bg-muted/30 overflow-y-auto p-4">
         <div className="flex items-center gap-2 mb-4 px-2">
           <BookOpen className="size-4 text-primary" />
-          <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+          <Text variant="label" className="text-foreground/70">
             Contents
-          </span>
+          </Text>
         </div>
         <div className="space-y-0.5">
           {sections.map((s) => (

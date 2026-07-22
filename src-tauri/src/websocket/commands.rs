@@ -135,7 +135,10 @@ where
                         break;
                     }
                     Some(Ok(Message::Ping(_))) | Some(Ok(Message::Pong(_))) => {}
-                    Some(Ok(Message::Binary(_))) => {}
+                    Some(Ok(Message::Binary(data))) => {
+                        let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
+                        handler.emit_message(&conn_id, format!("[binary {} bytes] base64:{}", data.len(), b64));
+                    }
                     Some(Ok(Message::Frame(_))) => {}
                     Some(Err(e)) => {
                         handler.emit_error(&conn_id, e.to_string());

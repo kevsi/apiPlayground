@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Sparkles, Loader2, Send, Bell, ChevronsUpDown, Check, Bot } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { EnvironmentSelector } from "@/components/environment-selector";
 import { MessageActions } from "@/components/message-actions";
@@ -88,6 +89,7 @@ export default function AiInsightsPage() {
   const [conversationHistory, setConversationHistory] = useState<ConversationSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [showClearNotifConfirm, setShowClearNotifConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingMessageRef = useRef<string | null>(null);
@@ -625,13 +627,26 @@ export default function AiInsightsPage() {
               <div className="p-2">
                 <button
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => clearNotifications()}
+                  onClick={() => setShowClearNotifConfirm(true)}
                 >
                   Effacer
                 </button>
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <ConfirmDialog
+            open={showClearNotifConfirm}
+            onOpenChange={setShowClearNotifConfirm}
+            title="Effacer toutes les notifications ?"
+            description="Toutes les notifications seront définitivement supprimées. Cette action est irréversible."
+            confirmLabel="Tout effacer"
+            cancelLabel="Annuler"
+            onConfirm={() => {
+              clearNotifications();
+              setShowClearNotifConfirm(false);
+            }}
+          />
         </div>
       </header>
 

@@ -143,7 +143,7 @@ export default function SdksPage() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <Package className="w-6 h-6 text-warning" />
-          <h1 className="text-2xl font-bold">SDK Generator</h1>
+          <h1 className="text-2xl font-bold tracking-tight">SDK Generator</h1>
           <p className="text-sm text-muted-foreground">
             Generates a native client from your collection via OpenAPI Generator
           </p>

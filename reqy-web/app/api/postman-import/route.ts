@@ -1,20 +1,18 @@
-export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from "next/server"
-import { InMemoryRateLimiter } from "@/lib/rate-limiter"
+export const dynamic = "force-static";
+import { NextRequest, NextResponse } from "next/server";
+import { InMemoryRateLimiter } from "@/lib/rate-limiter";
 import {
   formatZodError,
   postmanImportBodySchema,
   postmanImportResponseSchema,
-} from "@/lib/import-schemas"
-import { postmanFetchJson, PostmanApiError, extractPostmanCollection } from "@/lib/postman"
+} from "@/lib/import-schemas";
+import { postmanFetchJson, PostmanApiError, extractPostmanCollection } from "@/lib/postman";
 
-const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 })
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 
 function getRateLimitKey(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for")
-  return forwarded?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || "127.0.0.1"
+  const forwarded = request.headers.get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1";
 }
 
 /**
@@ -30,40 +28,36 @@ function getRateLimitKey(request: NextRequest): string {
  * the legacy fields and lets the extra ones pass through.
  */
 export async function POST(request: NextRequest) {
-  const rateKey = getRateLimitKey(request)
-  const rateResult = await rateLimiter.check(rateKey)
+  const rateKey = getRateLimitKey(request);
+  const rateResult = await rateLimiter.check(rateKey);
   if (!rateResult.allowed) {
-    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
 
-  let raw: unknown
+  let raw: unknown;
   try {
-    raw = await request.json()
+    raw = await request.json();
   } catch {
-    return NextResponse.json({ message: "Body JSON invalide" }, { status: 400 })
+    return NextResponse.json({ message: "Body JSON invalide" }, { status: 400 });
   }
 
-  const bodyResult = postmanImportBodySchema.safeParse(raw)
+  const bodyResult = postmanImportBodySchema.safeParse(raw);
   if (!bodyResult.success) {
-    return NextResponse.json(
-      { message: formatZodError(bodyResult.error) },
-      { status: 400 },
-    )
+    return NextResponse.json({ message: formatZodError(bodyResult.error) }, { status: 400 });
   }
-  const { collectionId } = bodyResult.data
-  const apiKey = request.cookies.get("postman_api_key")?.value
+  const { collectionId } = bodyResult.data;
+  const apiKey = request.cookies.get("postman_api_key")?.value;
 
   if (!apiKey) {
-    return NextResponse.json(
-      { message: "Non connecté à Postman" },
-      { status: 401 },
-    )
+    return NextResponse.json({ message: "Non connecté à Postman" }, { status: 401 });
   }
 
   try {
-    const data = await postmanFetchJson<{ collection: { info?: { name?: string; description?: string }; item?: unknown[] } }>(apiKey, `/collections/${collectionId}`)
-    const collection = data.collection
-    const { folders, requests } = extractPostmanCollection(collection?.item ?? [])
+    const data = await postmanFetchJson<{
+      collection: { info?: { name?: string; description?: string }; item?: unknown[] };
+    }>(apiKey, `/collections/${collectionId}`);
+    const collection = data.collection;
+    const { folders, requests } = extractPostmanCollection(collection?.item ?? []);
 
     // Map the rich extracted requests down to the legacy `routes` shape while
     // preserving body, auth, headers and query params so the legacy import
@@ -81,7 +75,7 @@ export async function POST(request: NextRequest) {
       authType: r.authType,
       authToken: r.authToken,
       queryParams: r.queryParams,
-    }))
+    }));
 
     const payload = {
       name: collection?.info?.name ?? "Postman Collection",
@@ -96,9 +90,9 @@ export async function POST(request: NextRequest) {
       // additional properties by default.
       folders,
       requests,
-    }
+    };
 
-    const validated = postmanImportResponseSchema.safeParse(payload)
+    const validated = postmanImportResponseSchema.safeParse(payload);
     if (!validated.success) {
       return NextResponse.json(
         {
@@ -106,32 +100,33 @@ export async function POST(request: NextRequest) {
           details: formatZodError(validated.error),
         },
         { status: 502 },
-      )
+      );
     }
 
-    return NextResponse.json(payload)
+    return NextResponse.json(payload);
   } catch (error) {
     if (error instanceof PostmanApiError) {
-      return NextResponse.json({ message: error.message }, { status: error.status === 401 ? 401 : 400 })
+      return NextResponse.json(
+        { message: error.message },
+        { status: error.status === 401 ? 401 : 400 },
+      );
     }
-    console.error("Postman import error:", error)
+    console.error("Postman import error:", error);
     return NextResponse.json(
       {
         message:
-          error instanceof Error
-            ? error.message
-            : "Erreur lors de l'import de la collection",
+          error instanceof Error ? error.message : "Erreur lors de l'import de la collection",
       },
       { status: 500 },
-    )
+    );
   }
 }
 
 function stripDomain(rawUrl: string): string {
-  if (!rawUrl) return "/"
+  if (!rawUrl) return "/";
   try {
-    return new URL(rawUrl).pathname || "/"
+    return new URL(rawUrl).pathname || "/";
   } catch {
-    return rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`
+    return rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
   }
 }

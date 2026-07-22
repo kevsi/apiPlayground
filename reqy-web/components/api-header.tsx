@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Search, Bell, Clock, Command, GitBranch, X, Sparkles } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { Text } from "@/components/ui/text";
 import { EnvironmentSelector } from "@/components/environment-selector";
 import { VariablesPanel } from "@/components/variables-panel";
 import { WorkspaceSelector } from "@/components/workspace-selector";
@@ -61,6 +63,8 @@ export function ApiHeader() {
   );
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [pendingRemoveNotifId, setPendingRemoveNotifId] = useState<string | null>(null);
+  const [showClearNotifConfirm, setShowClearNotifConfirm] = useState(false);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -189,9 +193,7 @@ export function ApiHeader() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[320px] animate-scale-in">
               <DropdownMenuLabel className="flex items-center justify-between px-4 py-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Notifications
-                </span>
+                <Text variant="label">Notifications</Text>
                 {notifications && notifications.length > 0 && (
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                     {notifications.filter((n) => !n.read).length} new
@@ -254,7 +256,7 @@ export function ApiHeader() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeNotification(n.id);
+                              setPendingRemoveNotifId(n.id);
                             }}
                             className="shrink-0 rounded-md p-0.5 text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-foreground transition-all duration-200"
                             title="Supprimer"
@@ -277,7 +279,7 @@ export function ApiHeader() {
               <div className="p-2">
                 <button
                   className="w-full rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground"
-                  onClick={() => clearNotifications()}
+                  onClick={() => setShowClearNotifConfirm(true)}
                 >
                   Clear all notifications
                 </button>
@@ -286,6 +288,33 @@ export function ApiHeader() {
           </DropdownMenu>
         </div>
       </div>
+      <ConfirmDialog
+        open={!!pendingRemoveNotifId}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemoveNotifId(null);
+        }}
+        title="Supprimer cette notification ?"
+        description="Cette notification sera définitivement supprimée."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        onConfirm={() => {
+          if (pendingRemoveNotifId) removeNotification(pendingRemoveNotifId);
+          setPendingRemoveNotifId(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={showClearNotifConfirm}
+        onOpenChange={setShowClearNotifConfirm}
+        title="Effacer toutes les notifications ?"
+        description="Toutes les notifications seront définitivement supprimées. Cette action est irréversible."
+        confirmLabel="Tout effacer"
+        cancelLabel="Annuler"
+        onConfirm={() => {
+          clearNotifications();
+          setShowClearNotifConfirm(false);
+        }}
+      />
     </header>
   );
 }

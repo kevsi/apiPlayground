@@ -28,6 +28,7 @@ const ACTIVE_PAGE_MAP: Record<string, string> = {
   websocket: "websocket",
   git: "git",
   sse: "sse",
+  grpc: "grpc",
 };
 
 function getActivePage(pathname: string): string {

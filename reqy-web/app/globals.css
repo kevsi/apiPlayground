@@ -317,6 +317,9 @@ body[data-scroll-locked] {
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-size-caption: 0.625rem;
+  --font-size-micro: 0.5625rem;
+  --font-size-tab: 0.6875rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

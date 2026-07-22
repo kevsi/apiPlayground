@@ -1,3 +1,15 @@
+/** A single cookie returned from a Set-Cookie response header. */
+export interface TauriCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  secure: boolean;
+  httpOnly: boolean;
+  sameSite: string;
+  expires: string | null;
+}
+
 /** Post-processed response returned to callers. */
 export interface TauriFetchResponse {
   status: number;
@@ -5,6 +17,7 @@ export interface TauriFetchResponse {
   headers: Record<string, string>;
   durationMs: number;
   encoding: string;
+  cookies: TauriCookie[];
 }
 
 /**
@@ -20,6 +33,16 @@ interface RawTauriFetchResponse {
   headers: Array<[string, string]>;
   durationMs: number;
   encoding: string;
+  cookies: Array<{
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    secure: boolean;
+    httpOnly: boolean;
+    sameSite: string;
+    expires: string | null;
+  }>;
 }
 
 declare global {
@@ -41,6 +64,7 @@ export async function invokeTauriFetch(
   url: string,
   headers: Record<string, string>,
   body?: string,
+  acceptInvalidCerts?: boolean,
 ): Promise<TauriFetchResponse> {
   if (!isTauriAvailable()) {
     throw new Error("Tauri is not available in this environment");
@@ -52,6 +76,7 @@ export async function invokeTauriFetch(
     url,
     headers: Object.entries(headers),
     body,
+    acceptInvalidCerts: acceptInvalidCerts === true,
   });
 
   return {
@@ -60,6 +85,16 @@ export async function invokeTauriFetch(
     headers: Object.fromEntries(result.headers ?? []),
     durationMs: result.durationMs,
     encoding: result.encoding ?? "utf8",
+    cookies: (result.cookies ?? []).map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain,
+      path: c.path,
+      secure: c.secure,
+      httpOnly: c.httpOnly,
+      sameSite: c.sameSite,
+      expires: c.expires ?? null,
+    })),
   };
 }
 

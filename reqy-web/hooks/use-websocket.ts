@@ -85,8 +85,6 @@ function useBrowserFallback(connectionId: string | null) {
           store.setStatus(id, "disconnected");
         }
         store.setDisconnectedAt(id);
-        // Clear messages for this connection to avoid stale state on reconnect
-        store.clearMessages(id);
         if (wsRef.current === socket) wsRef.current = null;
       };
 
@@ -111,6 +109,12 @@ function useBrowserFallback(connectionId: string | null) {
             byteSize: new Blob([message]).size,
           });
         }
+      } else {
+        console.warn(
+          "[useWebSocket:browser] send called but WebSocket is not OPEN (state:",
+          wsRef.current?.readyState,
+          "). Message dropped.",
+        );
       }
     },
     [connectionId, store],

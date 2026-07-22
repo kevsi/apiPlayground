@@ -258,7 +258,7 @@ export default function CapturePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Capture de trafic</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Capture de trafic</h1>
         <p className="text-muted-foreground">
           Interceptez le trafic HTTP via le proxy de capture Reqly, puis générez une collection de
           requêtes testables à partir des appels capturés.

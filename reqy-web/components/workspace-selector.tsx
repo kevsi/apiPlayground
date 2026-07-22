@@ -2,6 +2,7 @@
 
 import { workspaceFetch } from "@/lib/workspace-api";
 import { useState, useCallback, useEffect } from "react";
+import { Text } from "@/components/ui/text";
 import {
   Plus,
   Check,
@@ -209,7 +210,7 @@ export function WorkspaceSelector() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[240px] animate-scale-in">
           <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Workspaces
+            <Text variant="label">Workspaces</Text>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {workspaces.map((w) => {

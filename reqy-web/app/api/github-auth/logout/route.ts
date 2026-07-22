@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 import { NextRequest, NextResponse } from "next/server";
 import { InMemoryRateLimiter } from "@/lib/rate-limiter";
 

@@ -74,3 +74,43 @@ commands.allow = ["sync_mcp_collections"]
 identifier = "allow-save-file"
 description = "Allows the save_file command"
 commands.allow = ["save_file"]
+
+[[permission]]
+identifier = "allow-list-captured-sessions"
+description = "Allows the list_captured_sessions command"
+commands.allow = ["list_captured_sessions"]
+
+[[permission]]
+identifier = "allow-get-captured-session"
+description = "Allows the get_captured_session command"
+commands.allow = ["get_captured_session"]
+
+[[permission]]
+identifier = "allow-clear-captured-sessions"
+description = "Allows the clear_captured_sessions command"
+commands.allow = ["clear_captured_sessions"]
+
+[[permission]]
+identifier = "allow-set-bandwidth-limit"
+description = "Allows the set_bandwidth_limit command"
+commands.allow = ["set_bandwidth_limit"]
+
+[[permission]]
+identifier = "allow-enqueue-request"
+description = "Allows the enqueue_request command"
+commands.allow = ["enqueue_request"]
+
+[[permission]]
+identifier = "allow-list-pending"
+description = "Allows the list_pending command"
+commands.allow = ["list_pending"]
+
+[[permission]]
+identifier = "allow-dequeue-ready"
+description = "Allows the dequeue_ready command"
+commands.allow = ["dequeue_ready"]
+
+[[permission]]
+identifier = "allow-mark-sent"
+description = "Allows the mark_sent command"
+commands.allow = ["mark_sent"]

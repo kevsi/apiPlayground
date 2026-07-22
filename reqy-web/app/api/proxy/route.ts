@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 import { NextRequest, NextResponse } from "next/server";
 import { validateProxyPayload } from "@/lib/schemas/proxy";
 import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils";
@@ -14,6 +14,59 @@ import { isPrivateHost, isBlockedIp } from "@/lib/security/ssrf";
 import { readWithCap } from "@/lib/security/streaming";
 import { resolveCached } from "@/lib/security/dns-cache";
 import net, { isIP } from "node:net";
+
+/**
+ * Parse a single Set-Cookie header value into structured fields.
+ * Only the attributes we surface in the UI are decoded (domain, path,
+ * secure, httponly, samesite, expires).
+ */
+function parseSetCookie(raw: string): {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  secure: boolean;
+  httpOnly: boolean;
+  sameSite: string;
+  expires: string | null;
+} {
+  const [pair, ...attrs] = raw.split(";");
+  const eq = pair.indexOf("=");
+  const name = eq >= 0 ? pair.slice(0, eq).trim() : pair.trim();
+  const value = eq >= 0 ? pair.slice(eq + 1).trim() : "";
+  let domain = "";
+  let path = "/";
+  let secure = false;
+  let httpOnly = false;
+  let sameSite = "unspecified";
+  let expires: string | null = null;
+  for (const attr of attrs) {
+    const idx = attr.indexOf("=");
+    const key = (idx >= 0 ? attr.slice(0, idx) : attr).trim().toLowerCase();
+    const val = idx >= 0 ? attr.slice(idx + 1).trim() : "";
+    switch (key) {
+      case "domain":
+        domain = val;
+        break;
+      case "path":
+        path = val || "/";
+        break;
+      case "secure":
+        secure = true;
+        break;
+      case "httponly":
+        httpOnly = true;
+        break;
+      case "samesite":
+        sameSite = val.toLowerCase();
+        break;
+      case "expires":
+        expires = val;
+        break;
+    }
+  }
+  return { name, value, domain, path, secure, httpOnly, sameSite, expires };
+}
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -273,6 +326,25 @@ export async function POST(request: NextRequest) {
       redirect: "manual",
     }).finally(() => clearTimeout(timeout));
 
+    // SSRF hardening for redirects: when the server responds with a 3xx,
+    // validate the Location header against the same SSRF checks that were
+    // applied to the original URL. An attacker hosting a public endpoint
+    // that 302 -> http://10.0.0.1/ would otherwise bypass the guard.
+    const location = response.headers.get("location");
+    if (location && response.status >= 300 && response.status < 400) {
+      const locValidation = validateUrl(location);
+      if (!locValidation.valid) {
+        return NextResponse.json(
+          {
+            error: "blocked_redirect",
+            message: `Redirect to blocked destination: ${locValidation.error}`,
+            status: 502,
+          },
+          { status: 502 },
+        );
+      }
+    }
+
     // Real TCP connect time (probe ran concurrently with the fetch above).
     timings.connectMs = await connectProbe;
 
@@ -289,6 +361,11 @@ export async function POST(request: NextRequest) {
     response.headers.forEach((value, key) => {
       responseHeaders[key] = value;
     });
+
+    // Parse Set-Cookie headers into structured cookie objects so the UI can
+    // display them (mirrors what the Tauri desktop client returns).
+    const setCookieHeaders = response.headers.getSetCookie?.() ?? [];
+    const cookies = setCookieHeaders.map((raw) => parseSetCookie(raw));
 
     const contentType = response.headers.get("content-type")?.split(";")[0].toLowerCase() || "";
     const isBinary = /^(image\/|video\/|audio\/|application\/pdf|application\/octet-stream)/.test(
@@ -333,6 +410,7 @@ export async function POST(request: NextRequest) {
       statusText: response.statusText,
       body,
       headers: responseHeaders,
+      cookies,
       encoding,
       durationMs,
       size,

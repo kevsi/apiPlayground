@@ -21,16 +21,33 @@ use crate::error::AppError;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TauriCookie {
+  pub name: String,
+  pub value: String,
+  pub domain: String,
+  pub path: String,
+  pub secure: bool,
+  pub http_only: bool,
+  pub same_site: String,
+  pub expires: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TauriFetchResponse {
   pub status: u16,
   pub body: String,
   pub headers: Vec<(String, String)>,
   pub duration_ms: u64,
   pub encoding: String,
+  pub cookies: Vec<TauriCookie>,
 }
 
 #[derive(Clone)]
-pub struct SharedClient(pub reqwest::Client);
+pub struct SharedClient {
+  pub normal: reqwest::Client,
+  pub insecure: reqwest::Client,
+}
 
 /// Decode common HTML entities in response bodies.
 ///
@@ -74,6 +91,7 @@ pub async fn fetch_proxy(
   url: String,
   headers: Vec<(String, String)>,
   body: Option<String>,
+  accept_invalid_certs: Option<bool>,
   client: tauri::State<'_, SharedClient>,
 ) -> Result<TauriFetchResponse, AppError> {
   // Parse and validate URL
@@ -85,8 +103,12 @@ pub async fn fetch_proxy(
     return Err(AppError::InvalidInput("Invalid URL: missing host".into()));
   }
   let start = Instant::now();
-  let mut request = client
-    .0
+  let http_client = if accept_invalid_certs.unwrap_or(false) {
+    &client.insecure
+  } else {
+    &client.normal
+  };
+  let mut request = http_client
     .request(method.parse::<reqwest::Method>().map_err(|e| AppError::InvalidInput(e.to_string()))?, &url);
 
   // Add headers
@@ -115,6 +137,26 @@ pub async fn fetch_proxy(
     .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
     .collect();
 
+  // Capture cookies from the Set-Cookie response headers before the body
+  // is consumed (response.text()/bytes() moves the response).
+  let cookies: Vec<TauriCookie> = response
+    .cookies()
+    .map(|c| {
+      let expires = c
+        .expires()
+        .map(|e| format!("{:?}", e));
+      TauriCookie {
+        name: c.name().to_string(),
+        value: c.value().to_string(),
+        domain: c.domain().unwrap_or_default().to_string(),
+        path: c.path().unwrap_or_default().to_string(),
+        secure: c.secure(),
+        http_only: c.http_only(),
+        same_site: "unknown".to_string(),
+        expires,
+      }
+    })
+    .collect();
   // Detect binary content types to encode as base64
   let content_type = header_pairs
     .iter()
@@ -138,6 +180,7 @@ pub async fn fetch_proxy(
     headers: header_pairs,
     duration_ms,
     encoding,
+    cookies,
   })
 }
 

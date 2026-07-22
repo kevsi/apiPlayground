@@ -453,7 +453,7 @@ pub fn start_capture_proxy(
   // Captures accumulate across sessions; use `clear_captured_sessions` to reset.
   ensure_loaded(&state);
 
-  start_proxy_server(app_handle, port, &state, client.0.clone())
+  start_proxy_server(app_handle, port, &state, client.normal.clone())
 }
 
 #[tauri::command]

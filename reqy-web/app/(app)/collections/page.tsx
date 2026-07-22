@@ -343,9 +343,7 @@ export default function CollectionsPage() {
       try {
         const handle = await (
           window as unknown as {
-            showSaveFilePicker: (
-              opts: unknown,
-            ) => Promise<{
+            showSaveFilePicker: (opts: unknown) => Promise<{
               createWritable: () => Promise<{
                 write: (c: string) => Promise<void>;
                 close: () => Promise<void>;
@@ -387,7 +385,7 @@ export default function CollectionsPage() {
     <main className="flex-1 overflow-auto">
       <div className="flex flex-col gap-4 border-b border-border bg-background/80 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Collections</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Collections</h1>
           <p className="text-sm text-muted-foreground">
             Gérez vos groupes de requêtes et exportez-les en OpenAPI.
           </p>

@@ -4,7 +4,8 @@ import type { Assertion, AssertionResult, RequestResponse } from "@/lib/test-run
 import { evaluateAssertions } from "@/lib/test-runner/assertions";
 import { interpolate, replaceLocalhostPort, parseJsonSafe } from "@/lib/utils";
 import { proxyAuthHeaders } from "@/lib/proxy-auth";
-import { invokeTauriFetch } from "@/lib/tauri";
+import { invokeTauriFetch, type TauriCookie } from "@/lib/tauri";
+import { persistence } from "@/lib/persistence";
 import { classifyError, enqueueOnNetworkFailure } from "@/lib/offline/queue";
 import type { ResponseTimings } from "@/components/response-timeline";
 export type BodyType = "json" | "form-data" | "x-www-form" | "raw" | "binary";
@@ -43,6 +44,7 @@ export interface RequestTab {
   responseBody?: string;
   responseData?: string | Blob;
   responseHeaders?: Record<string, string>;
+  responseCookies?: TauriCookie[];
   responseTimings?: ResponseTimings;
   assertions?: RequestTestAssertion[];
   runnerAssertions?: Assertion[];
@@ -284,6 +286,12 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
   let responseSize = "0 B";
   let responseTime: number | undefined;
   let proxyTimings: { dnsMs?: number; connectMs?: number; ttfbMs?: number } | undefined;
+  let responseCookies: TauriCookie[] = [];
+
+  // SSL verification toggle (desktop only): when disabled, the Tauri fetch
+  // uses the insecure reqwest client that skips certificate validation.
+  const sslEnabled = persistence.getItem<boolean>("reqly_ssl_verification_enabled");
+  const acceptInvalidCerts = sslEnabled === false;
 
   // Create an AbortController with a 30-second timeout to prevent hung requests
   const controller = new AbortController();
@@ -298,12 +306,14 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
           finalUrl,
           headers,
           tab.method !== "GET" && tab.method !== "HEAD" ? finalBody : undefined,
+          acceptInvalidCerts,
         ),
         controller.signal,
       );
       responseStatus = result.status;
       responseHeaders = result.headers;
       responseTime = result.durationMs;
+      responseCookies = result.cookies ?? [];
 
       if (result.encoding === "base64") {
         const contentType =
@@ -347,6 +357,7 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
       proxyTimings = proxyResult.timings;
       responseStatus = proxyResult.status ?? proxyResponse.status ?? 0;
       responseHeaders = proxyResult.headers || {};
+      responseCookies = proxyResult.cookies ?? [];
 
       const proxyError =
         proxyResult.error ||
@@ -439,6 +450,7 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
   return {
     responseStatus,
     responseHeaders,
+    responseCookies,
     responseBody,
     responseData,
     responseSize,

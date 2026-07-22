@@ -137,7 +137,7 @@ export function RequestPanel({
   const buildRequestHeaders = () => {
     const requestHeaders: Array<[string, string]> = [...buildAuthHeaders()];
     headers.forEach((header) => {
-      if (header.key.trim() && header.value.trim()) {
+      if (header.enabled !== false && header.key.trim() && header.value.trim()) {
         requestHeaders.push([header.key.trim(), header.value.trim()]);
       }
     });
@@ -427,7 +427,14 @@ ${bodyPart}})
             <AccordionContent>
               <TestAssertionPanel
                 assertions={assertions ?? []}
-                onChange={onAssertionsChange ?? (() => {})}
+                onChange={
+                  onAssertionsChange ??
+                  ((_assertions: RequestTestAssertion[]) => {
+                    console.warn(
+                      "[RequestPanel] onAssertionsChange not provided — assertion changes ignored",
+                    );
+                  })
+                }
                 onRunTests={onRunTests}
               />
             </AccordionContent>

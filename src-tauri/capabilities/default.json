@@ -30,6 +30,14 @@
     "allow-get-mcp-server-status",
     "allow-read-mcp-bundle",
     "allow-sync-mcp-collections",
-    "allow-save-file"
+    "allow-save-file",
+    "allow-list-captured-sessions",
+    "allow-get-captured-session",
+    "allow-clear-captured-sessions",
+    "allow-set-bandwidth-limit",
+    "allow-enqueue-request",
+    "allow-list-pending",
+    "allow-dequeue-ready",
+    "allow-mark-sent"
   ]
 }

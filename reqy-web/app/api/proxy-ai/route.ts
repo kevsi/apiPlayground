@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimiter, getRateLimitKey } from "./lib/rate-limit";
 import { structuredError } from "./lib/errors";

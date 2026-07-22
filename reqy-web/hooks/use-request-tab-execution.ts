@@ -115,6 +115,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
         durationMs: activeTab.responseTime ?? 0,
         headers: activeTab.responseHeaders ?? {},
         body: activeTab.responseBody,
+        cookies: activeTab.responseCookies ?? [],
       });
     }
   }, [activeTab, setCurrentRequest, setLastResponse]);
@@ -415,6 +416,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
           durationMs: result.responseTime ?? 0,
           headers: result.responseHeaders ?? {},
           body: result.responseBody,
+          cookies: result.responseCookies ?? [],
         });
 
         addHistoryAndNotify({

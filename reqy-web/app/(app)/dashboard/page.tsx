@@ -267,7 +267,7 @@ export default function DashboardPage() {
       <main className="flex-1 overflow-auto p-6 hide-scrollbar">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
             {isEmpty
               ? "Start sending requests to see your metrics"

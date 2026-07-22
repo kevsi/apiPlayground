@@ -2,6 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Text } from "@/components/ui/text";
 import type { AuthType } from "@/lib/request-executor";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,11 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
+import { AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 interface AuthSectionProps {
   authType: AuthType;
@@ -47,9 +44,9 @@ export function AuthSection({ authType, authToken, onAuthChange }: AuthSectionPr
       <AccordionContent>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Authentication Type
-            </label>
+            <Text variant="label" asChild>
+              <label>Authentication Type</label>
+            </Text>
             <Select
               value={authType}
               onValueChange={(value) => onAuthChange(value as AuthType, authToken)}
@@ -69,15 +66,17 @@ export function AuthSection({ authType, authToken, onAuthChange }: AuthSectionPr
 
           {authType !== "none" && (
             <div className="space-y-2 animate-slide-up">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {authType === "bearer"
-                  ? "Bearer Token"
-                  : authType === "basic"
-                    ? "Credentials (Base64)"
-                    : authType === "api-key"
-                      ? "API Key"
-                      : "OAuth2 Token"}
-              </label>
+              <Text variant="label" asChild>
+                <label>
+                  {authType === "bearer"
+                    ? "Bearer Token"
+                    : authType === "basic"
+                      ? "Credentials (Base64)"
+                      : authType === "api-key"
+                        ? "API Key"
+                        : "OAuth2 Token"}
+                </label>
+              </Text>
               <div className="relative">
                 <Input
                   type={authType === "basic" ? "text" : "password"}

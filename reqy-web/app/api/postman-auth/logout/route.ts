@@ -1,24 +1,22 @@
-export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from "next/server"
-import { InMemoryRateLimiter } from "@/lib/rate-limiter"
+export const dynamic = "force-static";
+import { NextRequest, NextResponse } from "next/server";
+import { InMemoryRateLimiter } from "@/lib/rate-limiter";
 
-const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 })
+const rateLimiter = new InMemoryRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 
 function getRateLimitKey(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for")
-  return forwarded?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || "127.0.0.1"
+  const forwarded = request.headers.get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1";
 }
 
 export async function POST(request: NextRequest) {
-  const rateKey = getRateLimitKey(request)
-  const rateResult = await rateLimiter.check(rateKey)
+  const rateKey = getRateLimitKey(request);
+  const rateResult = await rateLimiter.check(rateKey);
   if (!rateResult.allowed) {
-    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
 
-  const resp = NextResponse.json({ message: "Déconnexion Postman réussie" })
-  resp.cookies.delete("postman_api_key")
-  return resp
+  const resp = NextResponse.json({ message: "Déconnexion Postman réussie" });
+  resp.cookies.delete("postman_api_key");
+  return resp;
 }

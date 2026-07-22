@@ -1,11 +1,22 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Clock, Trash2, Search, RotateCcw, CheckCircle2, XCircle, AlertCircle, Sparkles, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState } from "react";
+import {
+  Clock,
+  Trash2,
+  Search,
+  RotateCcw,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -13,32 +24,32 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { methodSubtle, methodBadge, methodBg } from "@/lib/http-method-colors"
-import { getStatusBadgeClass, getStatusTextClass, getStatusLabel } from "@/lib/http-status-colors"
-import type { HistoryItem, HttpMethod } from "@/hooks/use-request-store"
+} from "@/components/ui/dialog";
+import { methodSubtle, methodBadge, methodBg } from "@/lib/http-method-colors";
+import { getStatusBadgeClass, getStatusTextClass, getStatusLabel } from "@/lib/http-status-colors";
+import type { HistoryItem, HttpMethod } from "@/hooks/use-request-store";
 
 interface HistoryPanelProps {
-  history: HistoryItem[]
-  onSelectRequest: (item: HistoryItem) => void
-  onClearHistory: () => void
-  onRemoveItem: (id: string) => void
-  onGenerateFollowUp?: (item: HistoryItem) => void
-  generatingFollowUpId?: string | null
+  history: HistoryItem[];
+  onSelectRequest: (item: HistoryItem) => void;
+  onClearHistory: () => void;
+  onRemoveItem: (id: string) => void;
+  onGenerateFollowUp?: (item: HistoryItem) => void;
+  generatingFollowUpId?: string | null;
 }
 
 function formatTimeAgo(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
 
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (minutes > 0) return `${minutes}m ago`
-  return "Just now"
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return "Just now";
 }
 
 export function HistoryPanel({
@@ -49,76 +60,80 @@ export function HistoryPanel({
   onGenerateFollowUp,
   generatingFollowUpId,
 }: HistoryPanelProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [methodFilter, setMethodFilter] = useState<HttpMethod[]>([])
-  const [statusFilter, setStatusFilter] = useState<string>("")
-  const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [methodFilter, setMethodFilter] = useState<HttpMethod[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
 
-  const ALL_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+  const ALL_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
   const toggleMethodFilter = (method: HttpMethod) => {
     setMethodFilter((prev) =>
-      prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
-    )
-  }
+      prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method],
+    );
+  };
 
   const filteredHistory = history.filter((item) => {
     // Text search
     if (searchQuery) {
-      const q = searchQuery.toLowerCase()
+      const q = searchQuery.toLowerCase();
       const matchesSearch =
         item.name.toLowerCase().includes(q) ||
         item.endpoint.toLowerCase().includes(q) ||
         item.method.toLowerCase().includes(q) ||
-        String(item.responseStatus || "").includes(q)
-      if (!matchesSearch) return false
+        String(item.responseStatus || "").includes(q);
+      if (!matchesSearch) return false;
     }
 
     // Method filter
-    if (methodFilter.length > 0 && !methodFilter.includes(item.method)) return false
+    if (methodFilter.length > 0 && !methodFilter.includes(item.method)) return false;
 
     // Status filter
     if (statusFilter) {
-      const s = item.responseStatus
-      if (statusFilter === "2xx" && (!s || s < 200 || s >= 300)) return false
-      if (statusFilter === "4xx" && (!s || s < 400 || s >= 500)) return false
-      if (statusFilter === "5xx" && (!s || s < 500)) return false
-      if (statusFilter === "error" && (s && s < 400)) return false
+      const s = item.responseStatus;
+      if (statusFilter === "2xx" && (!s || s < 200 || s >= 300)) return false;
+      if (statusFilter === "4xx" && (!s || s < 400 || s >= 500)) return false;
+      if (statusFilter === "5xx" && (!s || s < 500)) return false;
+      if (statusFilter === "error" && s && s < 400) return false;
     }
 
-    return true
-  })
+    return true;
+  });
 
   // Pagination
-  const PAGE_SIZE = 50
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const paginatedHistory = filteredHistory.slice(0, visibleCount)
-  const hasMore = visibleCount < filteredHistory.length
+  const PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const paginatedHistory = filteredHistory.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredHistory.length;
 
   // Group by date
-  const groupedHistory = paginatedHistory.reduce((acc, item) => {
-    const date = new Date(item.executedAt)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-    const startOfWeek = new Date(today)
-    startOfWeek.setDate(today.getDate() - today.getDay())
+  const groupedHistory = paginatedHistory.reduce(
+    (acc, item) => {
+      const date = new Date(item.executedAt);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
 
-    let key: string
-    if (date.toDateString() === today.toDateString()) {
-      key = "Today"
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      key = "Yesterday"
-    } else if (date >= startOfWeek) {
-      key = "This Week"
-    } else {
-      key = date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    }
+      let key: string;
+      if (date.toDateString() === today.toDateString()) {
+        key = "Today";
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        key = "Yesterday";
+      } else if (date >= startOfWeek) {
+        key = "This Week";
+      } else {
+        key = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      }
 
-    if (!acc[key]) acc[key] = []
-    acc[key].push(item)
-    return acc
-  }, {} as Record<string, HistoryItem[]>)
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    },
+    {} as Record<string, HistoryItem[]>,
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -151,7 +166,7 @@ export function HistoryPanel({
         {/* Method filter chips */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {ALL_METHODS.map((method) => {
-            const active = methodFilter.includes(method)
+            const active = methodFilter.includes(method);
             return (
               <button
                 key={method}
@@ -160,12 +175,12 @@ export function HistoryPanel({
                   "h-6 rounded px-2 text-[10px] font-bold border transition-colors",
                   active
                     ? methodSubtle[method]
-                    : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
                 )}
               >
                 {method}
               </button>
-            )
+            );
           })}
 
           <span className="w-px h-4 bg-border mx-1" />
@@ -184,7 +199,7 @@ export function HistoryPanel({
                 "h-6 rounded px-2 text-[10px] font-medium border transition-colors",
                 statusFilter === f.value
                   ? "bg-primary/10 text-primary border-primary/30"
-                  : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                  : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
               )}
             >
               {f.label}
@@ -194,7 +209,11 @@ export function HistoryPanel({
           {/* Clear all filters */}
           {(methodFilter.length > 0 || statusFilter || searchQuery) && (
             <button
-              onClick={() => { setMethodFilter([]); setStatusFilter(""); setSearchQuery("") }}
+              onClick={() => {
+                setMethodFilter([]);
+                setStatusFilter("");
+                setSearchQuery("");
+              }}
               className="h-6 rounded px-2 text-[10px] font-medium text-muted-foreground hover:text-destructive transition-colors"
             >
               Clear
@@ -207,9 +226,7 @@ export function HistoryPanel({
       <div className="flex-1 overflow-y-auto hide-scrollbar p-2">
         {Object.entries(groupedHistory).map(([date, items]) => (
           <div key={date} className="mb-4">
-            <h4 className="mb-2 px-2 text-xs font-medium text-muted-foreground">
-              {date}
-            </h4>
+            <h4 className="mb-2 px-2 text-xs font-medium text-muted-foreground">{date}</h4>
             <div className="space-y-0.5">
               {items.map((item) => (
                 <div
@@ -224,7 +241,7 @@ export function HistoryPanel({
                       variant="outline"
                       className={cn(
                         "h-5 shrink-0 px-1.5 text-[10px] font-bold",
-                        methodSubtle[item.method]
+                        methodSubtle[item.method],
                       )}
                     >
                       {item.method}
@@ -238,14 +255,31 @@ export function HistoryPanel({
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      {item.responseStatus != null && item.responseStatus >= 200 && item.responseStatus < 300
-  ? <CheckCircle2 className={cn("size-3.5", getStatusTextClass(item.responseStatus))} />
-  : item.responseStatus != null && item.responseStatus >= 400 && item.responseStatus < 500
-    ? <XCircle className={cn("size-3.5", getStatusTextClass(item.responseStatus))} />
-    : item.responseStatus != null && item.responseStatus >= 500
-      ? <AlertCircle className={cn("size-3.5", getStatusTextClass(item.responseStatus))} />
-      : <Clock className="size-3.5 text-muted-foreground" />}
-                      <span className={cn("text-xs font-medium", getStatusTextClass(item.responseStatus))}>
+                      {item.responseStatus != null &&
+                      item.responseStatus >= 200 &&
+                      item.responseStatus < 300 ? (
+                        <CheckCircle2
+                          className={cn("size-3.5", getStatusTextClass(item.responseStatus))}
+                        />
+                      ) : item.responseStatus != null &&
+                        item.responseStatus >= 400 &&
+                        item.responseStatus < 500 ? (
+                        <XCircle
+                          className={cn("size-3.5", getStatusTextClass(item.responseStatus))}
+                        />
+                      ) : item.responseStatus != null && item.responseStatus >= 500 ? (
+                        <AlertCircle
+                          className={cn("size-3.5", getStatusTextClass(item.responseStatus))}
+                        />
+                      ) : (
+                        <Clock className="size-3.5 text-muted-foreground" />
+                      )}
+                      <span
+                        className={cn(
+                          "text-xs font-medium",
+                          getStatusTextClass(item.responseStatus),
+                        )}
+                      >
                         {item.responseStatus || "-"}
                       </span>
                       <span className="text-xs text-muted-foreground">
@@ -282,7 +316,7 @@ export function HistoryPanel({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onRemoveItem(item.id)}
+                      onClick={() => setPendingRemoveId(item.id)}
                       className="size-6 p-0 text-muted-foreground hover:text-destructive"
                       title="Remove from history"
                     >
@@ -317,7 +351,9 @@ export function HistoryPanel({
               {searchQuery ? "No matching requests" : "No history yet"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {searchQuery ? "Try a different search or clear filters" : "Run a request to see it here"}
+              {searchQuery
+                ? "Try a different search or clear filters"
+                : "Run a request to see it here"}
             </p>
             {!searchQuery && (
               <p className="text-xs text-muted-foreground/60 mt-2 max-w-[220px]">
@@ -328,30 +364,47 @@ export function HistoryPanel({
         )}
       </div>
 
-        <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Clear all history?</DialogTitle>
-              <DialogDescription>
-                This action cannot be undone. All request history will be permanently removed.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" size="sm" onClick={() => setShowClearConfirm(false)}>Cancel</Button>
-              <Button
-                variant="default"
-                size="sm"
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => {
-                  onClearHistory()
-                  setShowClearConfirm(false)
-                }}
-              >
-                Clear
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clear all history?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. All request history will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setShowClearConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                onClearHistory();
+                setShowClearConfirm(false);
+              }}
+            >
+              Clear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!pendingRemoveId}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemoveId(null);
+        }}
+        title="Supprimer cette entrée de l'historique ?"
+        description="Cette action est irréversible. Cette entrée d'historique sera définitivement supprimée."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        onConfirm={() => {
+          if (pendingRemoveId) onRemoveItem(pendingRemoveId);
+          setPendingRemoveId(null);
+        }}
+      />
     </div>
-  )
+  );
 }

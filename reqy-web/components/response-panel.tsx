@@ -14,9 +14,11 @@ import { ResponseStatusBar } from "@/components/response-status-bar";
 import { ResponseTimeline } from "@/components/response-timeline";
 import { ResponseAiSummary } from "@/components/response-ai-summary";
 import { ResponseHeadersTab } from "@/components/response-headers-tab";
+import { ResponseCookiesTab } from "@/components/response-cookies-tab";
 import { CodeSnippet } from "@/components/response-code-snippet";
 import { TestResultsSection } from "@/components/response-test-results";
 import type { CorrectionSuggestion } from "@/lib/ai-engine/propose-correction";
+import type { TauriCookie } from "@/lib/tauri";
 import dynamic from "next/dynamic";
 
 // Heavy dependencies — only loaded on demand (response received, AI opened).
@@ -67,6 +69,7 @@ interface ResponsePanelProps {
   };
   responseSize?: string;
   responseHeaders?: Record<string, string>;
+  responseCookies?: TauriCookie[];
   isLoading?: boolean;
   onRun?: () => Promise<void>;
   onRunAndSave?: () => Promise<void>;
@@ -99,6 +102,7 @@ export function ResponsePanel({
   responseTimings,
   responseSize,
   responseHeaders,
+  responseCookies = [],
   testResults,
   isLoading = false,
   onRun,
@@ -122,7 +126,10 @@ export function ResponsePanel({
   proposeAskAI,
   onApplyCorrection,
 }: ResponsePanelProps) {
-  const [responseFormat, setResponseFormat] = useState<ResponseFormat>("pretty");
+  const [responseFormat, setResponseFormat] = useState<ResponseFormat>(() => {
+    if (!responseBody && !responseData) return "pretty";
+    return getAutoFormat();
+  });
   const [activeTab, setActiveTab] = useState("response");
   const [diffDialogOpen, setDiffDialogOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -246,13 +253,6 @@ export function ResponsePanel({
     return "pretty";
   }
 
-  useEffect(() => {
-    if (responseBody) {
-      const t0 = window.setTimeout(() => setResponseFormat(getAutoFormat()), 0);
-      return () => window.clearTimeout(t0);
-    }
-  }, [responseBody, responseHeaders]);
-
   const handleExport = useCallback(() => {
     if (!responseBody) return;
     try {
@@ -342,8 +342,19 @@ export function ResponsePanel({
             >
               Headers
               {hasResponse && responseHeaders && (
-                <span className="ml-1.5 rounded-full bg-muted-foreground/10 px-1.5 py-0.5 text-[10px] font-mono">
+                <span className="ml-1.5 rounded-full bg-muted-foreground/10 px-1.5 py-0.5 text-[10px] font-mono tabular-nums">
                   {Object.keys(responseHeaders).length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="cookies"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:border-muted-foreground/20"
+            >
+              Cookies
+              {hasResponse && responseCookies && responseCookies.length > 0 && (
+                <span className="ml-1.5 rounded-full bg-muted-foreground/10 px-1.5 py-0.5 text-[10px] font-mono tabular-nums">
+                  {responseCookies.length}
                 </span>
               )}
             </TabsTrigger>
@@ -361,7 +372,7 @@ export function ResponsePanel({
               {testResults && testResults.length > 0 && (
                 <span
                   className={cn(
-                    "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-mono",
+                    "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-mono tabular-nums",
                     testResults.every((r) => r.passed)
                       ? "bg-success/10 text-success"
                       : "bg-destructive/10 text-destructive",
@@ -382,7 +393,7 @@ export function ResponsePanel({
               <Sparkles className="size-3.5" />
               AI
               {diagnostics.length > 0 && (
-                <span className="ml-1 rounded-full bg-destructive/20 text-destructive px-1.5 py-0.5 text-[10px] font-mono">
+                <span className="ml-1 rounded-full bg-destructive/20 text-destructive px-1.5 py-0.5 text-[10px] font-mono tabular-nums">
                   {diagnostics.length}
                 </span>
               )}
@@ -473,6 +484,10 @@ export function ResponsePanel({
 
         <TabsContent value="headers" className="m-0 min-h-0 flex-1 animate-fade-in">
           <ResponseHeadersTab responseHeaders={responseHeaders} />
+        </TabsContent>
+
+        <TabsContent value="cookies" className="m-0 min-h-0 flex-1 animate-fade-in">
+          <ResponseCookiesTab responseCookies={responseCookies} />
         </TabsContent>
 
         <TabsContent value="code" className="m-0 flex min-h-0 flex-1 flex-col p-4 animate-fade-in">

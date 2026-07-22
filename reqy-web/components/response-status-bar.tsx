@@ -116,7 +116,9 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
               ) : responseStatus != null && responseStatus >= 400 ? (
                 <XCircle className={cn("size-3.5", getStatusTextClass(responseStatus))} />
               ) : null}
-              <span className="text-xs font-bold font-mono">{responseStatus ?? "-"}</span>
+              <span className="text-xs font-bold font-mono tabular-nums">
+                {responseStatus ?? "-"}
+              </span>
             </div>
 
             {/* Time — with animated gauge bar */}
@@ -130,7 +132,7 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
                   }}
                 />
               </div>
-              <span className="text-[11px] font-mono font-medium text-muted-foreground whitespace-nowrap">
+              <span className="text-[11px] font-mono font-medium text-muted-foreground whitespace-nowrap tabular-nums">
                 {responseTime ?? 0}
                 <span className="text-muted-foreground/70">ms</span>
               </span>
@@ -139,7 +141,7 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
             {/* Size — compact */}
             <div className="flex items-center gap-1 rounded-md border border-muted-foreground/10 bg-muted/20 px-2 py-1">
               <FileText className="size-3 text-muted-foreground/70" />
-              <span className="text-[11px] font-mono font-medium text-muted-foreground">
+              <span className="text-[11px] font-mono font-medium text-muted-foreground tabular-nums">
                 {responseSize ?? "0 B"}
               </span>
             </div>

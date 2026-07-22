@@ -1,16 +1,23 @@
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 import { NextRequest, NextResponse } from "next/server";
 import { getPublicEnv } from "@/lib/env";
 import { proxyAuthHeaders } from "@/lib/proxy-auth";
 
 const SYNC_URL = getPublicEnv().NEXT_PUBLIC_SYNC_URL || "";
 
-async function proxyJson(req: NextRequest, path: string): Promise<NextResponse> {
+function getSyncPath(request: NextRequest): string {
+  const segments = request.nextUrl.pathname.split("/").filter(Boolean);
+  const id = segments[2] ?? "";
+  return `/workspaces/${id}`;
+}
+
+async function proxyJson(req: NextRequest): Promise<NextResponse> {
   if (!SYNC_URL) {
     return NextResponse.json({ error: "Sync server not configured" }, { status: 500 });
   }
 
-  const target = `${SYNC_URL}/api${path}${req.nextUrl.search}`;
+  const syncPath = getSyncPath(req);
+  const target = `${SYNC_URL}/api${syncPath}${req.nextUrl.search}`;
   const body = req.method !== "GET" && req.method !== "HEAD" ? await req.text() : undefined;
 
   try {
@@ -32,10 +39,10 @@ async function proxyJson(req: NextRequest, path: string): Promise<NextResponse> 
   }
 }
 
-export async function GET(request: NextRequest) {
-  return proxyJson(request, "/workspaces");
+export async function PUT(request: NextRequest) {
+  return proxyJson(request);
 }
 
-export async function POST(request: NextRequest) {
-  return proxyJson(request, "/workspaces");
+export async function DELETE(request: NextRequest) {
+  return proxyJson(request);
 }
