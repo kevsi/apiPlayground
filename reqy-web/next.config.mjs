@@ -5,11 +5,11 @@ import withBundleAnalyzer from "@next/bundle-analyzer"
 const AUTH_SIGNING_SECRET = process.env.AUTH_SIGNING_SECRET
 if (!AUTH_SIGNING_SECRET || AUTH_SIGNING_SECRET.length < 32) {
   if (process.env.NODE_ENV === "production") {
-    console.warn(
-      "[env:build] AUTH_SIGNING_SECRET is missing or too short. The auth flow " +
-        "is currently disabled, so this is non-fatal.",
+    throw new Error(
+      "[env:build] AUTH_SIGNING_SECRET is required in production. Set it in .env.local",
     )
   }
+  console.warn('AUTH_SIGNING_SECRET is not set. Using insecure default for development only.')
 }
 
 // Allow the configured sync backend as a `connect-src` target. In dev this is
