@@ -1,1 +1,0 @@
-{"version":3,"file":"validator.d.ts","sourceRoot":"","sources":["../src/validator.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAc,eAAe,EAAE,MAAM,YAAY,CAAA;AAM3E,wBAAgB,oBAAoB,CAAC,IAAI,EAAE,OAAO,GAAG,eAAe,EAAE,CA6GrE;AAED,wBAAgB,mBAAmB,CAAC,IAAI,EAAE,OAAO,GAAG,IAAI,IAAI,YAAY,CAEvE"}

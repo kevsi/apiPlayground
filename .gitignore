@@ -56,3 +56,12 @@ RECOVERY_STEPS.md
 # ── Generated SDK output (produced by the SDK generator) ──────────
 general-typescript-fetch/
 general-typescript-fetch.zip
+
+# npm lockfiles (pnpm only)
+package-lock.json
+
+# Build artifacts
+recli/dist/
+
+# OS artifacts
+*.deb
