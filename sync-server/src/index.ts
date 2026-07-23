@@ -93,6 +93,8 @@ node.on("upgrade", (req, socket, head) => {
 function shutdown() {
   console.log("[reqly-sync] shutting down");
   closeAll();
+  apiLimiter.dispose();
+  syncLimiter.dispose();
   node.close(() => process.exit(0));
   // Force exit after 5s if close hangs
   setTimeout(() => process.exit(0), 5000).unref();
