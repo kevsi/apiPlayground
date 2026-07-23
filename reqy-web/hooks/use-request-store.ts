@@ -232,6 +232,8 @@ type RequestStoreState = RequestStore & {
   reset: () => void;
   initStore: () => Promise<void>;
   fetchWorkspacesFromApi: () => Promise<void>;
+  mergeRemote: (changes: SyncChange[]) => void;
+  pullWorkspace: (workspaceId?: string | null) => Promise<{ applied: number }>;
   notify?: (message: string) => void;
   exportActiveRequest: (data: {
     method: string;
@@ -398,7 +400,9 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     if (!syncUrl) return { applied: 0 };
     const since = loadSyncCursors()[workspaceId] ?? 0;
     const res = await pullAndMerge(workspaceId, since, { apply: mergeRemote });
-    if (res.applied > 0) saveSyncCursor(workspaceId, Date.now());
+    // Always bump the cursor so subsequent loads use the latest timestamp,
+    // even when no changes were returned.
+    saveSyncCursor(workspaceId, Date.now());
     return res;
   };
 
