@@ -17,7 +17,7 @@ pub struct McpProcessState {
 
 pub type ManagedMcpState = Arc<Mutex<McpProcessState>>;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct McpServerStatus {
   pub running: bool,
@@ -379,5 +379,102 @@ mod tests {
         assert_eq!(config.env_name, Some("production".into()));
         assert!(config.allow_local_hosts);
         assert_eq!(config.max_response_size, Some(5_242_880));
+    }
+
+    #[test]
+    fn test_mcp_server_status_deserialization() {
+        let json = r#"{"running":true,"port":3311,"pid":12345}"#;
+        let status: McpServerStatus =
+            serde_json::from_str(json).expect("deserialize");
+        assert!(status.running);
+        assert_eq!(status.port, Some(3311));
+        assert_eq!(status.pid, Some(12345));
+    }
+
+    #[test]
+    fn test_mcp_server_status_roundtrip() {
+        let original = McpServerStatus {
+            running: true,
+            port: Some(3311),
+            pid: Some(12345),
+        };
+        let json = serde_json::to_string(&original).expect("serialize");
+        let deserialized: McpServerStatus =
+            serde_json::from_str(&json).expect("deserialize");
+        assert!(deserialized.running);
+        assert_eq!(deserialized.port, Some(3311));
+        assert_eq!(deserialized.pid, Some(12345));
+    }
+
+    #[test]
+    fn test_mcp_server_config_partial_json_defaults() {
+        // Only port is provided; serde(default) should fill in the rest.
+        let json = r#"{"port":9000}"#;
+        let config: McpServerConfig =
+            serde_json::from_str(json).expect("deserialize partial");
+        assert_eq!(config.port, Some(9000));
+        assert!(config.env_name.is_none());
+        assert!(!config.allow_local_hosts);
+        assert!(config.max_response_size.is_none());
+    }
+
+    #[test]
+    fn test_mcp_server_config_empty_json_defaults() {
+        // Empty object; all fields should come from Default.
+        let json = r#"{}"#;
+        let config: McpServerConfig =
+            serde_json::from_str(json).expect("deserialize empty");
+        assert!(config.port.is_none());
+        assert!(config.env_name.is_none());
+        assert!(!config.allow_local_hosts);
+        assert!(config.max_response_size.is_none());
+    }
+
+    #[test]
+    fn test_mcp_server_config_full_json() {
+        // Round-trip a fully populated JSON payload.
+        let json = r#"{"port":4000,"envName":"staging","allowLocalHosts":true,"maxResponseSize":1048576}"#;
+        let config: McpServerConfig =
+            serde_json::from_str(json).expect("deserialize full");
+        assert_eq!(config.port, Some(4000));
+        assert_eq!(config.env_name, Some("staging".into()));
+        assert!(config.allow_local_hosts);
+        assert_eq!(config.max_response_size, Some(1_048_576));
+        // Verify round-trip
+        let output = serde_json::to_string(&config).expect("serialize");
+        assert!(output.contains("\"port\":4000"));
+        assert!(output.contains("\"envName\""));
+        assert!(output.contains("\"allowLocalHosts\":true"));
+    }
+
+    #[test]
+    fn test_mcp_server_port_range_safety() {
+        // u16 already enforces 0–65535 at the type level; this test
+        // confirms that valid edge values survive serialization.
+        let min = McpServerConfig {
+            port: Some(0),
+            ..McpServerConfig::default()
+        };
+        let max = McpServerConfig {
+            port: Some(65535),
+            ..McpServerConfig::default()
+        };
+        let min_str = serde_json::to_string(&min).expect("serialize");
+        let max_str = serde_json::to_string(&max).expect("serialize");
+        assert!(min_str.contains("\"port\":0"));
+        assert!(max_str.contains("\"port\":65535"));
+    }
+
+    #[test]
+    fn test_mcp_server_config_env_name_edge_cases() {
+        // Empty string env name is valid (not None).
+        let config = McpServerConfig {
+            env_name: Some(String::new()),
+            ..McpServerConfig::default()
+        };
+        assert_eq!(config.env_name, Some(String::new()));
+        // Verify round-trip
+        let json = serde_json::to_string(&config).expect("serialize");
+        assert!(json.contains("\"envName\":\"\""));
     }
 }
