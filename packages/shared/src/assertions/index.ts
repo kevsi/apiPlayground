@@ -404,7 +404,7 @@ export function evaluateStructuredAssertion(
             passed =
               typeof actual === "string" &&
               typeof assertion.value === "string" &&
-              actual.includes(assertion.value);
+              actual.toLowerCase().includes(assertion.value.toLowerCase());
             break;
           case "exists":
             passed = actual !== undefined && actual !== null;

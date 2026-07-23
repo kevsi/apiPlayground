@@ -240,17 +240,34 @@ export function evaluateStructuredAssertion(assertion, ctx) {
     try {
         switch (type) {
             case "status-code": {
-                const expected = Number(assertion.value ?? assertion.target);
-                if (Number.isNaN(expected)) {
-                    return {
-                        assertion,
-                        passed: false,
-                        actualValue: ctx.status,
-                        error: `Invalid expected status: ${assertion.value ?? assertion.target}`,
-                    };
+                const raw = assertion.value ?? assertion.target;
+                let passed = false;
+                let expected = raw;
+                // Support { in: [...] } and { not: number } syntax
+                if (typeof raw === "object" && raw !== null) {
+                    const obj = raw;
+                    if ("in" in obj && Array.isArray(obj.in)) {
+                        passed = obj.in.includes(ctx.status);
+                        expected = obj.in;
+                    }
+                    else if ("not" in obj) {
+                        passed = ctx.status !== Number(obj.not);
+                        expected = obj.not;
+                    }
                 }
-                const op = (assertion.operator ?? "eq");
-                const passed = compareNumeric(ctx.status, expected, op);
+                else {
+                    const expectedNum = Number(raw);
+                    if (Number.isNaN(expectedNum)) {
+                        return {
+                            assertion,
+                            passed: false,
+                            actualValue: ctx.status,
+                            error: `Invalid expected status: ${raw}`,
+                        };
+                    }
+                    const op = (assertion.operator ?? "eq");
+                    passed = compareNumeric(ctx.status, expectedNum, op);
+                }
                 return { assertion, passed, actualValue: ctx.status };
             }
             case "response-time": {
@@ -308,7 +325,7 @@ export function evaluateStructuredAssertion(assertion, ctx) {
                         passed =
                             typeof actual === "string" &&
                                 typeof assertion.value === "string" &&
-                                actual.includes(assertion.value);
+                                actual.toLowerCase().includes(assertion.value.toLowerCase());
                         break;
                     case "exists":
                         passed = actual !== undefined && actual !== null;
