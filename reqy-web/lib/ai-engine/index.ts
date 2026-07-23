@@ -11,7 +11,8 @@
  *   - types.ts      — type definitions
  *   - prompts.ts    — SYSTEM_PROMPT + prompt templates
  *   - parser.ts     — parseAIResponse, isValidAIResponse
- *   - providers.ts  — callAI, callAIText, fetchWithTimeout, extractProxyError
+ *   - providers.ts      — callAI, callAIText
+ *   - providers-utils.ts — fetchWithTimeout, extractProxyError, getProviderGroup (internal)
  *   - dispatch.ts   — dispatchAIActions
  */
 

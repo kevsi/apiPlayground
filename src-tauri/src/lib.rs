@@ -3,8 +3,6 @@ use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 
-use crate::error::AppError;
-
 mod error;
 pub mod websocket;
 mod mcp;
@@ -20,42 +18,7 @@ use crate::capture::{
   start_capture_proxy, stop_capture_proxy, ManagedCaptureProxyState,
 };
 use crate::fetch::{fetch_proxy, SharedClient};
-use crate::open::{export_json, open_external};
-
-/// Writes arbitrary bytes to a user-chosen path.
-///
-/// Used by the SDK "Save As" flow. We write directly with `std::fs` (instead
-/// of the `fs` plugin) so the user can save anywhere they pick via the native
-/// dialog, without being constrained by the plugin's filesystem scope.
-#[tauri::command]
-fn save_file(path: String, contents: Vec<u8>) -> Result<(), String> {
-    std::fs::write(&path, contents).map_err(|e| format!("Failed to save file to {path}: {e}"))
-}
-
-// ── Offline request queue (store-and-forward prereq, Task 12a) ──────────────
-//
-// These thin commands expose the persistent `QueueStore` (see `store.rs`) to
-// the frontend. Task 12b (replay on reconnect) will call them from TypeScript.
-
-#[tauri::command]
-fn enqueue_request(req: crate::store::QueuedRequest) -> Result<(), AppError> {
-    crate::store::enqueue_request(req)
-}
-
-#[tauri::command]
-fn list_pending() -> Vec<crate::store::QueuedRequest> {
-    crate::store::list_pending()
-}
-
-#[tauri::command]
-fn dequeue_ready() -> Option<crate::store::QueuedRequest> {
-    crate::store::dequeue_ready()
-}
-
-#[tauri::command]
-fn mark_sent(id: String) -> Result<(), AppError> {
-    crate::store::mark_sent(&id)
-}
+use crate::open::{export_json, open_external, save_file};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -149,10 +112,10 @@ pub fn run() {
       mcp::read_mcp_bundle,
       mcp::sync_mcp_collections,
       save_file,
-      enqueue_request,
-      list_pending,
-      dequeue_ready,
-      mark_sent,
+      store::enqueue_request,
+      store::list_pending,
+      store::dequeue_ready,
+      store::mark_sent,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

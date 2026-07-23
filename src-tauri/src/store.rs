@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
+use tauri;
 
 use crate::error::AppError;
 
@@ -184,23 +185,27 @@ fn default_store() -> &'static QueueStore {
 }
 
 /// Enqueue a request on the default store (see [`init_queue_store`]).
+#[tauri::command]
 pub fn enqueue_request(req: QueuedRequest) -> Result<(), AppError> {
     default_store().enqueue(req)
 }
 
 /// List pending requests on the default store.
+#[tauri::command]
 pub fn list_pending() -> Vec<QueuedRequest> {
     default_store().list_pending()
 }
 
 /// Peek the next request ready to replay on the default store.
+#[tauri::command]
 pub fn dequeue_ready() -> Option<QueuedRequest> {
     default_store().dequeue_ready()
 }
 
 /// Mark a request as sent (remove from the default store).
-pub fn mark_sent(id: &str) -> Result<(), AppError> {
-    default_store().mark_sent(id)
+#[tauri::command]
+pub fn mark_sent(id: String) -> Result<(), AppError> {
+    default_store().mark_sent(&id)
 }
 
 #[cfg(test)]
