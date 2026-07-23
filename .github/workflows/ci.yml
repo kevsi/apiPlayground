@@ -116,9 +116,6 @@ jobs:
 
   format:
     name: Format (Prettier)
-    # Non-blocking for now: 419 files are currently not Prettier-clean.
-    # Run `pnpm format` locally, then drop `continue-on-error` to enforce it.
-    continue-on-error: true
     runs-on: ubuntu-latest
 
     steps:
