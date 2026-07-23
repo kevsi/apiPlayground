@@ -31,6 +31,7 @@ import type {
   CollectionFolder,
   Environment,
   HistoryItem,
+  HttpMethod,
   RequestItem,
   RequestStore,
   VariableMapping,
@@ -242,6 +243,12 @@ type RequestStoreState = RequestStore & {
     authToken: string;
     assertions: unknown;
   }) => Promise<void>;
+  addCapturedRequest: (captured: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    body: string;
+  }) => void;
 } & MutationMethods;
 
 type MergedState = ReturnType<typeof computeMergedState>;
@@ -603,6 +610,90 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     getFoldersForCollection,
     notify: (message: string) =>
       storeApi.addNotification?.({ title: "Notification", body: String(message), type: "info" }),
+    addCapturedRequest: (captured) => {
+      const safeMethod = (
+        ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "GRAPHQL"].includes(
+          captured.method?.toUpperCase(),
+        )
+          ? captured.method.toUpperCase()
+          : "GET"
+      ) as HttpMethod;
+
+      let pathname = "";
+      try {
+        pathname = new URL(captured.url).pathname;
+      } catch {
+        pathname = captured.url;
+      }
+
+      const now = Date.now();
+      const id = `req-${crypto.randomUUID()}`;
+
+      commit((prev) => {
+        const wsId = prev.activeWorkspaceId ?? WORKSPACE_PERSONAL_ID;
+        const drafts = prev.collections.find((c) => c.name === "Drafts");
+
+        if (!drafts) {
+          const newColId = `col-${crypto.randomUUID()}`;
+          return {
+            ...prev,
+            collections: [
+              ...prev.collections,
+              {
+                id: newColId,
+                name: "Drafts",
+                description: "Your drafts and uncategorized requests",
+                color: "slate",
+                icon: "folder",
+                workspaceId: wsId,
+                requests: [
+                  {
+                    id,
+                    name: `Captured ${safeMethod} ${pathname}`,
+                    method: safeMethod,
+                    url: captured.url,
+                    endpoint: captured.url,
+                    headers: captured.headers,
+                    body: captured.body,
+                    createdAt: now,
+                    updatedAt: now,
+                  },
+                ],
+                folders: [],
+                createdAt: now,
+                updatedAt: now,
+              },
+            ],
+          };
+        }
+
+        return {
+          ...prev,
+          collections: prev.collections.map((c) =>
+            c.id === drafts.id
+              ? {
+                  ...c,
+                  updatedAt: now,
+                  requests: [
+                    ...c.requests,
+                    {
+                      id,
+                      name: `Captured ${safeMethod} ${pathname}`,
+                      method: safeMethod,
+                      url: captured.url,
+                      endpoint: captured.url,
+                      headers: captured.headers,
+                      body: captured.body,
+                      createdAt: now,
+                      updatedAt: now,
+                    },
+                  ],
+                }
+              : c,
+          ),
+        };
+      });
+    },
     exportActiveRequest: async (requestData) => {
       const isTauri =
         !!(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ ||
