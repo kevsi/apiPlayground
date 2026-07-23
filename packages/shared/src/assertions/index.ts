@@ -316,17 +316,33 @@ export function evaluateStructuredAssertion(
   try {
     switch (type) {
       case "status-code": {
-        const expected = Number(assertion.value ?? assertion.target);
-        if (Number.isNaN(expected)) {
-          return {
-            assertion,
-            passed: false,
-            actualValue: ctx.status,
-            error: `Invalid expected status: ${assertion.value ?? assertion.target}`,
-          };
+        const raw = assertion.value ?? assertion.target;
+        let passed = false;
+        let expected: unknown = raw;
+
+        // Support { in: [...] } and { not: number } syntax
+        if (typeof raw === "object" && raw !== null) {
+          const obj = raw as Record<string, unknown>;
+          if ("in" in obj && Array.isArray(obj.in)) {
+            passed = obj.in.includes(ctx.status);
+            expected = obj.in;
+          } else if ("not" in obj) {
+            passed = ctx.status !== Number(obj.not);
+            expected = obj.not;
+          }
+        } else {
+          const expectedNum = Number(raw);
+          if (Number.isNaN(expectedNum)) {
+            return {
+              assertion,
+              passed: false,
+              actualValue: ctx.status,
+              error: `Invalid expected status: ${raw}`,
+            };
+          }
+          const op = (assertion.operator ?? "eq") as StructuredAssertionOperator;
+          passed = compareNumeric(ctx.status, expectedNum, op);
         }
-        const op = (assertion.operator ?? "eq") as StructuredAssertionOperator;
-        const passed = compareNumeric(ctx.status, expected, op);
         return { assertion, passed, actualValue: ctx.status };
       }
 

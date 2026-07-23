@@ -18,6 +18,13 @@ import {
 } from "../index.js";
 import type { Assertion } from "../../types.js";
 
+// Helper to build a structured assertion. Casts via Record to allow
+// object shapes like { in: [200, 201] } on the value field at runtime.
+function structuredAssertion(overrides: Record<string, unknown>): Assertion {
+  return { type: "status-code", value: "200", ...overrides } as unknown as Assertion;
+}
+import type { UnifiedEvalContext } from "../index.js";
+
 function makeContext(
   overrides: Partial<{
     status: number;
@@ -33,6 +40,20 @@ function makeContext(
     durationMs: overrides.durationMs ?? 150,
   };
 }
+
+const ctxOk: UnifiedEvalContext = {
+  status: 200,
+  body: JSON.stringify({ user: { id: 1, name: "John" }, items: [1, 2, 3] }),
+  headers: { "content-type": "application/json" },
+  durationMs: 150,
+};
+
+const ctxUser: UnifiedEvalContext = {
+  status: 200,
+  body: JSON.stringify({ user: { id: 123, name: "John" } }),
+  headers: { "content-type": "application/json" },
+  durationMs: 150,
+};
 
 // ── Tokenizer & value parsing ─────────────────────────────
 
@@ -293,6 +314,131 @@ describe("validateSchema", () => {
   });
 });
 
+// ── Structured operators (comprehensive coverage) ────────
+
+describe("structured operators", () => {
+  // neq
+  it("neq fails when equal (status-code)", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "status-code", operator: "neq", value: "200" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(false);
+  });
+  it("neq passes when not equal (status-code)", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "status-code", operator: "neq", value: "404" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(true);
+  });
+  it("neq passes when not equal (json-path)", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "json-path", target: "user.id", operator: "neq", value: "999" },
+      ctxUser,
+    );
+    expect(result.passed).toBe(true);
+  });
+  it("neq fails when equal (header)", () => {
+    const result = evaluateStructuredAssertion(
+      {
+        name: "t",
+        type: "header",
+        target: "content-type",
+        operator: "neq",
+        value: "application/json",
+      },
+      ctxOk,
+    );
+    expect(result.passed).toBe(false);
+  });
+
+  // gt / gte / lt / lte for status-code
+  it("gt passes when status > expected", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "status-code", operator: "gt", value: "199" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(true);
+  });
+  it("gt fails when status <= expected", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "status-code", operator: "gt", value: "200" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(false);
+  });
+  it("gte passes when status >= expected", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "status-code", operator: "gte", value: "200" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(true);
+  });
+  it("lte passes when status <= expected", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "status-code", operator: "lte", value: "200" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(true);
+  });
+
+  // gt / gte / lt / lte for response-time
+  it("lt passes when response time < expected", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "response-time", operator: "lt", value: "1000" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(true);
+  });
+
+  // notExists
+  it("notExists passes when json-path not found", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "json-path", target: "nonexistent.field", operator: "notExists" },
+      ctxUser,
+    );
+    expect(result.passed).toBe(true);
+  });
+  it("notExists fails when json-path exists", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "json-path", target: "user.id", operator: "notExists" },
+      ctxUser,
+    );
+    expect(result.passed).toBe(false);
+  });
+  it("notExists passes when header not found", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "header", target: "x-unknown", operator: "notExists" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(true);
+  });
+
+  // regex
+  it("regex passes when json-path matches pattern", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "json-path", target: "user.name", operator: "regex", value: "^J.*" },
+      ctxUser,
+    );
+    expect(result.passed).toBe(true);
+  });
+  it("regex fails when json-path does not match", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "json-path", target: "user.name", operator: "regex", value: "^X.*" },
+      ctxUser,
+    );
+    expect(result.passed).toBe(false);
+  });
+  it("regex passes when header matches pattern", () => {
+    const result = evaluateStructuredAssertion(
+      { name: "t", type: "header", target: "content-type", operator: "regex", value: "json" },
+      ctxOk,
+    );
+    expect(result.passed).toBe(true);
+  });
+});
+
 // ── Structured evaluation (reqy-mcp) ──────────────────────
 
 describe("evaluateStructuredAssertion", () => {
@@ -359,6 +505,50 @@ describe("evaluateStructuredAssertion", () => {
     );
     expect(result.passed).toBe(false);
     expect(result.error).toContain("Unknown assertion type");
+  });
+
+  it("status-code supports { in: number[] } syntax", () => {
+    const result = evaluateStructuredAssertion(
+      structuredAssertion({ value: { in: [200, 201, 204] } }),
+      makeContext({ status: 200 }),
+    );
+    expect(result.passed).toBe(true);
+    expect(result.actualValue).toBe(200);
+  });
+
+  it("status-code { in: number[] } fails when status not in list", () => {
+    const result = evaluateStructuredAssertion(
+      structuredAssertion({ value: { in: [201, 204] } }),
+      makeContext({ status: 200 }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.actualValue).toBe(200);
+  });
+
+  it("status-code supports { not: number } syntax", () => {
+    const result = evaluateStructuredAssertion(
+      structuredAssertion({ value: { not: 404 } }),
+      makeContext({ status: 200 }),
+    );
+    expect(result.passed).toBe(true);
+    expect(result.actualValue).toBe(200);
+  });
+
+  it("status-code { not: number } fails when status matches", () => {
+    const result = evaluateStructuredAssertion(
+      structuredAssertion({ value: { not: 200 } }),
+      makeContext({ status: 200 }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.actualValue).toBe(200);
+  });
+
+  it("response-time type alias works identically to response-time", () => {
+    const result = evaluateStructuredAssertion(
+      { type: "response-time", operator: "lt", value: "1000" },
+      makeContext({ durationMs: 150 }),
+    );
+    expect(result.passed).toBe(true);
   });
 });
 
