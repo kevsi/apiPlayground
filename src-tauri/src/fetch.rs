@@ -52,11 +52,14 @@ pub struct SharedClient {
 /// Decode common HTML entities in response bodies.
 ///
 /// Some upstream servers/frameworks encode characters like ' → &#x27; in JSON.
+/// This also handles general numeric (`&#123;`) and hex (`&#x2F;`) HTML entities.
 pub fn decode_html_entities(text: &str) -> String {
   if !text.contains('&') {
     return text.to_string();
   }
-  text
+
+  // First pass: handle known named/short entities via simple replacement.
+  let result = text
     .replace("&#x27;", "'")
     .replace("&#39;", "'")
     .replace("&apos;", "'")
@@ -64,7 +67,56 @@ pub fn decode_html_entities(text: &str) -> String {
     .replace("&#x22;", "\"")
     .replace("&lt;", "<")
     .replace("&gt;", ">")
-    .replace("&amp;", "&")
+    .replace("&amp;", "&");
+
+  // Second pass: handle general numeric (&#DECIMAL;) and hex (&#xHEX;) entities
+  // that the simple replace chain above cannot cover (variable values).
+  let mut out = String::with_capacity(result.len());
+  let mut pos = 0;
+  let s = result.as_str();
+
+  while let Some(amp) = s[pos..].find('&') {
+    // Copy everything before the ampersand.
+    out.push_str(&s[pos..pos + amp]);
+    let entity_start = pos + amp;
+
+    // Find the closing semicolon.
+    if let Some(semi) = s[entity_start..].find(';') {
+      let body = &s[entity_start + 1..entity_start + semi]; // content between & and ;
+      if let Some(c) = decode_numeric_entity(body) {
+        out.push(c);
+      } else {
+        // Not a recognised numeric entity — keep the original text as-is.
+        out.push_str(&s[entity_start..=entity_start + semi]);
+      }
+      pos = entity_start + semi + 1;
+    } else {
+      // No semicolon found — the & is literal, copy the rest.
+      out.push_str(&s[entity_start..]);
+      pos = s.len(); // signal the tail append to add nothing
+      break;
+    }
+  }
+  out.push_str(&s[pos..]);
+  out
+}
+
+/// Try to decode a single numeric HTML entity (the part between `&` and `;`).
+///
+/// Supports decimal (`#123`) and hex (`#x2F`) forms.
+/// Returns `None` if the entity is not a recognised numeric form.
+fn decode_numeric_entity(entity: &str) -> Option<char> {
+  if let Some(num) = entity.strip_prefix('#') {
+    if let Ok(code) = num.parse::<u32>() {
+      return char::from_u32(code);
+    }
+  }
+  if let Some(hex) = entity.strip_prefix("#x") {
+    if let Ok(code) = u32::from_str_radix(hex, 16) {
+      return char::from_u32(code);
+    }
+  }
+  None
 }
 
 fn is_binary_content_type(content_type: &str) -> bool {
@@ -215,6 +267,23 @@ mod tests {
   #[test]
   fn decode_html_entities_does_not_touch_unknown_entities() {
     assert_eq!(decode_html_entities("a &unknown; b"), "a &unknown; b");
+  }
+
+  #[test]
+  fn decode_html_entities_handles_numeric_entities() {
+    assert_eq!(decode_html_entities("&#123;"), "{");
+    assert_eq!(decode_html_entities("&#65;"), "A");
+    assert_eq!(decode_html_entities("&#38;"), "&");
+    assert_eq!(decode_html_entities("&#x27;"), "'"); // already handled in pass 1
+  }
+
+  #[test]
+  fn decode_html_entities_handles_hex_entities() {
+    assert_eq!(decode_html_entities("&#x2F;"), "/");
+    assert_eq!(decode_html_entities("&#x41;"), "A");
+    assert_eq!(decode_html_entities("&#x26;"), "&");
+    assert_eq!(decode_html_entities("&#x22;"), "\""); // already handled in pass 1
+    assert_eq!(decode_html_entities("&#x27;"), "'");   // already handled in pass 1
   }
 
   #[test]
