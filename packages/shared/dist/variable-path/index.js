@@ -155,4 +155,21 @@ export function parseResponseForExtraction(responseBody) {
         return { parsed: responseBody, isJson: false };
     }
 }
+/**
+ * Validate that a source path has valid syntax for JSON extraction.
+ * Allows dotted paths (`a.b.c`), bracket notation (`items[0].id`),
+ * $‑prefix (`$.user.name`), and rejects consecutive dots or empty strings.
+ */
+export function isSourcePathSyntaxValid(path) {
+    if (typeof path !== "string")
+        return false;
+    if (path === "")
+        return false;
+    // Reject consecutive dots
+    if (path.includes(".."))
+        return false;
+    // Must start with a letter, underscore, or $
+    // Remainder may include letters, digits, underscore, $, ., [, ], -
+    return /^[a-zA-Z_$][a-zA-Z0-9_$.\[\]-]*$/.test(path);
+}
 //# sourceMappingURL=index.js.map

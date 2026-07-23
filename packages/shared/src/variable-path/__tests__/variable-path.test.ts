@@ -5,6 +5,7 @@ import {
   tryParseJson,
   getValueByPath,
   parseResponseForExtraction,
+  isSourcePathSyntaxValid,
 } from "../index.js";
 
 describe("tokenizePath", () => {
@@ -134,5 +135,39 @@ describe("parseResponseForExtraction", () => {
     const result = parseResponseForExtraction("");
     expect(result.isJson).toBe(false);
     expect(result.parsed).toBe("");
+  });
+});
+
+describe("isSourcePathSyntaxValid", () => {
+  it("accepts valid dotted paths", () => {
+    expect(isSourcePathSyntaxValid("a.b.c")).toBe(true);
+    expect(isSourcePathSyntaxValid("_foo.bar")).toBe(true);
+  });
+
+  it("accepts paths with bracket notation", () => {
+    expect(isSourcePathSyntaxValid("data.items[0].id")).toBe(true);
+    expect(isSourcePathSyntaxValid("items[2].name")).toBe(true);
+  });
+
+  it("accepts $‑prefixed paths", () => {
+    expect(isSourcePathSyntaxValid("$.id")).toBe(true);
+    expect(isSourcePathSyntaxValid("$.user.name")).toBe(true);
+  });
+
+  it("rejects consecutive dots", () => {
+    expect(isSourcePathSyntaxValid("a..b")).toBe(false);
+  });
+
+  it("rejects empty string", () => {
+    expect(isSourcePathSyntaxValid("")).toBe(false);
+  });
+
+  it("rejects paths with spaces", () => {
+    expect(isSourcePathSyntaxValid("data items")).toBe(false);
+  });
+
+  it("rejects non‑string input", () => {
+    expect(isSourcePathSyntaxValid(undefined as unknown as string)).toBe(false);
+    expect(isSourcePathSyntaxValid(null as unknown as string)).toBe(false);
   });
 });

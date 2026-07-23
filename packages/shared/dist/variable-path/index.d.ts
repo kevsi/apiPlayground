@@ -47,4 +47,10 @@ export declare function parseResponseForExtraction(responseBody: string): {
     parsed: unknown;
     isJson: boolean;
 };
+/**
+ * Validate that a source path has valid syntax for JSON extraction.
+ * Allows dotted paths (`a.b.c`), bracket notation (`items[0].id`),
+ * $‑prefix (`$.user.name`), and rejects consecutive dots or empty strings.
+ */
+export declare function isSourcePathSyntaxValid(path: string): boolean;
 //# sourceMappingURL=index.d.ts.map
