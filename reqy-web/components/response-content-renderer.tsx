@@ -90,11 +90,11 @@ export function ResponseContentRenderer({
     </div>
   );
 
-  /** Shared highlighted code block — for JSON with syntax colours. */
+  /** Shared highlighted code block — for JSON with syntax colours. Same base style as codeBlock. */
   const codeBlockHighlighted = (html: string) => (
     <div className="bg-code-bg h-full overflow-auto code-scrollbar">
       <pre
-        className="p-4 text-sm leading-relaxed whitespace-pre-wrap break-words font-mono"
+        className="p-4 text-sm leading-relaxed whitespace-pre-wrap break-words font-mono text-code-text"
         dangerouslySetInnerHTML={{
           __html: DOMPurify.sanitize(html, {
             ALLOWED_TAGS: ["span"],
