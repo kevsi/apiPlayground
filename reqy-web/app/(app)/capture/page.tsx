@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -349,9 +350,10 @@ export default function CapturePage() {
                   >
                     <span
                       data-method={s.method}
-                      className={`inline-flex h-6 min-w-[3.5rem] items-center justify-center rounded px-2 text-xs font-semibold ${methodBadgeClass(
-                        s.method,
-                      )}`}
+                      className={cn(
+                        "inline-flex h-6 min-w-[3.5rem] items-center justify-center rounded px-2 text-xs font-semibold",
+                        methodBadgeClass(s.method),
+                      )}
                     >
                       {s.method}
                     </span>
@@ -359,9 +361,10 @@ export default function CapturePage() {
                       {s.url}
                     </span>
                     <span
-                      className={`inline-flex h-6 items-center justify-center rounded px-2 text-xs font-semibold ${statusBadgeClass(
-                        statusById[s.id],
-                      )}`}
+                      className={cn(
+                        "inline-flex h-6 items-center justify-center rounded px-2 text-xs font-semibold",
+                        statusBadgeClass(statusById[s.id]),
+                      )}
                     >
                       {statusById[s.id] != null ? statusById[s.id] : "…"}
                     </span>
@@ -449,9 +452,10 @@ export default function CapturePage() {
               <div className="flex items-center gap-2">
                 <span
                   data-method={selected.method}
-                  className={`inline-flex h-6 min-w-[3.5rem] items-center justify-center rounded px-2 text-xs font-semibold ${methodBadgeClass(
-                    selected.method,
-                  )}`}
+                  className={cn(
+                    "inline-flex h-6 min-w-[3.5rem] items-center justify-center rounded px-2 text-xs font-semibold",
+                    methodBadgeClass(selected.method),
+                  )}
                 >
                   {selected.method}
                 </span>
@@ -464,9 +468,10 @@ export default function CapturePage() {
 
             <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
               <span
-                className={`inline-flex h-6 items-center justify-center rounded px-2 text-xs font-semibold ${statusBadgeClass(
-                  selected.status,
-                )}`}
+                className={cn(
+                  "inline-flex h-6 items-center justify-center rounded px-2 text-xs font-semibold",
+                  statusBadgeClass(selected.status),
+                )}
               >
                 {selected.status != null ? `Statut ${selected.status}` : "Statut —"}
               </span>

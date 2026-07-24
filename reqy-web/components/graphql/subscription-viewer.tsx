@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -42,13 +43,14 @@ export function SubscriptionViewer({ messages, onStop }: Props) {
         {messages.map((m) => (
           <div
             key={m.id}
-            className={`p-2 rounded text-xs font-mono ${
+            className={cn(
+              "p-2 rounded text-xs font-mono",
               m.type === "error"
                 ? "bg-destructive/10 text-destructive"
                 : m.type === "complete"
                   ? "bg-warning/10"
-                  : "bg-muted/30"
-            }`}
+                  : "bg-muted/30",
+            )}
           >
             <div className="text-xs text-muted-foreground mb-1">
               {new Date(m.timestamp).toLocaleTimeString()} — {m.type}

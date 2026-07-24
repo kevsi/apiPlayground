@@ -1,23 +1,24 @@
-"use client"
+"use client";
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { RotateCcw, RotateCcwIcon, Pencil, Check, X } from "lucide-react"
-import { useShortcuts } from "@/hooks/use-shortcuts"
-import { SHORTCUT_DEFS, type KeyCombo } from "@/lib/shortcut-defs"
+import { useState, useCallback, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { RotateCcw, RotateCcwIcon, Pencil, Check, X } from "lucide-react";
+import { useShortcuts } from "@/hooks/use-shortcuts";
+import { SHORTCUT_DEFS, type KeyCombo } from "@/lib/shortcut-defs";
 
 export function KeyboardSection() {
-  const { custom, getKeys, setCustom, reset, resetAll } = useShortcuts()
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const { custom, getKeys, setCustom, reset, resetAll } = useShortcuts();
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Group by category
-  const byCategory = new Map<string, typeof SHORTCUT_DEFS>()
+  const byCategory = new Map<string, typeof SHORTCUT_DEFS>();
   for (const def of SHORTCUT_DEFS) {
-    const list = byCategory.get(def.category) ?? []
-    list.push(def)
-    byCategory.set(def.category, list)
+    const list = byCategory.get(def.category) ?? [];
+    list.push(def);
+    byCategory.set(def.category, list);
   }
 
   return (
@@ -47,8 +48,8 @@ export function KeyboardSection() {
               </h3>
               <div className="space-y-2">
                 {defs.map((def) => {
-                  const isCustom = custom[def.id] !== undefined
-                  const isEditing = editingId === def.id
+                  const isCustom = custom[def.id] !== undefined;
+                  const isEditing = editingId === def.id;
                   return (
                     <div
                       key={def.id}
@@ -60,8 +61,8 @@ export function KeyboardSection() {
                           <KeyRecorder
                             initialKeys={getKeys(def.id)}
                             onSave={(combo) => {
-                              setCustom(def.id, combo)
-                              setEditingId(null)
+                              setCustom(def.id, combo);
+                              setEditingId(null);
                             }}
                             onCancel={() => setEditingId(null)}
                           />
@@ -90,7 +91,7 @@ export function KeyboardSection() {
                         )}
                       </div>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -98,28 +99,31 @@ export function KeyboardSection() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 // ─── Combo badge ────────────────────────────────────────────────────
 function ComboBadge({ combo, isCustom }: { combo: KeyCombo; isCustom: boolean }) {
-  const parts: string[] = []
-  if (combo.ctrl) parts.push("Ctrl")
-  if (combo.shift) parts.push("⇧")
-  if (combo.alt) parts.push("Alt")
-  parts.push(combo.key.charAt(0).toUpperCase() + combo.key.slice(1))
+  const parts: string[] = [];
+  if (combo.ctrl) parts.push("Ctrl");
+  if (combo.shift) parts.push("⇧");
+  if (combo.alt) parts.push("Alt");
+  parts.push(combo.key.charAt(0).toUpperCase() + combo.key.slice(1));
 
   return parts.map((p, i) => (
     <span key={i}>
       <Badge
         variant="outline"
-        className={`font-mono text-xs tracking-wide tabular-nums ${isCustom ? "border-primary/50 text-primary" : ""}`}
+        className={cn(
+          "font-mono text-xs tracking-wide tabular-nums",
+          isCustom ? "border-primary/50 text-primary" : "",
+        )}
       >
         {p}
       </Badge>
       {i < parts.length - 1 && <span className="mx-0.5 text-xs text-muted-foreground">+</span>}
     </span>
-  ))
+  ));
 }
 
 // ─── Key recorder ───────────────────────────────────────────────────
@@ -128,13 +132,13 @@ const MODIFIER_LABELS: Record<string, string> = {
   Meta: "⌘",
   Shift: "⇧",
   Alt: "Alt",
-}
+};
 
 function keyLabel(e: KeyboardEvent): string | null {
-  if (e.key === "Control" || e.key === "Meta" || e.key === "Shift" || e.key === "Alt") return null
-  if (e.key === " ") return "Space"
-  if (e.key.length === 1) return e.key.toUpperCase()
-  return e.key
+  if (e.key === "Control" || e.key === "Meta" || e.key === "Shift" || e.key === "Alt") return null;
+  if (e.key === " ") return "Space";
+  if (e.key.length === 1) return e.key.toUpperCase();
+  return e.key;
 }
 
 function KeyRecorder({
@@ -142,74 +146,78 @@ function KeyRecorder({
   onSave,
   onCancel,
 }: {
-  initialKeys: KeyCombo
-  onSave: (combo: KeyCombo) => void
-  onCancel: () => void
+  initialKeys: KeyCombo;
+  onSave: (combo: KeyCombo) => void;
+  onCancel: () => void;
 }) {
-  const [recording, setRecording] = useState(false)
-  const [current, setCurrent] = useState<KeyCombo>(initialKeys)
-  const ref = useRef<HTMLDivElement>(null)
+  const [recording, setRecording] = useState(false);
+  const [current, setCurrent] = useState<KeyCombo>(initialKeys);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const handleKey = useCallback((e: KeyboardEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleKey = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    if (e.key === "Escape") {
-      onCancel()
-      return
-    }
-    if (e.key === "Enter") {
-      // Only save if there's at least one modifier + a key
-      if (current.key && (current.ctrl || current.shift || current.alt)) {
-        onSave(current)
+      if (e.key === "Escape") {
+        onCancel();
+        return;
       }
-      return
-    }
+      if (e.key === "Enter") {
+        // Only save if there's at least one modifier + a key
+        if (current.key && (current.ctrl || current.shift || current.alt)) {
+          onSave(current);
+        }
+        return;
+      }
 
-    const label = keyLabel(e)
-    if (label) {
-      setCurrent((prev) => ({
-        ...prev,
-        key: label,
-        ctrl: prev.ctrl || e.ctrlKey || e.metaKey,
-        shift: prev.shift || e.shiftKey,
-        alt: prev.alt || e.altKey,
-      }))
-    } else {
-      // Modifier key pressed alone — track it
-      setCurrent((prev) => ({
-        ...prev,
-        ctrl: prev.ctrl || e.ctrlKey || e.metaKey,
-        shift: prev.shift || e.shiftKey,
-        alt: prev.alt || e.altKey,
-      }))
-    }
-  }, [current, onSave, onCancel])
+      const label = keyLabel(e);
+      if (label) {
+        setCurrent((prev) => ({
+          ...prev,
+          key: label,
+          ctrl: prev.ctrl || e.ctrlKey || e.metaKey,
+          shift: prev.shift || e.shiftKey,
+          alt: prev.alt || e.altKey,
+        }));
+      } else {
+        // Modifier key pressed alone — track it
+        setCurrent((prev) => ({
+          ...prev,
+          ctrl: prev.ctrl || e.ctrlKey || e.metaKey,
+          shift: prev.shift || e.shiftKey,
+          alt: prev.alt || e.altKey,
+        }));
+      }
+    },
+    [current, onSave, onCancel],
+  );
 
   useEffect(() => {
     if (recording) {
-      window.addEventListener("keydown", handleKey, true)
-      return () => window.removeEventListener("keydown", handleKey, true)
+      window.addEventListener("keydown", handleKey, true);
+      return () => window.removeEventListener("keydown", handleKey, true);
     }
-  }, [recording, handleKey])
+  }, [recording, handleKey]);
 
   // Auto-start recording on mount
   useEffect(() => {
-    setRecording(true)
-  }, [])
+    setRecording(true);
+  }, []);
 
-  const parts: string[] = []
-  if (current.ctrl) parts.push("Ctrl")
-  if (current.shift) parts.push("⇧")
-  if (current.alt) parts.push("Alt")
-  if (current.key) parts.push(current.key)
+  const parts: string[] = [];
+  if (current.ctrl) parts.push("Ctrl");
+  if (current.shift) parts.push("⇧");
+  if (current.alt) parts.push("Alt");
+  if (current.key) parts.push(current.key);
 
   return (
     <div ref={ref} className="flex items-center gap-1.5">
       <div
-        className={`flex items-center gap-0.5 rounded-md border px-2 py-0.5 font-mono text-xs ${
-          recording ? "border-primary animate-pulse" : "border-border"
-        }`}
+        className={cn(
+          "flex items-center gap-0.5 rounded-md border px-2 py-0.5 font-mono text-xs",
+          recording ? "border-primary animate-pulse" : "border-border",
+        )}
         onClick={() => setRecording(true)}
       >
         {parts.length > 0 ? (
@@ -229,7 +237,7 @@ function KeyRecorder({
         type="button"
         onClick={() => {
           if (current.key && (current.ctrl || current.shift || current.alt)) {
-            onSave(current)
+            onSave(current);
           }
         }}
         className="text-green-600 hover:text-green-500"
@@ -237,9 +245,14 @@ function KeyRecorder({
       >
         <Check className="size-4" />
       </button>
-      <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground" aria-label="Annuler">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-muted-foreground hover:text-foreground"
+        aria-label="Annuler"
+      >
         <X className="size-4" />
       </button>
     </div>
-  )
+  );
 }

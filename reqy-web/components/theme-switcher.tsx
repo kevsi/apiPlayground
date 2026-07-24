@@ -1,16 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Palette, Check } from "lucide-react"
-import { useTheme, type Theme } from "./theme-provider"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Palette, Check } from "lucide-react";
+import { useTheme, type Theme } from "./theme-provider";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const themes: { value: Theme; label: string; description: string; bg: string; card: string; accent: string }[] = [
+const themes: {
+  value: Theme;
+  label: string;
+  description: string;
+  bg: string;
+  card: string;
+  accent: string;
+}[] = [
   {
     value: "light",
     label: "Light",
@@ -67,13 +70,13 @@ const themes: { value: Theme; label: string; description: string; bg: string; ca
     card: "#0e0e0e",
     accent: "#5b50db",
   },
-]
+];
 
 export function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme()
-  const [open, setOpen] = useState(false)
+  const { theme, setTheme } = useTheme();
+  const [open, setOpen] = useState(false);
 
-  const activeTheme = themes.find((t) => t.value === theme)
+  const activeTheme = themes.find((t) => t.value === theme);
 
   return (
     <>
@@ -102,19 +105,20 @@ export function ThemeSwitcher() {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {themes.map((t) => {
-                  const isActive = theme === t.value
+                  const isActive = theme === t.value;
                   return (
                     <button
                       key={t.value}
                       onClick={() => {
-                        setTheme(t.value)
-                        setOpen(false)
+                        setTheme(t.value);
+                        setOpen(false);
                       }}
-                      className={`group relative flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 hover:scale-[1.02] ${
+                      className={cn(
+                        "group relative flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 hover:scale-[1.02]",
                         isActive
                           ? "border-primary ring-2 ring-primary/20"
-                          : "border-border hover:border-muted-foreground/30"
-                      }`}
+                          : "border-border hover:border-muted-foreground/30",
+                      )}
                     >
                       {/* Mini preview */}
                       <div
@@ -145,8 +149,12 @@ export function ThemeSwitcher() {
                       {/* Label + check */}
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-foreground leading-none">{t.label}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{t.description}</p>
+                          <p className="text-sm font-semibold text-foreground leading-none">
+                            {t.label}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {t.description}
+                          </p>
                         </div>
                         {isActive && (
                           <div className="flex size-5 items-center justify-center rounded-full bg-primary">
@@ -155,7 +163,7 @@ export function ThemeSwitcher() {
                         )}
                       </div>
                     </button>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -169,12 +177,13 @@ export function ThemeSwitcher() {
               <p className="text-xs text-muted-foreground">
                 Active theme:{" "}
                 <span className="font-semibold text-foreground">{activeTheme?.label}</span>
-                {" — "}{activeTheme?.description}
+                {" — "}
+                {activeTheme?.description}
               </p>
             </div>
           </div>
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

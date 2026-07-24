@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,16 +96,18 @@ function ToolRow({
           <span className="size-2 animate-pulse rounded-full bg-muted-foreground/30" />
         ) : (
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
               status === "connected"
                 ? "bg-success/10 text-success"
-                : "bg-muted text-muted-foreground"
-            }`}
+                : "bg-muted text-muted-foreground",
+            )}
           >
             <span
-              className={`size-1.5 rounded-full ${
-                status === "connected" ? "bg-success" : "bg-muted-foreground"
-              }`}
+              className={cn(
+                "size-1.5 rounded-full",
+                status === "connected" ? "bg-success" : "bg-muted-foreground",
+              )}
             />
             {status === "connected" ? "Connecté" : "Non connecté"}
           </span>

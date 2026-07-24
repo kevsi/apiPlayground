@@ -301,16 +301,23 @@ export default function DashboardPage() {
                 <Card key={stat.title} className="bg-card overflow-hidden relative">
                   {/* accent gradient */}
                   <div
-                    className={`absolute inset-x-0 top-0 h-16 bg-gradient-to-b ${stat.accent} pointer-events-none`}
+                    className={cn(
+                      "absolute inset-x-0 top-0 h-16 bg-gradient-to-b",
+                      stat.accent,
+                      "pointer-events-none",
+                    )}
                   />
                   <CardHeader className="flex flex-row items-center justify-between pb-1 relative">
                     <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       {stat.title}
                     </CardTitle>
                     <div
-                      className={`flex size-8 items-center justify-center rounded-lg ${stat.iconBg}`}
+                      className={cn(
+                        "flex size-8 items-center justify-center rounded-lg",
+                        stat.iconBg,
+                      )}
                     >
-                      <stat.icon className={`size-4 ${stat.iconColor}`} />
+                      <stat.icon className={cn("size-4", stat.iconColor)} />
                     </div>
                   </CardHeader>
                   <CardContent className="relative">
@@ -373,7 +380,10 @@ export default function DashboardPage() {
                         className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors"
                       >
                         <span
-                          className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}
+                          className={cn(
+                            "inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold",
+                            METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700",
+                          )}
                         >
                           {request.method}
                         </span>
@@ -381,7 +391,10 @@ export default function DashboardPage() {
                           {request.endpoint}
                         </span>
                         <span
-                          className={`text-xs font-semibold text-center ${STATUS_COLOR(request.status)}`}
+                          className={cn(
+                            "text-xs font-semibold text-center",
+                            STATUS_COLOR(request.status),
+                          )}
                         >
                           {request.status || "—"}
                         </span>
@@ -428,7 +441,14 @@ export default function DashboardPage() {
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span
-                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${endpoint.status === "healthy" ? "bg-success/10 text-success" : endpoint.status === "warning" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"}`}
+                              className={cn(
+                                "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                                endpoint.status === "healthy"
+                                  ? "bg-success/10 text-success"
+                                  : endpoint.status === "warning"
+                                    ? "bg-warning/10 text-warning"
+                                    : "bg-destructive/10 text-destructive",
+                              )}
                             >
                               {endpoint.status}
                             </span>
@@ -578,7 +598,14 @@ export default function DashboardPage() {
                     <div className="text-right shrink-0">
                       <p className="text-base font-bold text-foreground">{endpoint.avgTime}ms</p>
                       <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${endpoint.status === "healthy" ? "bg-success/10 text-success" : endpoint.status === "warning" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"}`}
+                        className={cn(
+                          "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                          endpoint.status === "healthy"
+                            ? "bg-success/10 text-success"
+                            : endpoint.status === "warning"
+                              ? "bg-warning/10 text-warning"
+                              : "bg-destructive/10 text-destructive",
+                        )}
                       >
                         {endpoint.status}
                       </span>
@@ -638,7 +665,10 @@ export default function DashboardPage() {
                   className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors"
                 >
                   <span
-                    className={`inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold ${METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700"}`}
+                    className={cn(
+                      "inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-bold",
+                      METHOD_BADGE[request.method] ?? "bg-slate-100 text-slate-700",
+                    )}
                   >
                     {request.method}
                   </span>
@@ -646,7 +676,10 @@ export default function DashboardPage() {
                     {request.endpoint}
                   </span>
                   <span
-                    className={`text-xs font-semibold text-center ${STATUS_COLOR(request.status)}`}
+                    className={cn(
+                      "text-xs font-semibold text-center",
+                      STATUS_COLOR(request.status),
+                    )}
                   >
                     {request.status || "—"}
                   </span>
