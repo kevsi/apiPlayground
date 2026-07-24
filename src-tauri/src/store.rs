@@ -120,15 +120,13 @@ impl QueueStore {
 
     /// All requests still awaiting delivery, in enqueue (FIFO) order.
     pub fn list_pending(&self) -> Vec<QueuedRequest> {
-        let guard = self.queue.lock().expect("queue lock poisoned");
-        guard.clone()
+        self.queue.lock().ok().map(|g| g.clone()).unwrap_or_default()
     }
 
     /// Peek the oldest pending request without removing it, or `None` if empty.
     /// Used by the replay loop to grab the next item to send.
     pub fn dequeue_ready(&self) -> Option<QueuedRequest> {
-        let guard = self.queue.lock().expect("queue lock poisoned");
-        guard.first().cloned()
+        self.queue.lock().ok()?.first().cloned()
     }
 
     /// Remove a request that has been delivered successfully.
@@ -178,7 +176,10 @@ fn default_store() -> &'static QueueStore {
                     "offline-queue-{}.json",
                     std::process::id()
                 ));
-                QueueStore::open(fallback).expect("offline queue fallback also failed")
+                QueueStore::open(fallback).unwrap_or_else(|e| {
+                    eprintln!("[offline-queue] CRITICAL: fallback also failed: {e}");
+                    panic!("offline queue completely unavailable: {e}")
+                })
             }
         }
     })

@@ -49,16 +49,18 @@ impl GrpcManager {
     }
   }
 
-  pub fn insert(&self, id: String, conn: GrpcConnection) {
-    self.connections.lock().unwrap().insert(id, conn);
+  pub fn insert(&self, id: String, conn: GrpcConnection) -> Result<(), AppError> {
+    self.connections.lock()?.insert(id, conn);
+    Ok(())
   }
 
   pub fn get(&self, id: &str) -> Option<GrpcConnection> {
-    self.connections.lock().unwrap().get(id).cloned()
+    self.connections.lock().ok()?.get(id).cloned()
   }
 
-  pub fn remove(&self, id: &str) {
-    self.connections.lock().unwrap().remove(id);
+  pub fn remove(&self, id: &str) -> Result<(), AppError> {
+    self.connections.lock()?.remove(id);
+    Ok(())
   }
 }
 
@@ -109,7 +111,7 @@ pub async fn grpc_connect(
     (hostport.to_string(), 80u16)
   };
 
-  manager.insert(id.clone(), GrpcConnection { host, port, _tls: false });
+  manager.insert(id.clone(), GrpcConnection { host, port, _tls: false })?;
   Ok(id)
 }
 
@@ -118,7 +120,7 @@ pub async fn grpc_disconnect(
   connection_id: String,
   manager: tauri::State<'_, GrpcManager>,
 ) -> Result<(), AppError> {
-  manager.remove(&connection_id);
+  manager.remove(&connection_id)?;
   Ok(())
 }
 

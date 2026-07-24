@@ -18,16 +18,17 @@ impl GitRepoState {
         GitRepoState { repo_dir: Arc::new(Mutex::new(None)) }
     }
 
-    pub fn set_path(&self, path: PathBuf) {
-        *self.repo_dir.lock().unwrap() = Some(path);
+    pub fn set_path(&self, path: PathBuf) -> Result<(), AppError> {
+        *self.repo_dir.lock().map_err(|e| AppError::Internal(e.to_string()))? = Some(path);
+        Ok(())
     }
 
-    pub fn get_path(&self) -> Option<PathBuf> {
-        self.repo_dir.lock().unwrap().clone()
+    pub fn get_path(&self) -> Result<Option<PathBuf>, AppError> {
+        self.repo_dir.lock().map_err(|e| AppError::Internal(e.to_string())).map(|g| g.clone())
     }
 
     pub fn open_repo(&self) -> Result<Repository, AppError> {
-        let path = self.get_path()
+        let path = self.get_path()?
             .ok_or_else(|| AppError::InvalidInput("No git repository initialized".into()))?;
         Repository::open(&path)
             .map_err(|e| AppError::Internal(format!("Failed to open repo: {}", e)))
@@ -42,7 +43,7 @@ pub async fn git_init(
     let repo_path = PathBuf::from(&path);
     Repository::init(&repo_path)
         .map_err(|e| AppError::Internal(format!("git init failed: {}", e)))?;
-    state.set_path(repo_path);
+    state.set_path(repo_path)?;
     Ok(())
 }
 
@@ -55,7 +56,7 @@ pub async fn git_open(
     // Validate by trying to open
     Repository::open(&repo_path)
         .map_err(|e| AppError::InvalidInput(format!("Cannot open repo at {path}: {e}")))?;
-    state.set_path(repo_path);
+    state.set_path(repo_path)?;
     Ok(())
 }
 
@@ -323,13 +324,13 @@ pub async fn git_branch_list(
         let (ahead, behind) = match branch.upstream() {
             Ok(upstream) => {
                 let merge_base = repo.merge_base(
-                    branch.get().target().unwrap(),
-                    upstream.get().target().unwrap(),
+                    branch.get().target().ok_or_else(|| AppError::Internal("branch has no target".into()))?,
+                    upstream.get().target().ok_or_else(|| AppError::Internal("branch has no target".into()))?,
                 ).ok();
                 match merge_base {
                     Some(base) => {
                         let a = repo.graph_ahead_behind(
-                            branch.get().target().unwrap(),
+                            branch.get().target().ok_or_else(|| AppError::Internal("branch has no target".into()))?,
                             base,
                         ).ok().unwrap_or((0, 0));
                         (a.0 as i32, a.1 as i32)
@@ -548,7 +549,7 @@ pub async fn git_clone(
 ) -> Result<(), AppError> {
     let _repo = Repository::clone(&url, &dest_path)
         .map_err(|e| AppError::Network(format!("Clone failed: {e}")))?;
-    state.set_path(PathBuf::from(&dest_path));
+    state.set_path(PathBuf::from(&dest_path))?;
     Ok(())
 }
 

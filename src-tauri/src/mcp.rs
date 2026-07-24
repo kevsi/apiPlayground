@@ -125,10 +125,14 @@ pub fn start_mcp_server(
 
   // Drain stderr in a background thread so the long-lived child never blocks on a
   // full pipe, and so we can report the reason if startup fails.
-  let mut stderr = child
+  let mut stderr: Box<dyn Read + Send> = child
     .stderr
     .take()
-    .expect("stderr was configured as piped");
+    .map(|s| Box::new(s) as Box<dyn Read + Send>)
+    .unwrap_or_else(|| {
+      eprintln!("[mcp] stderr not available");
+      Box::new(std::io::empty())
+    });
   let captured = Arc::new(Mutex::new(String::new()));
   let captured_for_thread = Arc::clone(&captured);
   std::thread::spawn(move || {
@@ -138,7 +142,9 @@ pub fn start_mcp_server(
         Ok(0) => break,
         Ok(n) => {
           if let Ok(text) = std::str::from_utf8(&buf[..n]) {
-            captured_for_thread.lock().unwrap().push_str(text);
+            if let Ok(mut guard) = captured_for_thread.lock() {
+              guard.push_str(text);
+            }
           }
         }
         Err(_) => break,
@@ -153,7 +159,7 @@ pub fn start_mcp_server(
   loop {
     match child.try_wait() {
       Ok(Some(_)) => {
-        let msg = captured.lock().unwrap().clone();
+        let msg = captured.lock().ok().map(|g| g.clone()).unwrap_or_default();
         return Err(AppError::Internal(format!(
           "MCP server exited during startup. {}",
           msg.trim()

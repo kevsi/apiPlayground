@@ -353,17 +353,28 @@ fn start_proxy_server(
           captured.error = Some(e.to_string());
           captured.duration_ms = Some(start.elapsed().as_millis() as u64);
           let _ = handle.emit("captured-request-updated", &captured);
-          let _ = request.respond(
-            Response::from_string(format!("Proxy error: {}", e))
-              .with_status_code(502)
-              .with_header(
-                tiny_http::Header::from_bytes(
-                  "Content-Type".as_bytes(),
-                  "text/plain".as_bytes(),
-                )
-                .unwrap(),
-              ),
-          );
+          match tiny_http::Header::from_bytes(
+            "Content-Type".as_bytes(),
+            "text/plain".as_bytes(),
+          ) {
+            Ok(header) => {
+              let _ = request.respond(
+                Response::from_string(format!("Proxy error: {}", e))
+                  .with_status_code(502)
+                  .with_header(header),
+              );
+            }
+            Err(err) => {
+              eprintln!(
+                "[capture-proxy] failed to create 502 Content-Type header: {:?}",
+                err
+              );
+              let _ = request.respond(
+                Response::from_string(format!("Proxy error: {}", e))
+                  .with_status_code(502),
+              );
+            }
+          };
           continue;
         }
       };
