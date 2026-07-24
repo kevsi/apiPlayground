@@ -9,7 +9,6 @@ mod capture;
 mod open;
 mod fetch;
 mod store;
-pub mod grpc;
 pub mod git;
 
 use crate::capture::{
@@ -62,7 +61,6 @@ pub fn run() {
       .manage(SharedClient { normal: http_client, insecure: insecure_client })
       .manage::<ManagedCaptureProxyState>(Arc::new(Mutex::new(capture::CaptureProxyState::default())))
       .manage::<mcp::ManagedMcpState>(Arc::new(Mutex::new(mcp::McpProcessState::default())))
-      .manage::<grpc::GrpcManager>(grpc::GrpcManager::new())
       .manage::<git::commands::GitRepoState>(git::commands::GitRepoState::new())
       .invoke_handler(tauri::generate_handler![
         fetch_proxy,
@@ -74,9 +72,6 @@ pub fn run() {
         get_captured_session,
         clear_captured_sessions,
         set_bandwidth_limit,
-        grpc::grpc_connect,
-        grpc::grpc_disconnect,
-        grpc::grpc_invoke,
         git::commands::git_init,
         git::commands::git_open,
         git::commands::git_status,
