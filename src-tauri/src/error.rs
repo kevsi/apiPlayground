@@ -77,3 +77,9 @@ impl<T> From<std::sync::PoisonError<T>> for AppError {
     AppError::Internal(format!("Lock poisoned: {}", e))
   }
 }
+
+impl From<git2::Error> for AppError {
+  fn from(e: git2::Error) -> Self {
+    AppError::Internal(e.to_string())
+  }
+}
