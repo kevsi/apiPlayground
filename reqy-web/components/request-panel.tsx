@@ -571,7 +571,7 @@ function TestAssertionPanel({
                         ? "header-name"
                         : "$.data.id"
                 }
-                className="flex-1 h-8 border-input bg-muted/20 text-xs font-mono transition-all duration-200 focus:bg-muted/40 min-w-0"
+                className="flex-1 h-8 border-input bg-muted/20 text-xs transition-all duration-200 focus:bg-muted/40 min-w-0"
               />
               {assertion.type !== "status" && (
                 <Input
@@ -581,7 +581,7 @@ function TestAssertionPanel({
                   placeholder={
                     assertion.type === "jsonPath" ? "expected value" : "expected value (optional)"
                   }
-                  className="flex-1 h-8 border-input bg-muted/20 text-xs font-mono transition-all duration-200 focus:bg-muted/40 min-w-0"
+                  className="flex-1 h-8 border-input bg-muted/20 text-xs transition-all duration-200 focus:bg-muted/40 min-w-0"
                 />
               )}
             </div>
