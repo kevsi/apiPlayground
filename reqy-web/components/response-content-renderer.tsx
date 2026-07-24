@@ -23,8 +23,6 @@ import {
   isAudio,
   isVideo,
   isBinary,
-  highlightJson,
-  highlightMarkup,
   extractVideoUrls,
   extractImageUrls,
 } from "./response-utils";
@@ -78,79 +76,35 @@ export function ResponseContentRenderer({
     </div>
   );
 
+  /** Shared code block styling for all text formats — no syntax highlighting, no line numbers. */
+  const codeBlock = (content: string, textColor = "text-code-text") => (
+    <div className="bg-code-bg h-full overflow-auto code-scrollbar">
+      <pre
+        className={
+          "p-4 text-sm leading-relaxed whitespace-pre-wrap break-words font-mono " + textColor
+        }
+      >
+        <code>{content}</code>
+      </pre>
+    </div>
+  );
+
   const renderJson = () => {
     if (isJson(safeBody, responseHeaders)) {
       try {
         const parsed = JSON.parse(safeBody);
         const formatted = JSON.stringify(parsed, null, 2);
-        const lines = formatted.split("\n");
-        return (
-          <div className="bg-code-bg h-full overflow-auto code-scrollbar">
-            <div className="flex">
-              <div className="shrink-0 select-none py-4 pl-3 pr-4 text-right text-[11px] leading-relaxed text-muted-foreground/20 font-mono border-r border-border/20">
-                {lines.map((_, i) => (
-                  <div
-                    key={i}
-                    className="px-1 text-right"
-                    style={{ minWidth: `${String(lines.length).length}ch` }}
-                  >
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-              <pre
-                className="flex-1 p-4 text-sm leading-relaxed font-mono overflow-auto whitespace-pre-wrap break-words"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightJson(formatted)) }}
-              />
-            </div>
-          </div>
-        );
+        return codeBlock(formatted);
       } catch {
-        return (
-          <div className="bg-code-bg h-full overflow-auto code-scrollbar">
-            <pre className="p-4 text-sm leading-relaxed text-destructive whitespace-pre-wrap break-words font-mono">
-              <code className="text-destructive">Error parsing JSON</code>
-            </pre>
-          </div>
-        );
+        return codeBlock("Error parsing JSON", "text-destructive");
       }
     }
-    return (
-      <div className="bg-code-bg h-full overflow-auto code-scrollbar">
-        <pre className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
-          <code>{safeBody}</code>
-        </pre>
-      </div>
-    );
+    return codeBlock(safeBody);
   };
 
-  const renderXml = () => (
-    <div className="bg-code-bg h-full overflow-auto code-scrollbar">
-      <pre
-        className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono"
-        dangerouslySetInnerHTML={{
-          __html: DOMPurify.sanitize(highlightMarkup(safeBody), {
-            ALLOWED_TAGS: ["span", "br"],
-            ALLOWED_ATTR: ["class"],
-          }),
-        }}
-      />
-    </div>
-  );
+  const renderXml = () => codeBlock(safeBody);
 
-  const renderHtml = () => (
-    <div className="bg-code-bg h-full overflow-auto code-scrollbar">
-      <pre
-        className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono"
-        dangerouslySetInnerHTML={{
-          __html: DOMPurify.sanitize(highlightMarkup(safeBody), {
-            ALLOWED_TAGS: ["span", "br"],
-            ALLOWED_ATTR: ["class"],
-          }),
-        }}
-      />
-    </div>
-  );
+  const renderHtml = () => codeBlock(safeBody);
 
   const renderPreview = () => {
     if (isHtml(safeBody, responseHeaders)) {
