@@ -92,10 +92,7 @@ export const ResponseTimeline = memo(function ResponseTimeline({ timings }: Resp
               )}
             >
               <span
-                className={cn(
-                  "font-semibold",
-                  dominantSegment?.key === segment.key && "flex items-center gap-0.5",
-                )}
+                className={cn(dominantSegment?.key === segment.key && "flex items-center gap-0.5")}
               >
                 {dominantSegment?.key === segment.key && <AlertTriangle className="size-2.5" />}
                 {segment.label}
@@ -109,7 +106,7 @@ export const ResponseTimeline = memo(function ResponseTimeline({ timings }: Resp
           <div className="text-muted-foreground/30">·</div>
 
           {/* Total */}
-          <div className="flex items-center gap-1 text-[10px] font-mono font-semibold text-foreground/70">
+          <div className="flex items-center gap-1 text-[10px] font-mono text-foreground/70">
             <span>Total</span>
             <span className="tabular-nums">{totalMs}</span>
             <span className="text-muted-foreground/70">ms</span>

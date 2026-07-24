@@ -118,9 +118,7 @@ export function BodyEditor({ body, bodyType, onBodyChange, onBodyTypeChange }: B
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="json">
-                <span className="font-mono">JSON</span>
-              </SelectItem>
+              <SelectItem value="json">JSON</SelectItem>
               <SelectItem value="form-data">Form Data</SelectItem>
               <SelectItem value="x-www-form">x-www-form</SelectItem>
               <SelectItem value="raw">Raw</SelectItem>

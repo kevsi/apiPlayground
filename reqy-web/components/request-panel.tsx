@@ -183,17 +183,17 @@ ${bodyPart}})
 
   return (
     <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
-      {/* Request URL Section — monumental command bar */}
-      <div className="p-3 pb-1">
-        {/* URL Bar — prominent glow container */}
-        <div className="flex items-center gap-2 rounded-lg border border-input/50 px-3 py-1.5 transition-all duration-200">
-          {/* Method select — compact */}
+      {/* Request URL Section */}
+      <div className="p-2 pb-1">
+        {/* URL Bar */}
+        <div className="flex items-center gap-1.5 rounded-lg border border-input/50 px-2.5 py-1 transition-all duration-200">
+          {/* Method select */}
           <Select value={method} onValueChange={(value) => onMethodChange(value as HttpMethod)}>
             <SelectTrigger
               aria-label="HTTP method"
               data-testid="method-selector"
               className={cn(
-                "shrink-0 rounded-lg border-0 px-2.5 py-1 text-[11px] font-bold font-mono cursor-pointer transition-all duration-200 outline-none ring-offset-0 focus:ring-0 focus:ring-offset-0 h-auto w-auto gap-1 [&>svg]:size-3.5",
+                "shrink-0 rounded-md border-0 px-2 py-0.5 text-[10px] font-bold font-mono cursor-pointer transition-all duration-200 outline-none ring-offset-0 focus:ring-0 focus:ring-offset-0 h-auto w-auto gap-0.5 [&>svg]:size-3",
                 methodBg[method],
                 "text-white",
               )}
@@ -212,7 +212,7 @@ ${bodyPart}})
             </SelectContent>
           </Select>
 
-          {/* URL Input — studio style */}
+          {/* URL Input */}
           <div className="relative flex-1">
             <Input
               ref={urlInputRef}
@@ -220,7 +220,7 @@ ${bodyPart}})
               value={url}
               onChange={(e) => onUrlChange(e.target.value)}
               placeholder="https://api.example.com/endpoint"
-              className="font-mono text-sm"
+              className="font-mono text-xs h-7 py-0 px-2"
             />
           </div>
 
@@ -229,7 +229,7 @@ ${bodyPart}})
             <div className="relative">
               <select
                 aria-label="Insert variable"
-                className="h-8 rounded-md border border-input/50 bg-muted/30 px-2 text-[11px] font-mono text-muted-foreground cursor-pointer outline-none hover:border-muted-foreground/30 appearance-none"
+                className="h-7 rounded-md border border-input/50 bg-muted/30 px-1.5 text-[10px] font-mono text-muted-foreground cursor-pointer outline-none hover:border-muted-foreground/30 appearance-none"
                 value=""
                 onChange={(e) => {
                   const name = e.target.value;
@@ -266,16 +266,16 @@ ${bodyPart}})
               await onSend();
             }}
             className={cn(
-              "h-8 shrink-0 gap-2 px-4 text-sm font-semibold transition-all duration-200",
+              "h-7 shrink-0 gap-1.5 px-2.5 text-xs font-semibold transition-all duration-200",
               methodBg[method],
               "text-white hover:opacity-85",
             )}
             title={!hasUrl ? "URL required to send" : "Send request"}
           >
             {isLoading ? (
-              <Loader2 className="size-4 animate-spin fill-current" />
+              <Loader2 className="size-3.5 animate-spin fill-current" />
             ) : (
-              <Play className="size-4 fill-current" />
+              <Play className="size-3.5 fill-current" />
             )}
             <span>{isLoading ? "Sending..." : "Send"}</span>
           </Button>

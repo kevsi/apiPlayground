@@ -404,7 +404,7 @@ export function ResponsePanel({
         <TabsContent
           value="response"
           data-testid="response-body"
-          className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-auto"
+          className="m-0 min-h-0 flex-1 animate-fade-in relative overflow-hidden bg-muted/5"
         >
           {/* Payload size — real byte count of the response body */}
           {hasResponse && responseByteSize > 0 && (

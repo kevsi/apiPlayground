@@ -132,7 +132,7 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
                   }}
                 />
               </div>
-              <span className="text-[11px] font-mono font-medium text-muted-foreground whitespace-nowrap tabular-nums">
+              <span className="text-[11px] font-mono font-semibold text-muted-foreground whitespace-nowrap tabular-nums">
                 {responseTime ?? 0}
                 <span className="text-muted-foreground/70">ms</span>
               </span>
@@ -141,7 +141,7 @@ export const ResponseStatusBar = memo(function ResponseStatusBar({
             {/* Size — compact */}
             <div className="flex items-center gap-1 rounded-md border border-muted-foreground/10 bg-muted/20 px-2 py-1">
               <FileText className="size-3 text-muted-foreground/70" />
-              <span className="text-[11px] font-mono font-medium text-muted-foreground tabular-nums">
+              <span className="text-[11px] font-mono font-semibold text-muted-foreground tabular-nums">
                 {responseSize ?? "0 B"}
               </span>
             </div>
