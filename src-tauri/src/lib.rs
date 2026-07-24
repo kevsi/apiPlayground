@@ -4,7 +4,6 @@ use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 
 mod error;
-pub mod websocket;
 mod mcp;
 mod capture;
 mod open;
@@ -23,8 +22,6 @@ use crate::open::{export_json, open_external, save_file};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Install Rustls crypto provider before any TLS operation.
-  // tokio-tungstenite (rustls 0.23) needs an explicit provider;
-  // reqwest uses an older rustls 0.21 with auto-selected ring.
   rustls::crypto::ring::default_provider()
     .install_default()
     .expect("Failed to install Rustls crypto provider");
@@ -62,7 +59,6 @@ pub fn run() {
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
-      .manage(websocket::manager::ConnectionManager::new())
       .manage(SharedClient { normal: http_client, insecure: insecure_client })
       .manage::<ManagedCaptureProxyState>(Arc::new(Mutex::new(capture::CaptureProxyState::default())))
       .manage::<mcp::ManagedMcpState>(Arc::new(Mutex::new(mcp::McpProcessState::default())))
@@ -78,10 +74,6 @@ pub fn run() {
         get_captured_session,
         clear_captured_sessions,
         set_bandwidth_limit,
-        websocket::commands::ws_connect,
-        websocket::commands::ws_send,
-        websocket::commands::ws_disconnect,
-        websocket::commands::ws_get_status,
         grpc::grpc_connect,
         grpc::grpc_disconnect,
         grpc::grpc_invoke,

@@ -26,26 +26,6 @@ description = "Allows the stop_capture_proxy command"
 commands.allow = ["stop_capture_proxy"]
 
 [[permission]]
-identifier = "allow-ws-connect"
-description = "Allows the ws_connect command"
-commands.allow = ["ws_connect"]
-
-[[permission]]
-identifier = "allow-ws-send"
-description = "Allows the ws_send command"
-commands.allow = ["ws_send"]
-
-[[permission]]
-identifier = "allow-ws-disconnect"
-description = "Allows the ws_disconnect command"
-commands.allow = ["ws_disconnect"]
-
-[[permission]]
-identifier = "allow-ws-get-status"
-description = "Allows the ws_get_status command"
-commands.allow = ["ws_get_status"]
-
-[[permission]]
 identifier = "allow-start-mcp-server"
 description = "Allows the start_mcp_server command"
 commands.allow = ["start_mcp_server"]

@@ -28,7 +28,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Wifi, Radio, Network, Braces } from "lucide-react";
+import { Radio, Braces } from "lucide-react";
 import { useRequestStore } from "@/hooks/use-request-store";
 import { useShallow } from "zustand/react/shallow";
 import { useRouter } from "next/navigation";
@@ -112,15 +112,6 @@ export function ApiHeader() {
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup heading="Tools">
-              <CommandItem
-                onSelect={() => {
-                  setSearchOpen(false);
-                  router.push("/websocket");
-                }}
-              >
-                <Wifi className="mr-2 size-4" />
-                <span>Open WebSocket Panel</span>
-              </CommandItem>
               <CommandItem
                 onSelect={() => {
                   setSearchOpen(false);
