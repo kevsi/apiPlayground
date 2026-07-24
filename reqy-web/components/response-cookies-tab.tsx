@@ -74,11 +74,9 @@ export const ResponseCookiesTab = memo(function ResponseCookiesTab({
             className="rounded-lg border border-border/30 bg-muted/10 px-3.5 py-2.5 transition-all duration-200 hover:bg-muted/20 hover:border-border/60"
           >
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-xs font-bold text-foreground/90">{cookie.name}</span>
+              <span className="text-xs font-bold text-foreground/90">{cookie.name}</span>
               <span className="text-[10px] text-muted-foreground/60">=</span>
-              <span className="font-mono text-xs text-muted-foreground/80 break-all">
-                {cookie.value}
-              </span>
+              <span className="text-xs text-muted-foreground/80 break-all">{cookie.value}</span>
             </div>
             <div className="mt-1.5 flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground/60">
               {cookie.domain && (
