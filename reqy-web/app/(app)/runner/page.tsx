@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Play,
@@ -12,6 +12,9 @@ import {
   ListChecks,
   Terminal,
   CircleSlash,
+  Upload,
+  FileText,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,10 +38,13 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useRequestStore, type Collection } from "@/hooks/use-request-store";
-import { runCollection as runCollectionEngine } from "@/lib/test-runner/runner";
+import { runCollection as runCollectionEngine, type RunnerOptions } from "@/lib/test-runner/runner";
 import { createRunnerExecutor } from "@/lib/test-runner/executor";
+import { loadJsonDataset, loadCsvDataset } from "@/lib/test-runner/data-driven";
 import {
   type CollectionRunReport,
   type RequestTestResult,
@@ -126,14 +132,20 @@ function formatActual(v: unknown): string {
   }
 }
 
-function RequestResult({ result }: { result: RequestTestResult }) {
+function RequestResult({
+  result,
+  accordionValue,
+}: {
+  result: RequestTestResult;
+  accordionValue: string;
+}) {
   const meta = STATUS_META[result.status];
   const StatusIcon = meta.icon;
   const hasScript = !!(result.scriptOutput?.pre || result.scriptOutput?.post);
   const hasAssertions = result.assertionResults.length > 0;
 
   return (
-    <AccordionItem value={result.requestId} className="px-4">
+    <AccordionItem value={accordionValue} className="px-4">
       <AccordionTrigger className="items-center gap-3 hover:no-underline">
         <span className={cn("size-2 rounded-full shrink-0", meta.dot)} />
         <span className="flex-1 min-w-0 truncate font-medium text-foreground">
@@ -231,6 +243,13 @@ export default function RunnerPage() {
   const [error, setError] = useState<string | null>(null);
   const [integrity, setIntegrity] = useState<"idle" | "valid" | "tampered">("idle");
 
+  // Dataset state
+  const [datasetText, setDatasetText] = useState("");
+  const [datasetRows, setDatasetRows] = useState<Record<string, string>[]>([]);
+  const [datasetError, setDatasetError] = useState<string | null>(null);
+  const [datasetFileName, setDatasetFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const reportHash = useMemo(() => (report ? hashRunReport(report) : ""), [report]);
 
   const selected: Collection | null = collections.find((c) => c.id === selectedId) ?? null;
@@ -252,6 +271,96 @@ export default function RunnerPage() {
     [environmentVariables],
   );
 
+  // Build RunnerContext[] from dataset rows for iteration-based execution
+  const iterations = useMemo<RunnerContext[] | undefined>(() => {
+    if (datasetRows.length === 0) return undefined;
+    return datasetRows.map((row, i) => ({
+      environment: environmentVariables ?? {},
+      iterationData: row,
+      iterationIndex: i,
+      log: () => {},
+    }));
+  }, [datasetRows, environmentVariables]);
+
+  // Parse the pasted/uploaded text as JSON or CSV
+  const handleLoadDataset = useCallback(() => {
+    setDatasetError(null);
+    const trimmed = datasetText.trim();
+    if (!trimmed) {
+      setDatasetError("Please paste JSON or CSV data, or upload a file.");
+      return;
+    }
+    // Try JSON first
+    try {
+      const rows = loadJsonDataset(trimmed);
+      setDatasetRows(rows);
+      setDatasetFileName(null);
+      return;
+    } catch {
+      // Fall through to CSV
+    }
+    // Try CSV
+    try {
+      const rows = loadCsvDataset(trimmed);
+      if (rows.length === 0) {
+        setDatasetError("No rows found in CSV data.");
+        return;
+      }
+      setDatasetRows(rows);
+      setDatasetFileName(null);
+    } catch (e) {
+      setDatasetError(e instanceof Error ? e.message : "Failed to parse dataset.");
+    }
+  }, [datasetText]);
+
+  // Read a .json or .csv file and auto-parse it
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDatasetError(null);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      setDatasetText(text);
+      setDatasetFileName(file.name);
+      // Auto-parse
+      try {
+        const rows = loadJsonDataset(text);
+        setDatasetRows(rows);
+        return;
+      } catch {
+        // Fall through to CSV
+      }
+      try {
+        const rows = loadCsvDataset(text);
+        if (rows.length === 0) {
+          setDatasetError("No rows found in CSV data.");
+          return;
+        }
+        setDatasetRows(rows);
+      } catch (e) {
+        setDatasetError(e instanceof Error ? e.message : "Failed to parse dataset.");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  }, []);
+
+  // Clear the loaded dataset
+  const handleClearDataset = useCallback(() => {
+    setDatasetText("");
+    setDatasetRows([]);
+    setDatasetError(null);
+    setDatasetFileName(null);
+  }, []);
+
+  // Column names from the first row of the dataset
+  const columnNames = useMemo(() => {
+    if (datasetRows.length === 0) return [];
+    return Object.keys(datasetRows[0]);
+  }, [datasetRows]);
+
   const handleRun = useCallback(async () => {
     if (!selected) return;
     setIsRunning(true);
@@ -259,7 +368,11 @@ export default function RunnerPage() {
     setReport(null);
     setError(null);
     try {
-      const result = await runCollectionEngine(selected, baseContext, { executor });
+      const opts: RunnerOptions = { executor };
+      if (iterations) {
+        opts.iterations = iterations;
+      }
+      const result = await runCollectionEngine(selected, baseContext, opts);
       setReport(result);
       setProgress(100);
       setIntegrity("idle");
@@ -268,7 +381,7 @@ export default function RunnerPage() {
     } finally {
       setIsRunning(false);
     }
-  }, [selected, baseContext, executor]);
+  }, [selected, baseContext, executor, iterations]);
 
   const summary = report?.summary;
   const total = summary?.total ?? 0;
@@ -357,6 +470,97 @@ export default function RunnerPage() {
         </CardContent>
       </Card>
 
+      {/* Dataset section */}
+      <Card className="bg-card mb-5">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-sm font-medium text-foreground">
+              Dataset <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+            </h2>
+            {datasetRows.length > 0 && (
+              <Badge variant="secondary" className="gap-1.5 text-xs">
+                <FileText className="size-3" />
+                {datasetRows.length} row{datasetRows.length !== 1 ? "s" : ""}
+              </Badge>
+            )}
+          </div>
+
+          {datasetRows.length > 0 ? (
+            /* Loaded: show summary with columns and clear action */
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Columns
+                </span>
+                {columnNames.map((col) => (
+                  <Badge key={col} variant="outline" className="text-[11px] font-mono">
+                    {col}
+                  </Badge>
+                ))}
+              </div>
+              {datasetFileName && (
+                <p className="text-xs text-muted-foreground">
+                  File: <span className="font-medium text-foreground">{datasetFileName}</span>
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={handleClearDataset}
+                  disabled={isRunning}
+                >
+                  <X className="size-3" />
+                  Clear dataset
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Not loaded: show textarea + upload */
+            <div className="space-y-3">
+              <Textarea
+                placeholder={`Paste a JSON array of objects or CSV data here…\n\nExample (JSON):\n[{"id":"1","name":"Alice"},{"id":"2","name":"Bob"}]\n\nExample (CSV):\nid,name\n1,Alice\n2,Bob`}
+                value={datasetText}
+                onChange={(e) => setDatasetText(e.target.value)}
+                className="min-h-24 text-xs font-mono"
+                disabled={isRunning}
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={handleLoadDataset}
+                  disabled={isRunning || !datasetText.trim()}
+                >
+                  <Upload className="size-3" />
+                  Load dataset
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isRunning}
+                >
+                  <FileText className="size-3" />
+                  Upload .json/.csv
+                </Button>
+              </div>
+              {datasetError && <p className="text-xs text-destructive">{datasetError}</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Progress */}
       {(isRunning || progress === 100) && (
         <div className="mb-5">
@@ -434,6 +638,12 @@ export default function RunnerPage() {
                 <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {report.collectionName}
                 </span>
+                {datasetRows.length > 0 && (
+                  <Badge variant="secondary" className="text-[11px] gap-1">
+                    <FileText className="size-3" />
+                    {datasetRows.length} it
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent className="relative space-y-4">
@@ -516,14 +726,20 @@ export default function RunnerPage() {
                 <ListChecks className="size-4 text-muted-foreground" />
                 Requests
                 <span className="text-xs font-normal text-muted-foreground">
-                  ({report.results.length})
+                  {datasetRows.length > 0
+                    ? `(${datasetRows.length} iteration${datasetRows.length !== 1 ? "s" : ""} × ${requestCount} request${requestCount !== 1 ? "s" : ""})`
+                    : `(${report.results.length})`}
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Accordion type="single" collapsible className="w-full">
-                {report.results.map((r) => (
-                  <RequestResult key={r.requestId} result={r} />
+                {report.results.map((r, i) => (
+                  <RequestResult
+                    key={`${r.requestId}-${i}`}
+                    result={r}
+                    accordionValue={`${r.requestId}-${i}`}
+                  />
                 ))}
               </Accordion>
             </CardContent>
