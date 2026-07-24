@@ -220,7 +220,7 @@ ${bodyPart}})
               value={url}
               onChange={(e) => onUrlChange(e.target.value)}
               placeholder="https://api.example.com/endpoint"
-              className="font-mono text-xs h-7 py-0 px-2"
+              className="text-xs h-7 py-0 px-2"
             />
           </div>
 
