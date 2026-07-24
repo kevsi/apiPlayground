@@ -114,3 +114,114 @@ commands.allow = ["dequeue_ready"]
 identifier = "allow-mark-sent"
 description = "Allows the mark_sent command"
 commands.allow = ["mark_sent"]
+
+# ── Git commands ─────────────────────────────────────────────────────────
+[[permission]]
+identifier = "allow-git-init"
+description = "Allows the git_init command"
+commands.allow = ["git_init"]
+
+[[permission]]
+identifier = "allow-git-open"
+description = "Allows the git_open command"
+commands.allow = ["git_open"]
+
+[[permission]]
+identifier = "allow-git-status"
+description = "Allows the git_status command"
+commands.allow = ["git_status"]
+
+[[permission]]
+identifier = "allow-git-log"
+description = "Allows the git_log command"
+commands.allow = ["git_log"]
+
+[[permission]]
+identifier = "allow-git-commit"
+description = "Allows the git_commit command"
+commands.allow = ["git_commit"]
+
+[[permission]]
+identifier = "allow-git-stage"
+description = "Allows the git_stage command"
+commands.allow = ["git_stage"]
+
+[[permission]]
+identifier = "allow-git-stage-all"
+description = "Allows the git_stage_all command"
+commands.allow = ["git_stage_all"]
+
+[[permission]]
+identifier = "allow-git-unstage"
+description = "Allows the git_unstage command"
+commands.allow = ["git_unstage"]
+
+[[permission]]
+identifier = "allow-git-diff"
+description = "Allows the git_diff command"
+commands.allow = ["git_diff"]
+
+[[permission]]
+identifier = "allow-git-branch-list"
+description = "Allows the git_branch_list command"
+commands.allow = ["git_branch_list"]
+
+[[permission]]
+identifier = "allow-git-branch-create"
+description = "Allows the git_branch_create command"
+commands.allow = ["git_branch_create"]
+
+[[permission]]
+identifier = "allow-git-branch-delete"
+description = "Allows the git_branch_delete command"
+commands.allow = ["git_branch_delete"]
+
+[[permission]]
+identifier = "allow-git-branch-switch"
+description = "Allows the git_branch_switch command"
+commands.allow = ["git_branch_switch"]
+
+[[permission]]
+identifier = "allow-git-remote-list"
+description = "Allows the git_remote_list command"
+commands.allow = ["git_remote_list"]
+
+[[permission]]
+identifier = "allow-git-remote-add"
+description = "Allows the git_remote_add command"
+commands.allow = ["git_remote_add"]
+
+[[permission]]
+identifier = "allow-git-remote-remove"
+description = "Allows the git_remote_remove command"
+commands.allow = ["git_remote_remove"]
+
+[[permission]]
+identifier = "allow-git-push"
+description = "Allows the git_push command"
+commands.allow = ["git_push"]
+
+[[permission]]
+identifier = "allow-git-push-force"
+description = "Allows the git_push_force command"
+commands.allow = ["git_push_force"]
+
+[[permission]]
+identifier = "allow-git-fetch"
+description = "Allows the git_fetch command"
+commands.allow = ["git_fetch"]
+
+[[permission]]
+identifier = "allow-git-pull"
+description = "Allows the git_pull command"
+commands.allow = ["git_pull"]
+
+[[permission]]
+identifier = "allow-git-clone"
+description = "Allows the git_clone command"
+commands.allow = ["git_clone"]
+
+[[permission]]
+identifier = "allow-git-sync-collections"
+description = "Allows the git_sync_collections command"
+commands.allow = ["git_sync_collections"]
