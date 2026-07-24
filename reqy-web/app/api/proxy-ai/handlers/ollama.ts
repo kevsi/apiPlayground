@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { structuredError } from "../lib/errors";
+import { passthroughSSE } from "../lib/sse";
 import { isOllamaHostAllowed } from "../lib/url-utils";
 import { buildOpenAIToolHistory } from "../lib/tool-history";
 import type { PreviousTurn } from "../lib/tool-history";
@@ -72,6 +73,10 @@ export async function handleOllama(
     }),
   });
 
+  // Streaming passthrough
+  if (body.stream && res.body) return passthroughSSE(res);
+
+  // Non-streaming: parse JSON response
   const data: unknown = await res.json();
   if (!res.ok) {
     const err =

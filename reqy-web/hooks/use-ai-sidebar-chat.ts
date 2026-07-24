@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useRequestStore } from "@/hooks/use-request-store";
 import { useShallow } from "zustand/react/shallow";
-import { callAIText } from "@/lib/ai-engine/providers";
+import { callAIText, callAITextStream } from "@/lib/ai-engine/providers";
 import { dispatchAIActions } from "@/lib/ai-engine";
 import {
   loadAIProvider,
@@ -129,9 +129,7 @@ export function useAiSidebarChat() {
           apiKey,
           model: aiModel || undefined,
           openaiUrl:
-            provider === "openai" || provider === "custom"
-              ? aiBaseUrl || undefined
-              : undefined,
+            provider === "openai" || provider === "custom" ? aiBaseUrl || undefined : undefined,
           ollamaUrl:
             provider === "ollama"
               ? `http://${ollamaConfig.host || "127.0.0.1"}:${ollamaConfig.port ?? 11434}`
@@ -157,9 +155,8 @@ export function useAiSidebarChat() {
 
           addStep("fill", `Création de requête ${parsed.method} ${parsed.url}`);
 
-          const wantsExecute = /\b(exécute|exécuter|lance|lancer|execute|run|go|envoie|envoyer)\b/i.test(
-            content,
-          );
+          const wantsExecute =
+            /\b(exécute|exécuter|lance|lancer|execute|run|go|envoie|envoyer)\b/i.test(content);
           if (wantsExecute) {
             doneStep(); // fill done
             addStep("execute", `Exécution ${parsed.method} ${parsed.url}`);
@@ -207,8 +204,12 @@ export function useAiSidebarChat() {
           };
 
           const ctx: AIContext = {
-            currentRequest:
-              store.currentRequest ?? { method: "GET", url: "", headers: {}, params: {} },
+            currentRequest: store.currentRequest ?? {
+              method: "GET",
+              url: "",
+              headers: {},
+              params: {},
+            },
             lastResponse: store.lastResponse ?? null,
             environmentVariables: store.environmentVariables ?? {},
             collectionHistory: (store.collectionHistory ?? []).slice(0, 10),
@@ -241,8 +242,12 @@ export function useAiSidebarChat() {
         // Get fresh state AFTER actions have been dispatched
         const fresh = useRequestStore.getState();
         const responseCtx = {
-          currentRequest:
-            fresh.currentRequest ?? { method: "GET", url: "", headers: {}, params: {} },
+          currentRequest: fresh.currentRequest ?? {
+            method: "GET",
+            url: "",
+            headers: {},
+            params: {},
+          },
           lastResponse: fresh.lastResponse ?? null,
           environmentVariables: fresh.environmentVariables ?? {},
           collectionHistory: (fresh.collectionHistory ?? []).slice(0, 10),
@@ -272,18 +277,35 @@ IMPORTANT — When you describe a request (made or suggested), ALWAYS include a 
 \`\`\`
 This lets the system execute the actual request you described.`;
 
-        const responseText = await callAIText(content, {
-          ...aiConfig,
-          system: systemPrompt,
-        });
+        // ── Streaming response ──────────────────────────────────────
+        // Insert an empty assistant message that will be progressively filled.
+        const assistantIndex = messages.length; // index in the next state after push
+        setMessages((prev) => [...prev, { role: "assistant", content: "", steps: [...steps] }]);
+
+        let streamedText = "";
+        const onToken = (token: string) => {
+          streamedText += token;
+          // Update the last assistant message with accumulated text
+          setMessages((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last && last.role === "assistant") {
+              copy[copy.length - 1] = { ...last, content: streamedText, steps: [...steps] };
+            }
+            return copy;
+          });
+        };
+
+        await callAITextStream(content, { ...aiConfig, system: systemPrompt }, onToken);
         doneStep(); // réponse générée
 
+        // ── Post-AI actions (JSON block detection) ───────────────────
         // If no actions were dispatched by regex, try parsing the AI's
         // response for structured action data (method + URL in a JSON block).
-        let finalContent = responseText;
+        let finalContent = streamedText;
 
         if (actions.length === 0) {
-          const aiActions = parseActionsFromAIResponse(responseText);
+          const aiActions = parseActionsFromAIResponse(streamedText);
           if (aiActions && aiActions.length > 0) {
             const a = aiActions[0];
             addStep("fill", `Création de requête ${a.method} ${a.url}`);
@@ -312,8 +334,12 @@ This lets the system execute the actual request you described.`;
               addStep("execute", `Exécution ${a.method} ${a.url}`);
 
               const postCtx: AIContext = {
-                currentRequest:
-                  store.currentRequest ?? { method: "GET", url: "", headers: {}, params: {} },
+                currentRequest: store.currentRequest ?? {
+                  method: "GET",
+                  url: "",
+                  headers: {},
+                  params: {},
+                },
                 lastResponse: store.lastResponse ?? null,
                 environmentVariables: store.environmentVariables ?? {},
                 collectionHistory: (store.collectionHistory ?? []).slice(0, 10),
@@ -362,7 +388,7 @@ This lets the system execute the actual request you described.`;
                 const status = fresh2.lastResponse?.status ?? "?";
                 const durationMs = fresh2.lastResponse?.durationMs ?? 0;
                 finalContent =
-                  responseText +
+                  streamedText +
                   `\n\n✅ Requête \`${a.method} ${a.url}\` exécutée — status ${status} (${durationMs}ms)`;
               }
             } catch (e) {
@@ -372,6 +398,7 @@ This lets the system execute the actual request you described.`;
           }
         }
 
+        // ── Set final content ────────────────────────────────────────
         setMessages((prev) => {
           const copy = [...prev];
           const last = copy[copy.length - 1];

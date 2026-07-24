@@ -1,8 +1,10 @@
-export function passthroughSSE(upstreamRes: Response): Response {
+import { NextResponse } from "next/server";
+
+export function passthroughSSE(upstreamRes: Response): NextResponse {
   if (!upstreamRes.body) {
-    return new Response("Upstream returned no body", { status: 502 });
+    return NextResponse.json({ error: "Upstream returned no body" }, { status: 502 });
   }
-  return new Response(upstreamRes.body, {
+  return new NextResponse(upstreamRes.body, {
     status: upstreamRes.status,
     headers: {
       "Content-Type": "text/event-stream",
@@ -10,5 +12,5 @@ export function passthroughSSE(upstreamRes: Response): Response {
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },
-  });
+  }) as NextResponse;
 }

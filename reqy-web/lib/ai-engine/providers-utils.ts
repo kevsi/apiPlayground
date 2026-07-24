@@ -59,6 +59,75 @@ export async function fetchWithTimeout(
 }
 
 /**
+ * SSE event parser for streaming AI responses.
+ * Processes a ReadableStream<Uint8Array> and yields parsed SSE `data` lines.
+ * Supports the standard SSE format from OpenAI-compatible endpoints:
+ *   data: {"choices":[{"delta":{"content":"token"}}]}
+ *   data: [DONE]
+ *
+ * Also handles Ollama's NDJSON streaming format (each line is a JSON object).
+ */
+export async function* parseSSEStream(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<Record<string, unknown>> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Split on double newlines (SSE boundary)
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? ""; // keep incomplete chunk in buffer
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === "data: [DONE]") continue;
+
+        // Try both SSE format "data: {...}" and raw NDJSON
+        const dataStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
+
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (typeof parsed === "object" && parsed !== null) {
+            yield parsed as Record<string, unknown>;
+          }
+        } catch {
+          // Skip lines that aren't valid JSON
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
+ * Extract text content from streaming SSE chunks.
+ * Works with OpenAI-compatible format: choices[0].delta.content
+ * and Ollama format: message.content
+ */
+export function extractStreamContent(chunk: Record<string, unknown>): string | null {
+  const choices = chunk.choices;
+  if (Array.isArray(choices) && choices.length > 0) {
+    const delta = (choices[0] as Record<string, unknown>)?.delta as
+      Record<string, unknown> | undefined;
+    if (delta && typeof delta.content === "string") return delta.content;
+    const innerDelta = (choices[0] as Record<string, unknown>)?.message as
+      Record<string, unknown> | undefined;
+    if (innerDelta && typeof innerDelta.content === "string") return innerDelta.content;
+  }
+  const message = chunk.message as Record<string, unknown> | undefined;
+  if (message && typeof message.content === "string") return message.content;
+  return null;
+}
+
+/**
  * Provider groups that share the same proxy call shape.
  * - PROXY_API_KEY: anthropic, openai, custom, grok
  * - PROXY_API_KEY_EXTRA: openrouter, gemini, deepseek, opencode-zen
