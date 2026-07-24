@@ -23,6 +23,7 @@ import {
   isAudio,
   isVideo,
   isBinary,
+  highlightJson,
   extractVideoUrls,
   extractImageUrls,
 } from "./response-utils";
@@ -76,7 +77,7 @@ export function ResponseContentRenderer({
     </div>
   );
 
-  /** Shared code block styling for all text formats — no syntax highlighting, no line numbers. */
+  /** Shared plain code block — no syntax highlighting. */
   const codeBlock = (content: string, textColor = "text-code-text") => (
     <div className="bg-code-bg h-full overflow-auto code-scrollbar">
       <pre
@@ -89,12 +90,27 @@ export function ResponseContentRenderer({
     </div>
   );
 
+  /** Shared highlighted code block — for JSON with syntax colours. */
+  const codeBlockHighlighted = (html: string) => (
+    <div className="bg-code-bg h-full overflow-auto code-scrollbar">
+      <pre
+        className="p-4 text-sm leading-relaxed whitespace-pre-wrap break-words font-mono"
+        dangerouslySetInnerHTML={{
+          __html: DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ["span"],
+            ALLOWED_ATTR: ["class"],
+          }),
+        }}
+      />
+    </div>
+  );
+
   const renderJson = () => {
     if (isJson(safeBody, responseHeaders)) {
       try {
         const parsed = JSON.parse(safeBody);
         const formatted = JSON.stringify(parsed, null, 2);
-        return codeBlock(formatted);
+        return codeBlockHighlighted(highlightJson(formatted));
       } catch {
         return codeBlock("Error parsing JSON", "text-destructive");
       }
