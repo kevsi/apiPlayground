@@ -1,12 +1,34 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { useSSE, type SSEEvent } from "@/hooks/use-sse";
+import { useSSE, type SSEAuthType, type SSEEvent } from "@/hooks/use-sse";
+import { KeyValueEditor, type KeyValuePair } from "@/components/key-value-editor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Wifi, WifiOff, Loader2, Trash2, Activity, Radio } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Wifi,
+  WifiOff,
+  Loader2,
+  Trash2,
+  Activity,
+  Radio,
+  ChevronDown,
+  ChevronRight,
+  HeadersIcon,
+  Shield,
+  Filter,
+  List,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatTimestamp(ts: number): string {
@@ -63,16 +85,42 @@ function EventItem({ event }: { event: SSEEvent }) {
   );
 }
 
+const authTypeLabels: Record<SSEAuthType, string> = {
+  none: "No Auth",
+  bearer: "Bearer Token",
+  basic: "Basic Auth",
+};
+
 export function SSEPanel() {
   const { status, events, connect, disconnect, clearEvents } = useSSE();
   const [url, setUrl] = useState("https://localhost:3000/sse");
+  const [showOptions, setShowOptions] = useState(false);
   const eventsEndRef = useRef<HTMLDivElement>(null);
+
+  // Custom headers
+  const [headers, setHeaders] = useState<KeyValuePair[]>([]);
+
+  // Auth
+  const [authType, setAuthType] = useState<SSEAuthType>("none");
+  const [authToken, setAuthToken] = useState("");
+
+  // Event filter
+  const [eventFilter, setEventFilter] = useState("");
+
+  // Max events
+  const [maxEvents, setMaxEvents] = useState(500);
 
   const handleConnect = useCallback(() => {
     const trimmed = url.trim();
     if (!trimmed) return;
-    connect(trimmed);
-  }, [url, connect]);
+    connect({
+      url: trimmed,
+      headers,
+      auth: authType !== "none" && authToken ? { type: authType, token: authToken } : undefined,
+      maxEvents,
+      eventFilter: eventFilter.trim() || undefined,
+    });
+  }, [url, headers, authType, authToken, maxEvents, eventFilter, connect]);
 
   const handleDisconnect = useCallback(() => {
     disconnect();
@@ -109,6 +157,8 @@ export function SSEPanel() {
 
   const currentStatus = statusConfig[status] ?? statusConfig.idle;
 
+  const isConnected = status === "open" || status === "connecting";
+
   return (
     <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
       {/* Header */}
@@ -127,6 +177,7 @@ export function SSEPanel() {
           </div>
         </div>
       </div>
+
       {/* Connection Bar */}
       <div className="p-3 pb-1">
         <div className="flex items-center gap-2 rounded-lg border border-input/50 px-3 py-1.5 transition-all duration-200">
@@ -154,7 +205,7 @@ export function SSEPanel() {
           </div>
 
           {/* Connect / Disconnect button */}
-          {status === "open" || status === "connecting" ? (
+          {isConnected ? (
             <Button
               variant="outline"
               size="sm"
@@ -178,6 +229,136 @@ export function SSEPanel() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Options Toggle */}
+      <div className="px-3 pb-1">
+        <button
+          type="button"
+          onClick={() => setShowOptions(!showOptions)}
+          disabled={isConnected}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg border border-input/30 px-3 py-2 text-xs font-medium",
+            "text-muted-foreground/60 hover:text-foreground hover:border-input/60",
+            "transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
+          )}
+        >
+          {showOptions ? (
+            <ChevronDown className="size-3.5 shrink-0" />
+          ) : (
+            <ChevronRight className="size-3.5 shrink-0" />
+          )}
+          Options
+          {(headers.length > 0 || authType !== "none" || eventFilter || maxEvents !== 500) && (
+            <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
+              {headers.length > 0 && <HeadersIcon className="size-3" />}
+              {authType !== "none" && <Shield className="size-3" />}
+              {eventFilter && <Filter className="size-3" />}
+              {maxEvents !== 500 && <List className="size-3" />}
+            </span>
+          )}
+        </button>
+
+        {/* Options Panel */}
+        {showOptions && (
+          <div className="mt-2 space-y-4 rounded-lg border border-input/30 p-3 animate-in slide-in-from-top-1 duration-200">
+            {/* Custom Headers */}
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                Custom Headers
+              </Label>
+              <KeyValueEditor
+                pairs={headers}
+                onChange={setHeaders}
+                keyPlaceholder="Header name"
+                valuePlaceholder="Header value"
+                addLabel="Add header"
+                emptyLabel="No custom headers"
+                showToggle
+              />
+            </div>
+
+            {/* Separator */}
+            <div className="border-t border-border/40" />
+
+            {/* Auth */}
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                Authentication
+              </Label>
+              <div className="flex items-start gap-2">
+                <div className="w-40 shrink-0">
+                  <Select
+                    value={authType}
+                    onValueChange={(value) => setAuthType(value as SSEAuthType)}
+                  >
+                    <SelectTrigger className="h-9 border-input bg-muted/20 text-xs transition-all duration-200 hover:border-muted-foreground/30">
+                      <SelectValue placeholder="Auth type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Auth</SelectItem>
+                      <SelectItem value="bearer">Bearer Token</SelectItem>
+                      <SelectItem value="basic">Basic Auth</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {authType !== "none" && (
+                  <Input
+                    type="password"
+                    value={authToken}
+                    onChange={(e) => setAuthToken(e.target.value)}
+                    placeholder={
+                      authType === "bearer"
+                        ? "eyJhbGciOiJIUzI1NiIs..."
+                        : "base64(username:password)"
+                    }
+                    className="flex-1 h-9 border-input bg-muted/20 font-mono text-xs transition-all duration-200 focus:bg-muted/40"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Separator */}
+            <div className="border-t border-border/40" />
+
+            {/* Event Filter + Max Events */}
+            <div className="flex items-start gap-3">
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                  Event Filter
+                </Label>
+                <Input
+                  type="text"
+                  value={eventFilter}
+                  onChange={(e) => setEventFilter(e.target.value)}
+                  placeholder='Filter by event type (e.g. "update")'
+                  disabled={isConnected}
+                  className="h-9 border-input bg-muted/20 font-mono text-xs transition-all duration-200 focus:bg-muted/40"
+                />
+                <p className="text-[10px] text-muted-foreground/40">
+                  Leave empty to receive all events
+                </p>
+              </div>
+              <div className="w-32 shrink-0 space-y-1.5">
+                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                  Max Events
+                </Label>
+                <Input
+                  type="number"
+                  value={maxEvents}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) setMaxEvents(Math.min(Math.max(1, val), 5000));
+                  }}
+                  min={1}
+                  max={5000}
+                  disabled={isConnected}
+                  className="h-9 border-input bg-muted/20 font-mono text-xs transition-all duration-200 focus:bg-muted/40"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Events Area */}
