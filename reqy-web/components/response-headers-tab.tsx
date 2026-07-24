@@ -74,8 +74,8 @@ export const ResponseHeadersTab = memo(function ResponseHeadersTab({
             key={key}
             className="group/header flex items-start gap-3 rounded-lg border border-border/30 bg-muted/10 px-3.5 py-2.5 transition-all duration-200 hover:bg-muted/20 hover:border-border/60"
           >
-            <span className="shrink-0 font-mono text-xs font-bold text-foreground/80">{key}:</span>
-            <span className="font-mono text-xs text-muted-foreground/80 break-all leading-relaxed">
+            <span className="shrink-0 text-xs font-bold text-foreground/80">{key}:</span>
+            <span className="text-xs text-muted-foreground/80 break-all leading-relaxed">
               {value}
             </span>
           </div>
