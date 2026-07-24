@@ -71,8 +71,8 @@ export function ResponseContentRenderer({
   if (!safeBody && !responseData) return null;
 
   const renderRaw = () => (
-    <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
-      <pre className="text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
+    <div className="bg-code-bg h-full overflow-auto code-scrollbar">
+      <pre className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
         <code>{safeBody}</code>
       </pre>
     </div>
@@ -107,8 +107,8 @@ export function ResponseContentRenderer({
         );
       } catch {
         return (
-          <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
-            <pre className="text-sm leading-relaxed text-destructive whitespace-pre-wrap break-words font-mono">
+          <div className="bg-code-bg h-full overflow-auto code-scrollbar">
+            <pre className="p-4 text-sm leading-relaxed text-destructive whitespace-pre-wrap break-words font-mono">
               <code className="text-destructive">Error parsing JSON</code>
             </pre>
           </div>
@@ -116,8 +116,8 @@ export function ResponseContentRenderer({
       }
     }
     return (
-      <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
-        <pre className="text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
+      <div className="bg-code-bg h-full overflow-auto code-scrollbar">
+        <pre className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
           <code>{safeBody}</code>
         </pre>
       </div>
@@ -125,9 +125,9 @@ export function ResponseContentRenderer({
   };
 
   const renderXml = () => (
-    <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
+    <div className="bg-code-bg h-full overflow-auto code-scrollbar">
       <pre
-        className="text-sm leading-relaxed whitespace-pre-wrap break-words font-mono p-4"
+        className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono"
         dangerouslySetInnerHTML={{
           __html: DOMPurify.sanitize(highlightMarkup(safeBody), {
             ALLOWED_TAGS: ["span", "br"],
@@ -139,9 +139,9 @@ export function ResponseContentRenderer({
   );
 
   const renderHtml = () => (
-    <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
+    <div className="bg-code-bg h-full overflow-auto code-scrollbar">
       <pre
-        className="text-sm leading-relaxed whitespace-pre-wrap break-words font-mono p-4"
+        className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono"
         dangerouslySetInnerHTML={{
           __html: DOMPurify.sanitize(highlightMarkup(safeBody), {
             ALLOWED_TAGS: ["span", "br"],
@@ -247,8 +247,8 @@ export function ResponseContentRenderer({
         }
         const formatted = JSON.stringify(parsed, null, 2);
         return (
-          <div className="bg-code-bg p-4 h-full overflow-auto code-scrollbar">
-            <pre className="text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
+          <div className="bg-code-bg h-full overflow-auto code-scrollbar">
+            <pre className="p-4 text-sm leading-relaxed text-code-text whitespace-pre-wrap break-words font-mono">
               <code>{formatted}</code>
             </pre>
           </div>
