@@ -94,7 +94,7 @@ export function AssertionCorrection({
   };
 
   return (
-    <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 space-y-2">
+    <div className="mt-2 rounded-md border border-warning/30 bg-warning/5 p-2 space-y-2">
       {!suggestion && (
         <Button
           size="sm"

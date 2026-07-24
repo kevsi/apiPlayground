@@ -188,7 +188,7 @@ export function DiffDialog({
           {/* Left selector */}
           <div className="flex flex-1 flex-col gap-1.5 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="flex size-5 items-center justify-center rounded-full bg-red-500/15 text-[10px] font-bold text-red-500">
+              <span className="flex size-5 items-center justify-center rounded-full bg-destructive/15 text-[10px] font-bold text-destructive">
                 L
               </span>
               <span className="text-xs font-medium text-muted-foreground">Base</span>
@@ -248,7 +248,7 @@ export function DiffDialog({
           {/* Right selector */}
           <div className="flex flex-1 flex-col gap-1.5 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">
+              <span className="flex size-5 items-center justify-center rounded-full bg-success/15 text-[10px] font-bold text-success">
                 R
               </span>
               <span className="text-xs font-medium text-muted-foreground">Compare</span>

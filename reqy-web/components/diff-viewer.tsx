@@ -236,7 +236,9 @@ export function DiffViewer({
                         <span
                           className={cn(
                             "shrink-0 w-5 select-none text-right pr-3 font-mono text-[10px] leading-5",
-                            line.type === "removed" ? "text-red-400" : "text-muted-foreground/30",
+                            line.type === "removed"
+                              ? "text-destructive"
+                              : "text-muted-foreground/30",
                           )}
                         >
                           {line.type === "removed" ? "−" : " "}
@@ -244,9 +246,7 @@ export function DiffViewer({
                         <pre
                           className={cn(
                             "whitespace-pre-wrap break-all flex-1 py-0",
-                            line.type === "removed"
-                              ? "text-red-900 dark:text-red-300"
-                              : "text-muted-foreground",
+                            line.type === "removed" ? "text-destructive" : "text-muted-foreground",
                           )}
                         >
                           {line.content || " "}

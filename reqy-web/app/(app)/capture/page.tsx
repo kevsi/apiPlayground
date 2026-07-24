@@ -72,10 +72,10 @@ function methodBadgeClass(method: string): string {
 /** Colour classes for an HTTP status badge. */
 function statusBadgeClass(status: number | null | undefined): string {
   if (status == null) return "bg-slate-100 text-slate-500";
-  if (status >= 500) return "bg-rose-100 text-rose-700";
-  if (status >= 400) return "bg-amber-100 text-amber-700";
+  if (status >= 500) return "bg-destructive/15 text-destructive";
+  if (status >= 400) return "bg-warning/15 text-warning";
   if (status >= 300) return "bg-sky-100 text-sky-700";
-  if (status >= 200) return "bg-emerald-100 text-emerald-700";
+  if (status >= 200) return "bg-success/15 text-success";
   return "bg-slate-100 text-slate-500";
 }
 
@@ -266,7 +266,7 @@ export default function CapturePage() {
       </header>
 
       {!isTauriAvailable() && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700">
+        <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
           La capture nécessite l&apos;application de bureau Reqly (Tauri). La génération et
           l&apos;enregistrement de collection restent disponibles.
         </div>
@@ -319,7 +319,7 @@ export default function CapturePage() {
             <span>{sessions.length} requête(s) capturée(s).</span>
             {sessions.length > 0 && (
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success"
                 title="Les captures sont enregistrées sur le disque et survivent au redémarrage"
               >
                 <Database className="size-3" />

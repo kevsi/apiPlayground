@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   AreaChart,
@@ -16,31 +16,39 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-} from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+} from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const CHART_MARGIN = { top: 10, right: 10, left: -10, bottom: 0 } as const
+const CHART_MARGIN = { top: 10, right: 10, left: -10, bottom: 0 } as const;
 
 interface ChartDataPoint {
-  label: string
-  requests: number
-  errorRate: number
-  avgTime: number
+  label: string;
+  requests: number;
+  errorRate: number;
+  avgTime: number;
 }
 
 interface MethodDataPoint {
-  method: string
-  count: number
-  color: string
+  method: string;
+  count: number;
+  color: string;
 }
 
 interface StatusDataPoint {
-  range: string
-  count: number
-  color: string
+  range: string;
+  count: number;
+  color: string;
 }
 
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) => {
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { name: string; value: number; color: string }[];
+  label?: string;
+}) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-lg text-xs">
@@ -51,19 +59,19 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
           </p>
         ))}
       </div>
-    )
+    );
   }
-  return null
-}
+  return null;
+};
 
 export default function ChartsContent({
   data,
   methodData,
   statusData,
 }: {
-  data: ChartDataPoint[]
-  methodData: MethodDataPoint[]
-  statusData: StatusDataPoint[]
+  data: ChartDataPoint[];
+  methodData: MethodDataPoint[];
+  statusData: StatusDataPoint[];
 }) {
   return (
     <div className="grid gap-6">
@@ -72,7 +80,7 @@ export default function ChartsContent({
         <Card className="bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span className="size-2 rounded-full bg-emerald-500 inline-block" />
+              <span className="size-2 rounded-full bg-success inline-block" />
               Request Volume — 7 days
             </CardTitle>
           </CardHeader>
@@ -122,7 +130,12 @@ export default function ChartsContent({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.5} />
                 <XAxis dataKey="label" stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} />
-                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} domain={[0, 100]} unit="%" />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  tick={{ fontSize: 11 }}
+                  domain={[0, 100]}
+                  unit="%"
+                />
                 <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
@@ -221,9 +234,19 @@ export default function ChartsContent({
               <p className="text-xs text-muted-foreground text-center w-full">No data yet</p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={statusData} layout="vertical" margin={{ top: 5, right: 10, left: 20, bottom: 5 }}>
+                <BarChart
+                  data={statusData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 10, left: 20, bottom: 5 }}
+                >
                   <XAxis type="number" stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="range" stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} width={32} />
+                  <YAxis
+                    type="category"
+                    dataKey="range"
+                    stroke="var(--muted-foreground)"
+                    tick={{ fontSize: 11 }}
+                    width={32}
+                  />
                   <Tooltip
                     contentStyle={{
                       background: "var(--popover)",
@@ -244,5 +267,5 @@ export default function ChartsContent({
         </Card>
       </div>
     </div>
-  )
+  );
 }

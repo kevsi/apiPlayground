@@ -92,9 +92,7 @@ export const ResponseCookiesTab = memo(function ResponseCookiesTab({
                 </span>
               )}
               {cookie.secure && (
-                <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 dark:text-amber-400">
-                  Secure
-                </span>
+                <span className="rounded bg-warning/10 px-1.5 py-0.5 text-warning">Secure</span>
               )}
               {cookie.httpOnly && (
                 <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-600 dark:text-blue-400">

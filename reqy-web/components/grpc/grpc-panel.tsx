@@ -137,7 +137,7 @@ export function GrpcPanel() {
           className="flex-1 font-mono text-sm"
         />
         {isConnected ? (
-          <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-300">
+          <Badge variant="outline" className="gap-1 text-success border-success/40">
             <PlugZap className="size-3.5" />
             Connected
           </Badge>

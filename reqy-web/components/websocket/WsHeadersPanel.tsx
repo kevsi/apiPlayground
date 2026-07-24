@@ -75,9 +75,9 @@ export function WsHeadersPanel({ headers, onChange, disabled }: WsHeadersPanelPr
   return (
     <div className="border-b border-border/60 px-4 py-3">
       {!isTauriAvailable() && (
-        <div className="flex items-start gap-2 mb-2 rounded-md bg-amber-500/5 border border-amber-500/10 px-2 py-1.5">
-          <Info className="size-3.5 text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-[10px] text-amber-700 leading-tight">
+        <div className="flex items-start gap-2 mb-2 rounded-md bg-warning/5 border border-warning/10 px-2 py-1.5">
+          <Info className="size-3.5 text-warning shrink-0 mt-0.5" />
+          <p className="text-[10px] text-warning leading-tight">
             Custom headers are only supported in desktop mode (Tauri). In web mode, WebSocket
             connections use browser defaults.
           </p>

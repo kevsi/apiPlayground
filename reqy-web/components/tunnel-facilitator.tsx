@@ -110,7 +110,7 @@ export function TunnelFacilitator() {
       )}
 
       {reachable === true && (
-        <p className="text-sm text-emerald-600" data-testid="tunnel-reachable">
+        <p className="text-sm text-success" data-testid="tunnel-reachable">
           ✓ URL accessible
         </p>
       )}

@@ -19,7 +19,7 @@ const COLORS = {
   dns: "bg-blue-500/70",
   connect: "bg-violet-500/70",
   ttfb: "bg-orange-500/70",
-  transfer: "bg-emerald-500/70",
+  transfer: "bg-success/70",
 };
 
 const LABELS = {
