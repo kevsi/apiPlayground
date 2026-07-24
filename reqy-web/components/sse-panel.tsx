@@ -333,7 +333,7 @@ export function SSEPanel() {
                   onChange={(e) => setEventFilter(e.target.value)}
                   placeholder='Filter by event type (e.g. "update")'
                   disabled={isConnected}
-                  className="h-9 border-input bg-muted/20 font-mono text-xs transition-all duration-200 focus:bg-muted/40"
+                  className="h-9 border-input bg-muted/20 text-xs transition-all duration-200 focus:bg-muted/40"
                 />
                 <p className="text-[10px] text-muted-foreground/40">
                   Leave empty to receive all events
