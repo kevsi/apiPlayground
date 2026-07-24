@@ -18,8 +18,8 @@ use crate::error::AppError;
 /// of the `fs` plugin) so the user can save anywhere they pick via the native
 /// dialog, without being constrained by the plugin's filesystem scope.
 #[tauri::command]
-pub fn save_file(path: String, contents: Vec<u8>) -> Result<(), String> {
-    std::fs::write(&path, contents).map_err(|e| format!("Failed to save file to {path}: {e}"))
+pub fn save_file(path: String, contents: Vec<u8>) -> Result<(), AppError> {
+    std::fs::write(&path, contents).map_err(|e| AppError::Io(e.to_string()))
 }
 
 /// Maximum size of exported JSON content (50 MB).
