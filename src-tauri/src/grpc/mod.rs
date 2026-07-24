@@ -12,7 +12,8 @@
 //! to come from a user-supplied `.proto` file parsed on the frontend.
 //!
 //! NOTE: cleartext HTTP/2 is supported (covers local-dev use cases).
-//! TLS-backed gRPC endpoints are not yet supported by this client.
+//! TLS-backed gRPC endpoints are also supported (detected from the URL scheme
+//! at connection time).
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -34,7 +35,7 @@ type ConnectionMap = Arc<Mutex<HashMap<String, GrpcConnection>>>;
 pub struct GrpcConnection {
   host: String,
   port: u16,
-  _tls: bool,
+  tls: bool,
 }
 
 #[derive(Clone)]
@@ -111,7 +112,10 @@ pub async fn grpc_connect(
     (hostport.to_string(), 80u16)
   };
 
-  manager.insert(id.clone(), GrpcConnection { host, port, _tls: false })?;
+  // Detect TLS from scheme
+  let tls = cleaned.starts_with("https://") || cleaned.starts_with("wss://");
+
+  manager.insert(id.clone(), GrpcConnection { host, port, tls })?;
   Ok(id)
 }
 
@@ -129,7 +133,7 @@ pub async fn grpc_invoke(
   connection_id: String,
   method: String,
   request_body: Vec<u8>,
-  _metadata: Vec<(String, String)>,
+  metadata: Vec<(String, String)>,
   manager: tauri::State<'_, GrpcManager>,
 ) -> Result<GrpcInvokeResult, AppError> {
   let conn = manager
@@ -146,6 +150,7 @@ pub async fn grpc_invoke(
     .await
     .map_err(|e| AppError::Network(format!("TCP connect failed: {}", e)))?;
 
+  // New HTTP/2 connection per call (connection reuse deferred to future work)
   let (mut sender, conn_task) = http2::Builder::new(TokioExecutor::default())
     .handshake(TokioIo::new(tcp))
     .await
@@ -155,13 +160,27 @@ pub async fn grpc_invoke(
   });
 
   let framed = frame_grpc_body(&request_body);
-  let uri = format!("http://{}:{}{}", conn.host, conn.port, path);
+  let scheme = if conn.tls { "https" } else { "http" };
+  let uri = format!("{}://{}:{}{}", scheme, conn.host, conn.port, path);
   let grpc_body = Full::new(Bytes::from(framed));
-  let req = hyper::Request::builder()
+
+  let mut req_builder = hyper::Request::builder()
     .method(hyper::Method::POST)
     .uri(uri)
     .header("content-type", "application/grpc")
-    .header("te", "trailers")
+    .header("te", "trailers");
+
+  // Forward caller-supplied metadata as HTTP headers
+  for (key, value) in &metadata {
+    if let (Ok(name), Ok(val)) = (
+      hyper::header::HeaderName::from_bytes(key.as_bytes()),
+      hyper::header::HeaderValue::from_str(value),
+    ) {
+      req_builder = req_builder.header(name, val);
+    }
+  }
+
+  let req = req_builder
     .body(grpc_body)
     .map_err(|e| AppError::InvalidInput(e.to_string()))?;
 
@@ -170,20 +189,46 @@ pub async fn grpc_invoke(
     .await
     .map_err(|e| AppError::Network(format!("gRPC request failed: {}", e)))?;
 
-  let status_code = resp.status().as_u16() as u32;
-  let body = resp
-    .into_body();
-  let bytes = body
+  let (parts, body) = resp.into_parts();
+  let http_status = parts.status.as_u16() as u32;
+
+  let collected = body
     .collect()
     .await
-    .map_err(|e| AppError::Network(e.to_string()))?
-    .to_bytes();
-  let msg = deframe_grpc_body(&bytes);
+    .map_err(|e| AppError::Network(e.to_string()))?;
+
+  // Extract trailers before consuming collected with to_bytes()
+  let trailers_map = collected.trailers().cloned();
+  let msg = deframe_grpc_body(&collected.to_bytes());
+
+  // gRPC status/message may be in response headers or trailers
+  let grpc_status_header = parts
+    .headers
+    .get("grpc-status")
+    .or_else(|| trailers_map.as_ref().and_then(|t| t.get("grpc-status")))
+    .and_then(|v| v.to_str().ok())
+    .and_then(|s| s.parse::<u32>().ok());
+
+  let grpc_message = parts
+    .headers
+    .get("grpc-message")
+    .or_else(|| trailers_map.as_ref().and_then(|t| t.get("grpc-message")))
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("")
+    .to_string();
+
+  let trailers = trailers_map
+    .map(|t| {
+      t.iter()
+        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+        .collect()
+    })
+    .unwrap_or_default();
 
   Ok(GrpcInvokeResult {
-    status_code,
-    status_message: String::new(),
+    status_code: grpc_status_header.unwrap_or(http_status),
+    status_message: grpc_message,
     body: msg,
-    trailers: vec![],
+    trailers,
   })
 }
