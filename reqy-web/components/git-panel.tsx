@@ -98,7 +98,11 @@ export function GitPanel({ collections }: GitPanelProps) {
         </div>
         <div className="flex items-center gap-1.5">
           {!git.isInitialized ? (
-            <Button size="sm" onClick={git.init} className="h-7 gap-1.5 text-xs font-medium">
+            <Button
+              size="sm"
+              onClick={() => git.init()}
+              className="h-7 gap-1.5 text-xs font-medium"
+            >
               <GitBranch className="size-3.5" />
               Init repo
             </Button>
@@ -265,7 +269,11 @@ export function GitPanel({ collections }: GitPanelProps) {
           <p className="text-xs text-muted-foreground/60 mt-1.5 max-w-[240px] leading-relaxed">
             Initialize a repository to version your collections locally with Git.
           </p>
-          <Button size="sm" onClick={git.init} className="mt-5 h-8 gap-1.5 text-xs font-medium">
+          <Button
+            size="sm"
+            onClick={() => git.init()}
+            className="mt-5 h-8 gap-1.5 text-xs font-medium"
+          >
             <GitBranch className="size-3.5" />
             Initialize repository
           </Button>
