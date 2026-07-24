@@ -131,6 +131,7 @@ export function GitPanel({ collections }: GitPanelProps) {
             onAdd={git.remoteAdd}
             onRemove={git.remoteRemove}
             onPush={git.push}
+            onForcePush={git.forcePush}
             onPull={git.pull}
             onFetch={git.fetch}
             onClone={git.clone}

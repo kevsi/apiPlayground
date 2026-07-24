@@ -20,6 +20,8 @@ pub enum AppError {
   Cancelled,
   /// Resource or connection not found.
   NotFound(String),
+  /// Non-fast-forward push rejection with actionable suggestion.
+  NonFastForward(String),
   /// Resource is already in the requested state (e.g. already running).
   AlreadyRunning(String),
   /// Resource is not in the expected state (e.g. not running).
@@ -38,6 +40,7 @@ impl std::fmt::Display for AppError {
       AppError::Io(msg) => write!(f, "{}", msg),
       AppError::Cancelled => write!(f, "cancelled"),
       AppError::NotFound(msg) => write!(f, "{}", msg),
+      AppError::NonFastForward(msg) => write!(f, "{}", msg),
       AppError::AlreadyRunning(msg) => write!(f, "{}", msg),
       AppError::NotRunning(msg) => write!(f, "{}", msg),
       AppError::Internal(msg) => write!(f, "{}", msg),

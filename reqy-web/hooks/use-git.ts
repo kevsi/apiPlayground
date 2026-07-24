@@ -275,13 +275,28 @@ export function useGit(collections: Collection[]) {
 
   const push = useCallback(
     async (remote: string, branch: string) => {
+      updateState({ error: null });
       try {
         await invoke("git_push", { remote, branch });
+        await refreshAll();
       } catch (err: unknown) {
         updateState({ error: err instanceof Error ? err.message : String(err) });
       }
     },
-    [updateState],
+    [updateState, refreshAll],
+  );
+
+  const forcePush = useCallback(
+    async (remote: string, branch: string) => {
+      updateState({ error: null });
+      try {
+        await invoke("git_push_force", { remote, branch });
+        await refreshAll();
+      } catch (err: unknown) {
+        updateState({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [updateState, refreshAll],
   );
 
   const fetch = useCallback(
@@ -368,6 +383,7 @@ export function useGit(collections: Collection[]) {
     remoteAdd,
     remoteRemove,
     push,
+    forcePush,
     fetch,
     pull,
     clone,

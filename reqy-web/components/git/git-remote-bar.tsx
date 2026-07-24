@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, Plus, Trash2, Download, Upload, Cloud, GitFork } from "lucide-react";
+import { Globe, Plus, Trash2, Download, Upload, Cloud, GitFork, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +21,7 @@ interface RemoteBarProps {
   onAdd: (name: string, url: string) => void;
   onRemove: (name: string) => void;
   onPush: (remote: string, branch: string) => void;
+  onForcePush: (remote: string, branch: string) => void;
   onPull: (remote: string, branch: string) => void;
   onFetch: (remote: string) => void;
   onClone: (url: string, destPath: string) => void;
@@ -32,12 +33,16 @@ export function GitRemoteBar({
   onAdd,
   onRemove,
   onPush,
+  onForcePush,
   onPull,
   onFetch,
   onClone,
 }: RemoteBarProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [forcePushDialog, setForcePushDialog] = useState<{ remote: string; branch: string } | null>(
+    null,
+  );
   const [remoteName, setRemoteName] = useState("origin");
   const [remoteUrl, setRemoteUrl] = useState("");
   const [cloneUrl, setCloneUrl] = useState("");
@@ -112,6 +117,15 @@ export function GitRemoteBar({
                 title="Push"
               >
                 <Upload className="size-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="size-6 p-0 text-warning/60 hover:text-warning"
+                onClick={() => setForcePushDialog({ remote: r.name, branch: currentBranch })}
+                title="Force Push — overwrite remote history"
+              >
+                <AlertTriangle className="size-2.5" />
               </Button>
               <Button
                 variant="ghost"
@@ -210,6 +224,59 @@ export function GitRemoteBar({
               className="text-xs"
             >
               Clone
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Force Push confirmation dialog */}
+      <Dialog open={!!forcePushDialog} onOpenChange={(open) => !open && setForcePushDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm text-destructive">
+              <AlertTriangle className="size-4" />
+              Force push?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              This will <strong>overwrite remote history</strong> for branch{" "}
+              <code className="text-xs bg-muted px-1 rounded">
+                {forcePushDialog?.branch ?? "?"}
+              </code>{" "}
+              on{" "}
+              <code className="text-xs bg-muted px-1 rounded">
+                {forcePushDialog?.remote ?? "?"}
+              </code>
+              .
+            </p>
+            <p className="text-xs text-destructive/80 leading-relaxed">
+              Other collaborators will need to rebase their work. This is irreversible—proceed only
+              if you're sure.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setForcePushDialog(null)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (forcePushDialog) {
+                  onForcePush(forcePushDialog.remote, forcePushDialog.branch);
+                }
+                setForcePushDialog(null);
+              }}
+              className="text-xs gap-1.5"
+            >
+              <AlertTriangle className="size-3" />
+              Force push
             </Button>
           </DialogFooter>
         </DialogContent>

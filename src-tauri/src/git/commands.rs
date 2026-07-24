@@ -467,11 +467,44 @@ pub async fn git_push(
         .map_err(|_| AppError::InvalidInput(format!("Remote {remote} not found")))?;
 
     let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
-    // Push sans callback d'auth (identité SSH/git-credentials)
-    // À améliorer pour supporter l'authentification
     remote_obj.push(&[&refspec], None)
-        .map_err(|e| AppError::Network(format!("Push failed: {e}")))?;
+        .map_err(|e| push_error(e))?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn git_push_force(
+    remote: String,
+    branch: String,
+    state: State<'_, GitRepoState>,
+) -> Result<(), AppError> {
+    let repo = state.open_repo()?;
+    let mut remote_obj = repo.find_remote(&remote)
+        .map_err(|_| AppError::InvalidInput(format!("Remote {remote} not found")))?;
+
+    let refspec = format!("+refs/heads/{branch}:refs/heads/{branch}");
+    remote_obj.push(&[&refspec], None)
+        .map_err(|e| AppError::Network(format!("Force push failed: {e}")))?;
+    Ok(())
+}
+
+/// Map a `git2::Error` from a push to the most helpful `AppError` variant.
+///
+/// Non-fast-forward rejections get a dedicated, actionnable message that
+/// tells the user *why* and *what to do* instead of a generic "Push failed".
+fn push_error(e: git2::Error) -> AppError {
+    if e.code() == git2::ErrorCode::NotFastForward {
+        AppError::NonFastForward(
+            "Push rejected (non-fast-forward). The remote branch has commits you don't have locally.\n\
+             Suggestions:\n  \
+             1. Fetch: click the cloud ↓ button to get the latest changes\n  \
+             2. Rebase: git rebase origin/<branch>\n  \
+             3. Or force push (⎇  click Push, or use Force Push) — this overwrites remote history"
+                .into(),
+        )
+    } else {
+        AppError::Network(format!("Push failed: {e}"))
+    }
 }
 
 #[tauri::command]

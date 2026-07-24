@@ -102,6 +102,7 @@ pub fn run() {
         git::commands::git_remote_add,
         git::commands::git_remote_remove,
         git::commands::git_push,
+        git::commands::git_push_force,
         git::commands::git_fetch,
         git::commands::git_pull,
         git::commands::git_clone,
