@@ -1,5 +1,6 @@
 import type { Collection, RequestItem } from "@/hooks/request-types";
 import { CommitFn, WORKSPACE_PERSONAL_ID } from "./types";
+import { toast } from "sonner";
 
 export function createCollectionsMutations(commit: CommitFn) {
   const addCollection = (
@@ -88,6 +89,7 @@ export function createCollectionsMutations(commit: CommitFn) {
         collections: [...reordered, ...remaining],
       };
     });
+    toast.success("Collection réorganisée");
   };
 
   const addRequestToCollection = (

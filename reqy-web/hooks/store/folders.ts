@@ -2,6 +2,7 @@
 
 import type { CollectionFolder, RequestItem, Collection } from "@/hooks/request-types";
 import type { CommitFn } from "./types";
+import { toast } from "sonner";
 
 export function createFoldersMutations(commit: CommitFn) {
   const addFolder = (collectionId: string, name: string, parentId: string | null = null) => {
@@ -91,6 +92,7 @@ export function createFoldersMutations(commit: CommitFn) {
           : c,
       ),
     }));
+    toast.success("Requête déplacée");
   };
 
   const moveFolder = (collectionId: string, folderId: string, newParentId: string | null) => {
@@ -144,6 +146,7 @@ export function createFoldersMutations(commit: CommitFn) {
         };
       }),
     }));
+    toast.success("Requêtes réorganisées");
   };
 
   const reorderFolders = (
@@ -177,6 +180,7 @@ export function createFoldersMutations(commit: CommitFn) {
         ),
       };
     });
+    toast.success("Dossiers réorganisés");
   };
 
   const getFoldersForCollection = (
