@@ -159,14 +159,10 @@ Ces actions sont exposées via `AIEngineHandlers` (déjà défini dans `use-ai-e
 
 ---
 
-## 6. Questions ouvertes
+## 6. Décisions d'architecture
 
-1. **Historique des conversations** — On garde le localStorage comme aujourd'hui, ou on utilise IndexedDB (via `persistence`) ?
-
-2. **Resizable** — Simple `useState` + `onMouseDown`/`onMouseMove`, ou librairie (`react-resizable-panels`) ?
-
-3. **Toggle dans le header** — Plutôt un bouton dédié (icône `Bot`/`Sparkles`) ou intégré au bouton "IA" existant ?
-
-4. **Mobile/responsive** — Sidebar devient un drawer (overlay) ? Ou on cache complètement ?
-
-5. **Migration historique** — Les conversations du `floating-ai-chat` sont migrées automatiquement ?
+1. **Stockage historique:** IndexedDB (via idb-keyval) — supporte les gros volumes
+2. **Resizable:** react-resizable-panels — déjà utilisé dans l'application
+3. **Toggle:** Bouton dédié dans le header (icône Bot)
+4. **Mobile:** Drawer (via vaul) pour < 768px, sidebar pour desktop
+5. **Migration:** Ancien historique dans localStorage → migrer vers IndexedDB à la première connexion
