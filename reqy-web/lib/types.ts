@@ -31,6 +31,7 @@ export interface RequestItem {
   authType?: "none" | "bearer" | "basic" | "api-key" | "oauth2";
   authToken?: string;
   queryParams?: Array<{ key: string; value: string }>;
+  pathParams?: Array<{ key: string; value: string; enabled?: boolean }>;
   folderId?: string | null;
   /**
    * Legacy assertion format used by the original inline test editor.

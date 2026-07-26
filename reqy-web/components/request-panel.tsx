@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { Plus, Trash2, Play, Code, Braces, Check, Copy, Loader2, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HttpMethod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AutocompleteInput, type AutocompleteGroup } from "@/components/ui/autocomplete-input";
 import {
   Select,
   SelectContent,
@@ -20,7 +21,8 @@ import {
   AccordionContent,
 } from "@/components/ui/accordion";
 
-import type { BodyType, AuthType, QueryParam, Header } from "@/lib/request-executor";
+import type { BodyType, AuthType, QueryParam, Header, PathParam } from "@/lib/request-executor";
+import { extractPathParamNames, syncPathParams } from "@/lib/path-params";
 import { normalizeUrl as canonicalNormalizeUrl } from "@/lib/request-executor";
 import type { RequestTestAssertion, AssertionType } from "@/lib/types";
 import type { Assertion } from "@/lib/test-runner/types";
@@ -36,6 +38,7 @@ interface RequestPanelProps {
   method: HttpMethod;
   url: string;
   queryParams: QueryParam[];
+  pathParams: PathParam[];
   headers: Header[];
   body: string;
   bodyType: BodyType;
@@ -48,6 +51,7 @@ interface RequestPanelProps {
   onMethodChange: (method: HttpMethod) => void;
   onUrlChange: (url: string) => void;
   onQueryParamsChange: (queryParams: QueryParam[]) => void;
+  onPathParamsChange: (pathParams: PathParam[]) => void;
   onHeadersChange: (headers: Header[]) => void;
   onBodyChange: (body: string) => void;
   onBodyTypeChange: (bodyType: BodyType) => void;
@@ -60,12 +64,21 @@ interface RequestPanelProps {
   onSend: () => Promise<void>;
   isLoading?: boolean;
   variableNames?: string[];
+  /** History URLs for autocomplete (deduplicated most recent first). */
+  historyUrls?: string[];
+  /** Active environment variable names (enabled keys). */
+  environmentVariableNames?: string[];
+  /** Recent query param key suggestions from history. */
+  queryParamKeySuggestions?: AutocompleteGroup[];
+  /** Recent form-data key suggestions from history. */
+  formDataKeySuggestions?: AutocompleteGroup[];
 }
 
 export function RequestPanel({
   method,
   url,
   queryParams,
+  pathParams = [],
   headers,
   body,
   bodyType,
@@ -78,6 +91,7 @@ export function RequestPanel({
   onMethodChange,
   onUrlChange,
   onQueryParamsChange,
+  onPathParamsChange,
   onHeadersChange,
   onBodyChange,
   onBodyTypeChange,
@@ -90,11 +104,168 @@ export function RequestPanel({
   onSend,
   isLoading,
   variableNames,
+  historyUrls: historyUrlsProp,
+  environmentVariableNames,
+  queryParamKeySuggestions,
+  formDataKeySuggestions,
 }: RequestPanelProps) {
   const [exportFormat, setExportFormat] = useState<"curl" | "fetch">("curl");
 
   const [exportCopied, setExportCopied] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync path params when URL changes — auto-add/remove :param patterns
+  // Uses a ref to track the last synced URL so we don't loop.
+  const lastSyncedUrlRef = useRef(url);
+  useEffect(() => {
+    if (url === lastSyncedUrlRef.current) return;
+    lastSyncedUrlRef.current = url;
+    const synced = syncPathParams(url, pathParams);
+    onPathParamsChange(synced);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
+  const urlAutocompleteGroups = useMemo((): AutocompleteGroup[] => {
+    const groups: AutocompleteGroup[] = [];
+
+    // Environment variables — show as {{var}}
+    const envVars = environmentVariableNames?.filter(Boolean) ?? [];
+    if (envVars.length > 0) {
+      groups.push({
+        label: "Variables",
+        items: envVars.map((name) => {
+          const wrapped = `{{${name}}}`;
+          return {
+            id: `var-${name}`,
+            label: wrapped,
+            value: wrapped,
+          };
+        }),
+      });
+    }
+
+    // Variable mappings (chained variables)
+    const chainVars = variableNames?.filter(Boolean) ?? [];
+    if (chainVars.length > 0) {
+      groups.push({
+        label: "Enchaînement",
+        items: chainVars.map((name) => {
+          const wrapped = `{{${name}}}`;
+          return {
+            id: `chain-${name}`,
+            label: wrapped,
+            value: wrapped,
+          };
+        }),
+      });
+    }
+
+    // URL history (deduplicated, most recent first)
+    const seen = new Set<string>();
+    const historyItems: AutocompleteGroup["items"] = [];
+    for (const u of historyUrlsProp ?? []) {
+      if (!u || seen.has(u)) continue;
+      seen.add(u);
+      historyItems.push({
+        id: `url-${u}`,
+        label: u,
+        value: u,
+      });
+    }
+    if (historyItems.length > 0) {
+      groups.push({
+        label: "Historique",
+        items: historyItems.slice(0, 20), // cap at 20
+      });
+    }
+
+    return groups;
+  }, [environmentVariableNames, variableNames, historyUrlsProp]);
+
+  // ── Autocomplete suggestions for KeyValueEditor ──────────────────────────
+  const COMMON_HEADER_NAMES = [
+    "Accept",
+    "Accept-Encoding",
+    "Accept-Language",
+    "Access-Control-Allow-Origin",
+    "Authorization",
+    "Cache-Control",
+    "Connection",
+    "Content-Disposition",
+    "Content-Encoding",
+    "Content-Length",
+    "Content-Type",
+    "Cookie",
+    "Cross-Origin-Resource-Policy",
+    "Date",
+    "ETag",
+    "Expect",
+    "Expires",
+    "Host",
+    "If-Match",
+    "If-Modified-Since",
+    "If-None-Match",
+    "If-Range",
+    "If-Unmodified-Since",
+    "Last-Modified",
+    "Link",
+    "Location",
+    "Origin",
+    "Pragma",
+    "Range",
+    "Referer",
+    "Retry-After",
+    "Sec-Fetch-Dest",
+    "Sec-Fetch-Mode",
+    "Sec-Fetch-Site",
+    "Sec-Fetch-User",
+    "Sec-WebSocket-Accept",
+    "Sec-WebSocket-Key",
+    "Sec-WebSocket-Version",
+    "Server",
+    "Set-Cookie",
+    "Strict-Transport-Security",
+    "Transfer-Encoding",
+    "Upgrade",
+    "User-Agent",
+    "Vary",
+    "Via",
+    "WWW-Authenticate",
+    "X-API-Key",
+    "X-CSRF-Token",
+    "X-Forwarded-For",
+    "X-Forwarded-Proto",
+    "X-Request-ID",
+    "X-Requested-With",
+  ];
+
+  const headerKeySuggestions = useMemo((): AutocompleteGroup[] => {
+    return [
+      {
+        label: "En-têtes courants",
+        items: COMMON_HEADER_NAMES.map((name) => ({
+          id: `hdr-${name}`,
+          label: name,
+          value: name,
+        })),
+      },
+    ];
+  }, []);
+
+  const valueVarSuggestions = useMemo((): AutocompleteGroup[] => {
+    const vars = environmentVariableNames?.filter(Boolean) ?? [];
+    if (vars.length === 0) return [];
+    return [
+      {
+        label: "Variables",
+        items: vars.map((name) => ({
+          id: `vval-${name}`,
+          label: `{{${name}}}`,
+          value: `{{${name}}}`,
+        })),
+      },
+    ];
+  }, [environmentVariableNames]);
 
   const hasUrl = url.trim().length > 0;
 
@@ -212,15 +383,17 @@ ${bodyPart}})
             </SelectContent>
           </Select>
 
-          {/* URL Input */}
+          {/* URL Input with autocomplete */}
           <div className="relative flex-1">
-            <Input
+            <AutocompleteInput
               ref={urlInputRef}
               data-testid="url-input"
               value={url}
-              onChange={(e) => onUrlChange(e.target.value)}
+              onChange={onUrlChange}
               placeholder="https://api.example.com/endpoint"
               className="text-xs h-7 py-0 px-2"
+              suggestions={urlAutocompleteGroups}
+              emptyMessage="Aucun résultat"
             />
           </div>
 
@@ -304,7 +477,7 @@ ${bodyPart}})
           </div>
         )}
         {!hasUrl && (
-          <p className="mt-1 text-xs text-muted-foreground/70">
+          <p className="mt-1 px-2.5 text-xs text-muted-foreground/70">
             Enter a valid URL to enable sending.
           </p>
         )}
@@ -352,6 +525,32 @@ ${bodyPart}})
       {/* Accordion — collapsed sections, expand to configure */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         <Accordion type="multiple" className="space-y-1">
+          {/* Path Variables - detected from :param patterns in the URL */}
+          <AccordionItem value="path-vars" className="border border-border rounded-lg px-4 ">
+            <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wider hover:no-underline [&[data-state=open]>svg]:rotate-180">
+              <span className="flex items-center gap-2">
+                Path Variables
+                {(pathParams?.length ?? 0) > 0 && (
+                  <span className="rounded-full bg-muted-foreground/10 px-1.5 py-0.5 text-[10px] font-mono font-normal">
+                    {pathParams?.length ?? 0}
+                  </span>
+                )}
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <KeyValueEditor
+                pairs={pathParams ?? []}
+                onChange={onPathParamsChange}
+                keyPlaceholder=":param"
+                valuePlaceholder="Value"
+                addLabel="Add Path Variable"
+                emptyLabel="No path params detected — use :id in the URL"
+                showToggle
+                valueSuggestions={valueVarSuggestions}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Query Params */}
           <AccordionItem value="query-params" className="border border-border rounded-lg px-4 ">
             <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wider hover:no-underline [&[data-state=open]>svg]:rotate-180">
@@ -373,6 +572,8 @@ ${bodyPart}})
                 addLabel="Add Parameter"
                 emptyLabel="No parameters added yet"
                 showToggle
+                keySuggestions={queryParamKeySuggestions}
+                valueSuggestions={valueVarSuggestions}
               />
             </AccordionContent>
           </AccordionItem>
@@ -398,6 +599,8 @@ ${bodyPart}})
                 addLabel="Add Header"
                 emptyLabel="No headers added yet"
                 showToggle
+                keySuggestions={headerKeySuggestions}
+                valueSuggestions={valueVarSuggestions}
               />
             </AccordionContent>
           </AccordionItem>
@@ -407,9 +610,16 @@ ${bodyPart}})
             bodyType={bodyType}
             onBodyChange={onBodyChange}
             onBodyTypeChange={onBodyTypeChange}
+            environmentVariableNames={environmentVariableNames}
+            formDataKeySuggestions={formDataKeySuggestions}
           />
 
-          <AuthSection authType={authType} authToken={authToken} onAuthChange={onAuthChange} />
+          <AuthSection
+            authType={authType}
+            authToken={authToken}
+            onAuthChange={onAuthChange}
+            environmentVariableNames={environmentVariableNames}
+          />
 
           {/* Tests */}
           <AccordionItem value="tests" className="border border-border rounded-lg px-4">

@@ -324,6 +324,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
       endpoint: request.endpoint,
       headers: recordToHeaderArray(request.headers),
       queryParams: request.queryParams ?? [],
+      pathParams: (request as RequestItem).pathParams ?? [],
       body: request.body ?? "",
       bodyType: (request as RequestItem).bodyType ?? "json",
       authType: (request as RequestItem).authType ?? "none",

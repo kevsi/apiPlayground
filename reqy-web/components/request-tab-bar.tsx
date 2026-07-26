@@ -165,7 +165,7 @@ export function RequestTabBar({
                 <span
                   onDoubleClick={() => startEdit(tab)}
                   title="Double-click to rename"
-                  className="max-w-[200px] cursor-text truncate text-sm font-medium"
+                  className="max-w-[200px] cursor-pointer truncate text-sm font-medium"
                 >
                   {tab.name}
                 </span>

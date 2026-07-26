@@ -8,8 +8,10 @@ import { invokeTauriFetch, type TauriCookie } from "@/lib/tauri";
 import { persistence } from "@/lib/persistence";
 import { classifyError, enqueueOnNetworkFailure } from "@/lib/offline/queue";
 import type { ResponseTimings } from "@/components/response-timeline";
+import { applyPathParams, type PathParam } from "@/lib/path-params";
 export type BodyType = "json" | "form-data" | "x-www-form" | "raw" | "binary";
 export type AuthType = "none" | "bearer" | "basic" | "api-key" | "oauth2";
+export type { PathParam };
 
 export interface QueryParam {
   key: string;
@@ -31,6 +33,7 @@ export interface RequestTab {
   endpoint: string;
   headers: Header[];
   queryParams: QueryParam[];
+  pathParams: PathParam[];
   body: string;
   bodyType: BodyType;
   authType: AuthType;
@@ -142,8 +145,9 @@ export const normalizeUrl = (url: string) => {
   return sanitizedUrl;
 };
 
-export const buildUrl = (url: string, queryParams: QueryParam[]) => {
-  const normalizedUrl = normalizeUrl(url);
+export const buildUrl = (url: string, queryParams: QueryParam[], pathParams?: PathParam[]) => {
+  const withPathParams = pathParams ? applyPathParams(url, pathParams) : url;
+  const normalizedUrl = normalizeUrl(withPathParams);
 
   try {
     const finalUrl = new URL(normalizedUrl);
@@ -217,7 +221,7 @@ function buildFormDataBody(body: string): { body: string; boundary: string } {
 export const buildRequestPayload = (context: ExecuteRequestContext) => {
   const { tab, allVars, activeProjectPort, activeProject } = context;
   const resolvedUrl = activeProject ? replaceLocalhostPort(tab.url, activeProjectPort) : tab.url;
-  const rawUrl = buildUrl(resolvedUrl, tab.queryParams);
+  const rawUrl = buildUrl(resolvedUrl, tab.queryParams, tab.pathParams);
   const rawHeaders = buildHeaders(tab.headers, tab.authType, tab.authToken);
   const rawBody = tab.body || "";
 
