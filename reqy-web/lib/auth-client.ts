@@ -23,6 +23,18 @@ export interface AuthResult {
   token: string;
 }
 
+export interface SignupResult {
+  userId: string;
+  email: string;
+  message: string;
+}
+
+export interface LoginError {
+  error: string;
+  needsVerification?: boolean;
+  email?: string;
+}
+
 function authBaseUrl(): string {
   return (getPublicEnv().NEXT_PUBLIC_SYNC_URL || "").replace(/\/$/, "");
 }
@@ -43,7 +55,20 @@ async function postJson(
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    throw new Error((data?.error as string) || `Auth request failed: ${res.status}`);
+    // Propagate the full error object so callers can read needsVerification etc.
+    const err = new Error(
+      (data?.error as string) || `Auth request failed: ${res.status}`,
+    ) as Error & {
+      status: number;
+      needsVerification?: boolean;
+      email?: string;
+    };
+    err.status = res.status;
+    if (data?.needsVerification) {
+      err.needsVerification = true;
+      err.email = data.email as string;
+    }
+    throw err;
   }
   return data;
 }
@@ -52,10 +77,27 @@ export async function authSignup(
   email: string,
   password: string,
   name?: string,
-): Promise<AuthResult> {
+): Promise<SignupResult> {
   const data = await postJson("/signup", { email, password, name });
+  return {
+    userId: data.userId as string,
+    email: data.email as string,
+    message: data.message as string,
+  };
+}
+
+export async function authVerify(email: string, code: string): Promise<AuthResult> {
+  const data = await postJson("/verify", { email, code });
   return { user: data.user as AuthUser, token: data.token as string };
 }
+
+export async function authResendCode(email: string): Promise<{ message: string }> {
+  const data = await postJson("/resend-code", { email });
+  return { message: data.message as string };
+}
+
+// Alias for convenience
+export const resendVerificationCode = authResendCode;
 
 export async function authLogin(email: string, password: string): Promise<AuthResult> {
   const data = await postJson("/login", { email, password });

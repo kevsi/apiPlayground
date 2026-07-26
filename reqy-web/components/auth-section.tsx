@@ -1,10 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 import type { AuthType } from "@/lib/request-executor";
 import { Input } from "@/components/ui/input";
+import { AutocompleteInput, type AutocompleteGroup } from "@/components/ui/autocomplete-input";
 import {
   Select,
   SelectContent,
@@ -18,6 +20,7 @@ interface AuthSectionProps {
   authType: AuthType;
   authToken: string;
   onAuthChange: (type: AuthType, token: string) => void;
+  environmentVariableNames?: string[];
 }
 
 const authTypeLabels: Record<AuthType, string> = {
@@ -28,7 +31,28 @@ const authTypeLabels: Record<AuthType, string> = {
   oauth2: "OAuth 2.0",
 };
 
-export function AuthSection({ authType, authToken, onAuthChange }: AuthSectionProps) {
+export function AuthSection({
+  authType,
+  authToken,
+  onAuthChange,
+  environmentVariableNames,
+}: AuthSectionProps) {
+  const authVarSuggestions = useMemo((): AutocompleteGroup[] => {
+    const vars = environmentVariableNames?.filter(Boolean) ?? [];
+    if (vars.length === 0) return [];
+    return [
+      {
+        label: "Variables",
+        items: vars.map((name) => ({
+          id: `var-${name}`,
+          label: `{{${name}}}`,
+          value: `{{${name}}}`,
+          description: "variable",
+        })),
+      },
+    ];
+  }, [environmentVariableNames]);
+
   return (
     <AccordionItem value="auth" className="border border-border rounded-lg px-4 ">
       <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wider hover:no-underline [&[data-state=open]>svg]:rotate-180">
@@ -78,10 +102,10 @@ export function AuthSection({ authType, authToken, onAuthChange }: AuthSectionPr
                 </label>
               </Text>
               <div className="relative">
-                <Input
+                <AutocompleteInput
                   type={authType === "basic" ? "text" : "password"}
                   value={authToken}
-                  onChange={(event) => onAuthChange(authType, event.target.value)}
+                  onChange={(value) => onAuthChange(authType, value)}
                   placeholder={
                     authType === "bearer"
                       ? "eyJhbGciOiJIUzI1NiIs..."
@@ -92,6 +116,8 @@ export function AuthSection({ authType, authToken, onAuthChange }: AuthSectionPr
                           : "ya29.a0AfH6S..."
                   }
                   className="h-10 bg-muted/20 border-input pr-10 font-mono text-sm transition-all duration-200 focus:bg-muted/40"
+                  suggestions={authVarSuggestions}
+                  emptyMessage="Aucune variable"
                 />
                 {authToken && (
                   <button

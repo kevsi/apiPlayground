@@ -1,5 +1,14 @@
 import { create } from "zustand";
-import { authSignup, authLogin, authLogout, authMe, type AuthUser } from "@/lib/auth-client";
+import {
+  authSignup,
+  authVerify,
+  authResendCode,
+  authLogin,
+  authLogout,
+  authMe,
+  type AuthUser,
+  type SignupResult,
+} from "@/lib/auth-client";
 
 const TOKEN_KEY = "reqly.auth.token";
 
@@ -12,7 +21,12 @@ interface SessionState {
   /** Validate a persisted token on app start; clears it if invalid. */
   restore: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthUser>;
-  signup: (email: string, password: string, name?: string) => Promise<AuthUser>;
+  /** Creates an account (unverified). Returns the signup result — does NOT auto-login. */
+  signup: (email: string, password: string, name?: string) => Promise<SignupResult>;
+  /** Verify the 6-digit code and log in. */
+  verify: (email: string, code: string) => Promise<AuthUser>;
+  /** Resend a verification code. */
+  resendCode: (email: string) => Promise<{ message: string }>;
   logout: () => Promise<void>;
 }
 
@@ -65,10 +79,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   signup: async (email, password, name) => {
-    const { user, token } = await authSignup(email, password, name);
+    // Signup no longer auto-logs in — user must verify their email first
+    const result = await authSignup(email, password, name);
+    return result;
+  },
+
+  verify: async (email, code) => {
+    const { user, token } = await authVerify(email, code);
     saveToken(token);
     set({ user, token, status: "authenticated" });
     return user;
+  },
+
+  resendCode: async (email) => {
+    return await authResendCode(email);
   },
 
   logout: async () => {

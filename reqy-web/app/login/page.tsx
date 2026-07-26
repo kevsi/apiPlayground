@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSessionStore } from "@/lib/session-store";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,6 +25,12 @@ export default function LoginPage() {
       await login(email.trim(), password);
       router.push("/");
     } catch (err) {
+      if (err instanceof Error && (err as any).needsVerification) {
+        // Redirect to verification page — a code was already sent on signup
+        const verifyEmail = (err as any).email || email.trim();
+        router.push(`/signup?verify=${encodeURIComponent(verifyEmail)}`);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Échec de la connexion");
     } finally {
       setLoading(false);
@@ -29,55 +39,91 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold">Connexion</h1>
-        <p className="mb-6 text-sm text-muted-foreground">
-          Accédez à vos espaces de travail synchronisés.
-        </p>
-        <form onSubmit={onSubmit} className="space-y-4">
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium">Email</span>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-              placeholder="vous@exemple.com"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium">Mot de passe</span>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-              placeholder="••••••••"
-            />
-          </label>
-          {error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {loading ? "Connexion…" : "Se connecter"}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Pas encore de compte ?{" "}
-          <Link href="/signup" className="text-primary hover:underline">
-            Créer un compte
-          </Link>
-        </p>
+      <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          {/* Logo / Brand */}
+          <div className="mb-6 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+              R
+            </div>
+            <span className="text-sm font-semibold">Reqly</span>
+          </div>
+
+          <h1 className="mb-1 text-xl font-semibold tracking-tight">Connexion</h1>
+          <p className="mb-6 text-sm text-muted-foreground">
+            Accédez à vos espaces de travail synchronisés.
+          </p>
+
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="login-email">Email</Label>
+              <Input
+                id="login-email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vous@exemple.com"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="login-password">Mot de passe</Label>
+              </div>
+              <Input
+                id="login-password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-200 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              </div>
+            )}
+
+            <Button type="submit" disabled={loading} className="w-full h-10" size="lg">
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Connexion…
+                </span>
+              ) : (
+                "Se connecter"
+              )}
+            </Button>
+          </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">ou</span>
+            </div>
+          </div>
+
+          <p className="text-center text-sm text-muted-foreground">
+            Pas encore de compte ?{" "}
+            <Link
+              href="/signup"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Créer un compte
+            </Link>
+          </p>
+        </div>
       </div>
     </main>
   );
