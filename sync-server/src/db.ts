@@ -23,6 +23,9 @@ db.exec(`
     email TEXT NOT NULL,
     name TEXT,
     password_hash TEXT,
+    verified INTEGER NOT NULL DEFAULT 0,
+    verification_code TEXT,
+    verification_code_expires_at INTEGER,
     created_at INTEGER NOT NULL
   );
 
@@ -105,5 +108,10 @@ for (const table of ["collections", "environments", "folders"]) {
 
 // Password hash is optional: OAuth-based sessions don't set it.
 ensureColumn("users", "password_hash", "TEXT");
+
+// Migration: email verification support
+ensureColumn("users", "verified", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("users", "verification_code", "TEXT");
+ensureColumn("users", "verification_code_expires_at", "INTEGER");
 
 export default db;
