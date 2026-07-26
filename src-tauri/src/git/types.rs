@@ -1,7 +1,11 @@
 use serde::{Serialize, Deserialize};
+#[cfg(feature = "ts-export")]
+use ts_rs::TS;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct GitCommit {
     pub oid: String,
     pub message: String,
@@ -11,14 +15,18 @@ pub struct GitCommit {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct GitSignature {
     pub name: String,
     pub email: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct FileStatus {
     pub filepath: String,
     pub head: u8,       // 0=absent, 1=present
@@ -27,7 +35,9 @@ pub struct FileStatus {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct DiffHunk {
     pub old_start: u32,
     pub old_lines: u32,
@@ -37,7 +47,9 @@ pub struct DiffHunk {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct DiffLine {
     pub origin: String,      // "add", "delete", "context", "header"
     pub content: String,
@@ -46,14 +58,18 @@ pub struct DiffLine {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct DiffFile {
     pub filepath: String,
     pub hunks: Vec<DiffHunk>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct BranchInfo {
     pub name: String,
     pub is_current: bool,
@@ -64,7 +80,9 @@ pub struct BranchInfo {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct RemoteInfo {
     pub name: String,
     pub url: String,

@@ -18,6 +18,8 @@ use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri;
+#[cfg(feature = "ts-export")]
+use ts_rs::TS;
 
 use crate::error::AppError;
 
@@ -27,7 +29,9 @@ use crate::error::AppError;
 /// Serialized as camelCase so the frontend (Task 12b) can build/consume it
 /// directly from JS without field-name mapping.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct QueuedRequest {
     pub id: String,
     pub method: String,

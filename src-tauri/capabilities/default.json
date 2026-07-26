@@ -56,6 +56,8 @@
     "allow-git-fetch",
     "allow-git-pull",
     "allow-git-clone",
-    "allow-git-sync-collections"
+    "allow-git-sync-collections",
+    "allow-git-write-collection-file",
+    "allow-git-ls-remote"
   ]
 }

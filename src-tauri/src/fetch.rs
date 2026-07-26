@@ -16,11 +16,15 @@ use std::time::Instant;
 use base64::{Engine as _, engine::general_purpose};
 use serde::Serialize;
 use tauri;
+#[cfg(feature = "ts-export")]
+use ts_rs::TS;
 
 use crate::error::AppError;
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct TauriCookie {
   pub name: String,
   pub value: String,
@@ -33,7 +37,9 @@ pub struct TauriCookie {
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct TauriFetchResponse {
   pub status: u16,
   pub body: String,

@@ -473,6 +473,31 @@ pub async fn git_push(
 }
 
 #[tauri::command]
+pub async fn git_ls_remote(
+    url: String,
+    state: State<'_, GitRepoState>,
+) -> Result<Vec<String>, AppError> {
+    let repo = state.open_repo()?;
+    let mut remote = repo.remote_anonymous(&url)
+        .map_err(|e| AppError::InvalidInput(format!("Invalid remote URL: {e}")))?;
+    remote.connect(git2::Direction::Fetch)
+        .map_err(|e| AppError::Network(format!("Cannot connect to {url}: {e}")))?;
+    let refs = remote.list()
+        .map_err(|e| AppError::Network(format!("Cannot list remote refs: {e}")))?;
+    let mut branches: Vec<String> = Vec::new();
+    for head in refs.iter() {
+        let name = head.name();
+        if let Some(stripped) = name.strip_prefix("refs/heads/") {
+            branches.push(stripped.to_string());
+        }
+    }
+    if branches.is_empty() {
+        return Err(AppError::NotFound("No branches found on remote".into()));
+    }
+    Ok(branches)
+}
+
+#[tauri::command]
 pub async fn git_push_force(
     remote: String,
     branch: String,
@@ -583,6 +608,23 @@ pub async fn git_clone(
     let _repo = Repository::clone(&url, &dest_path)
         .map_err(|e| AppError::Network(format!("Clone failed: {e}")))?;
     state.set_path(PathBuf::from(&dest_path))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn git_write_collection_file(
+    name: String,
+    id: String,
+    content: String,
+    repo_dir: String,
+) -> Result<(), AppError> {
+    let collections_dir = PathBuf::from(&repo_dir).join("collections");
+    std::fs::create_dir_all(&collections_dir)
+        .map_err(|e| AppError::Internal(format!("Failed to create dir: {e}")))?;
+    let safe_name = name.replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "_");
+    let filepath = collections_dir.join(format!("{}_{}.json", safe_name, id));
+    std::fs::write(&filepath, content)
+        .map_err(|e| AppError::Internal(format!("Failed to write {filepath:?}: {e}")))?;
     Ok(())
 }
 

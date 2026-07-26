@@ -10,6 +10,8 @@ mod open;
 mod fetch;
 mod store;
 pub mod git;
+#[cfg(feature = "ts-export")]
+mod ts_bindings;
 
 use crate::capture::{
   clear_captured_sessions, get_captured_session, list_captured_sessions, set_bandwidth_limit,
@@ -94,6 +96,8 @@ pub fn run() {
         git::commands::git_pull,
         git::commands::git_clone,
         git::commands::git_sync_collections,
+        git::commands::git_write_collection_file,
+        git::commands::git_ls_remote,
       mcp::start_mcp_server,
       mcp::stop_mcp_server,
       mcp::get_mcp_server_status,

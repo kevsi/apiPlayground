@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
+#[cfg(feature = "ts-export")]
+use ts_rs::TS;
 use std::process::{Child, Command};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager};
@@ -18,7 +20,9 @@ pub struct McpProcessState {
 pub type ManagedMcpState = Arc<Mutex<McpProcessState>>;
 
 #[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct McpServerStatus {
   pub running: bool,
   pub port: Option<u16>,
@@ -26,8 +30,10 @@ pub struct McpServerStatus {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct McpServerConfig {
   pub port: Option<u16>,
   pub env_name: Option<String>,

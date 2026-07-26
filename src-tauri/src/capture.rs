@@ -17,6 +17,8 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use tiny_http::{Header, Response, Server};
+#[cfg(feature = "ts-export")]
+use ts_rs::TS;
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -73,7 +75,9 @@ impl std::io::Read for ThrottledReader {
 
 /// Lightweight view of a captured request, returned by `list_captured_sessions`.
 #[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct CapturedSummary {
   pub id: String,
   pub method: String,
@@ -148,7 +152,9 @@ fn ensure_loaded(state: &ManagedCaptureProxyState) {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-export", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts-export", ts(export, rename_all = "camelCase"))]
 pub struct CapturedRequest {
   pub id: String,
   pub method: String,

@@ -205,3 +205,13 @@ commands.allow = ["git_clone"]
 identifier = "allow-git-sync-collections"
 description = "Allows the git_sync_collections command"
 commands.allow = ["git_sync_collections"]
+
+[[permission]]
+identifier = "allow-git-write-collection-file"
+description = "Allows the git_write_collection_file command"
+commands.allow = ["git_write_collection_file"]
+
+[[permission]]
+identifier = "allow-git-ls-remote"
+description = "Allows the git_ls_remote command"
+commands.allow = ["git_ls_remote"]

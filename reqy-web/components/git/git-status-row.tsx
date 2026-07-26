@@ -9,9 +9,10 @@ interface StatusRowProps {
   status: FileStatus;
   onStage: (filepath: string) => void;
   onUnstage: (filepath: string) => void;
+  displayName?: string | null;
 }
 
-export function GitStatusRow({ status, onStage, onUnstage }: StatusRowProps) {
+export function GitStatusRow({ status, onStage, onUnstage, displayName }: StatusRowProps) {
   const isStaged = status.staged !== 1; // 1 = unchanged
 
   let label = "modified";
@@ -38,7 +39,16 @@ export function GitStatusRow({ status, onStage, onUnstage }: StatusRowProps) {
         className="size-4"
       />
       <Icon className={`size-3.5 ${iconClass} shrink-0`} />
-      <span className="flex-1 min-w-0 text-xs text-foreground truncate">{status.filepath}</span>
+      <div className="flex-1 min-w-0">
+        <span className="block text-xs text-foreground truncate">
+          {displayName || status.filepath}
+        </span>
+        {displayName && (
+          <span className="block text-[10px] text-muted-foreground/50 truncate">
+            {status.filepath}
+          </span>
+        )}
+      </div>
       {isStaged && (
         <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
           staged

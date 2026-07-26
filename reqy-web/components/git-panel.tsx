@@ -8,6 +8,9 @@ import {
   AlertCircle,
   Diff,
   CheckCircle2,
+  FolderOpen,
+  Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +24,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { isTauriAvailable } from "@/lib/tauri";
 import {
   useGit,
   type GitCommit as GitCommitType,
@@ -43,15 +48,46 @@ export function GitPanel({ collections }: GitPanelProps) {
   const git = useGit(collections);
   const [commitMessage, setCommitMessage] = useState("");
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
+  const [commitLoading, setCommitLoading] = useState(false);
+  const [initLoading, setInitLoading] = useState(false);
+  const [openLoading, setOpenLoading] = useState(false);
   const [diffOids, setDiffOids] = useState<[string, string] | null>(null);
   const [diffResult, setDiffResult] = useState<DiffFile[] | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
+  const [repoPathInput, setRepoPathInput] = useState("");
+
+  const pickRepoFolder = async () => {
+    if (isTauriAvailable()) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({ directory: true, multiple: false });
+        if (selected && typeof selected === "string") {
+          setRepoPathInput(selected);
+        }
+      } catch {
+        // fallback: manual input
+      }
+    }
+  };
 
   const handleCommit = async () => {
     if (!commitMessage.trim()) return;
-    await git.commit(commitMessage.trim());
-    setCommitMessage("");
-    setCommitDialogOpen(false);
+    setCommitLoading(true);
+    try {
+      await git.commit(commitMessage.trim());
+      setCommitMessage("");
+      setCommitDialogOpen(false);
+    } finally {
+      setCommitLoading(false);
+    }
+  };
+
+  const collectionNameForPath = (filepath: string): string | null => {
+    const match = filepath.match(/collections\/.+_(.+)\.json$/);
+    if (!match) return null;
+    const id = match[1];
+    const col = collections.find((c) => c.id === id);
+    return col ? col.name : null;
   };
 
   const handleDiff = async (oidA: string, oidB: string) => {
@@ -97,16 +133,7 @@ export function GitPanel({ collections }: GitPanelProps) {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          {!git.isInitialized ? (
-            <Button
-              size="sm"
-              onClick={() => git.init()}
-              className="h-7 gap-1.5 text-xs font-medium"
-            >
-              <GitBranch className="size-3.5" />
-              Init repo
-            </Button>
-          ) : (
+          {git.isInitialized && (
             <Button
               size="sm"
               onClick={() => setCommitDialogOpen(true)}
@@ -139,6 +166,7 @@ export function GitPanel({ collections }: GitPanelProps) {
             onPull={git.pull}
             onFetch={git.fetch}
             onClone={git.clone}
+            onLsRemote={git.lsRemote}
           />
         </div>
       )}
@@ -226,6 +254,7 @@ export function GitPanel({ collections }: GitPanelProps) {
                         status={s}
                         onStage={git.stage}
                         onUnstage={git.unstage}
+                        displayName={collectionNameForPath(s.filepath)}
                       />
                     ))}
                   </>
@@ -238,22 +267,25 @@ export function GitPanel({ collections }: GitPanelProps) {
             <ScrollArea className="h-full pr-2">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <select
-                    className="h-7 rounded-md border border-border bg-muted/30 px-2 text-xs"
-                    onChange={(e) => {
-                      const [a, b] = e.target.value.split("..");
-                      if (a && b) handleDiff(a, b);
-                    }}
-                  >
-                    <option value="">Select commits to compare</option>
-                    {git.commits.map((c, i) =>
-                      git.commits.slice(i + 1).map((d) => (
-                        <option key={`${d.oid}..${c.oid}`} value={`${d.oid}..${c.oid}`}>
-                          {d.message.slice(0, 30)} → {c.message.slice(0, 30)}
-                        </option>
-                      )),
-                    )}
-                  </select>
+                  <div className="relative flex-1">
+                    <select
+                      className="h-7 w-full appearance-none rounded-md border border-border bg-muted/30 px-2 pr-7 text-xs transition-colors hover:border-muted-foreground/30 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      onChange={(e) => {
+                        const [a, b] = e.target.value.split("..");
+                        if (a && b) handleDiff(a, b);
+                      }}
+                    >
+                      <option value="">Select commits to compare</option>
+                      {git.commits.map((c, i) =>
+                        git.commits.slice(i + 1).map((d) => (
+                          <option key={`${d.oid}..${c.oid}`} value={`${d.oid}..${c.oid}`}>
+                            {d.message.slice(0, 30)} → {c.message.slice(0, 30)}
+                          </option>
+                        )),
+                      )}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+                  </div>
                 </div>
                 <GitDiffViewer files={diffResult ?? []} loading={diffLoading} />
               </div>
@@ -261,22 +293,80 @@ export function GitPanel({ collections }: GitPanelProps) {
           </TabsContent>
         </Tabs>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center text-center px-6">
-          <div className="rounded-2xl bg-muted/20 p-6 mb-4 ring-1 ring-border/40">
+        <div className="flex flex-1 flex-col items-center justify-center text-center px-6 gap-4">
+          <div className="rounded-2xl bg-muted/20 p-6 ring-1 ring-border/40">
             <GitBranch className="size-10 text-muted-foreground/20" />
           </div>
-          <p className="text-sm font-semibold text-foreground/80">No Git repository</p>
-          <p className="text-xs text-muted-foreground/60 mt-1.5 max-w-[240px] leading-relaxed">
-            Initialize a repository to version your collections locally with Git.
-          </p>
-          <Button
-            size="sm"
-            onClick={() => git.init()}
-            className="mt-5 h-8 gap-1.5 text-xs font-medium"
-          >
-            <GitBranch className="size-3.5" />
-            Initialize repository
-          </Button>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-foreground/80">No Git repository</p>
+            <p className="text-xs text-muted-foreground/60 max-w-[260px] leading-relaxed">
+              Pick a folder to version your collections locally with Git.
+            </p>
+          </div>
+
+          <div className="flex w-full max-w-[300px] gap-2">
+            <Input
+              value={repoPathInput}
+              onChange={(e) => setRepoPathInput(e.target.value)}
+              placeholder="Path to repo folder…"
+              className="flex-1 text-xs h-8"
+              readOnly={isTauriAvailable()}
+            />
+            {isTauriAvailable() && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={pickRepoFolder}
+                className="h-8 shrink-0 gap-1"
+              >
+                <FolderOpen className="size-3.5" /> Browse
+              </Button>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={async () => {
+                setInitLoading(true);
+                try {
+                  await git.init(repoPathInput);
+                } finally {
+                  setInitLoading(false);
+                }
+              }}
+              disabled={!repoPathInput.trim() || initLoading}
+              className="h-8 gap-1.5 text-xs font-medium"
+            >
+              {initLoading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <GitBranch className="size-3.5" />
+              )}
+              {initLoading ? "Initializing…" : "Init new repo"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                setOpenLoading(true);
+                try {
+                  await git.open(repoPathInput);
+                } finally {
+                  setOpenLoading(false);
+                }
+              }}
+              disabled={!repoPathInput.trim() || openLoading}
+              className="h-8 gap-1.5 text-xs font-medium"
+            >
+              {openLoading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <FolderOpen className="size-3.5" />
+              )}
+              {openLoading ? "Opening…" : "Open existing"}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -307,10 +397,17 @@ export function GitPanel({ collections }: GitPanelProps) {
             <Button
               size="sm"
               onClick={handleCommit}
-              disabled={!commitMessage.trim()}
+              disabled={!commitMessage.trim() || commitLoading}
               className="text-xs"
             >
-              Commit
+              {commitLoading ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Committing…
+                </span>
+              ) : (
+                "Commit"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
