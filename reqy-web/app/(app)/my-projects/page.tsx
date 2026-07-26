@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Github } from "lucide-react";
+import { Github, Loader2 } from "lucide-react";
 import { ProjectCard } from "@/components/project-card";
 import { NewProjectModal } from "@/components/new-project-modal";
 import { RouteModal } from "@/components/route-modal";
@@ -107,8 +107,9 @@ const MyProjectsPage: React.FC = () => {
   // Wait for the store to finish loading from localStorage before rendering
   if (!isLoaded) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-muted-foreground">Chargement des projets…</p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Chargement des projets…</p>
       </div>
     );
   }

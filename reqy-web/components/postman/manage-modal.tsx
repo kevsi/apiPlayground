@@ -63,7 +63,7 @@ export function PostmanManageModal({
       setCollections(data.collections ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setError("Erreur r├®seau");
+      setError("Erreur réseau");
     } finally {
       if (abortRef.current === controller) {
         setLoading(false);
@@ -100,10 +100,10 @@ export function PostmanManageModal({
           </DialogTitle>
           <DialogDescription>
             {!isConnected
-              ? "Postman n'est pas connect├®."
+              ? "Postman n'est pas connecté."
               : collections.length > 0
-                ? `${collections.length} collection${collections.length > 1 ? "s" : ""} trouv├®e${collections.length > 1 ? "s" : ""} dans votre compte Postman.`
-                : "Chargement des collectionsÔÇª"}
+                ? `${collections.length} collection${collections.length > 1 ? "s" : ""} trouvée${collections.length > 1 ? "s" : ""} dans votre compte Postman.`
+                : "Chargement des collections…"}
           </DialogDescription>
         </DialogHeader>
 
@@ -111,11 +111,11 @@ export function PostmanManageModal({
           {!isConnected ? (
             <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">
               <p className="mb-3 text-warning">
-                Connectez-vous ├á Postman dans les param├¿tres pour importer vos collections.
+                Connectez-vous à Postman dans les paramètres pour importer vos collections.
               </p>
               {onGoToSettings && (
                 <Button size="sm" variant="outline" onClick={onGoToSettings}>
-                  Aller aux param├¿tres
+                  Aller aux paramètres
                 </Button>
               )}
             </div>
@@ -129,7 +129,7 @@ export function PostmanManageModal({
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
               <p className="text-destructive">{error}</p>
               <Button size="sm" variant="outline" className="mt-2" onClick={fetchCollections}>
-                R├®essayer
+                Réessayer
               </Button>
             </div>
           ) : collections.length === 0 ? (

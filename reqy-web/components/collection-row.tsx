@@ -89,7 +89,7 @@ function RequestRow({
       )}
       {onSelectAndSendRequest && (
         <button
-          className="shrink-0 size-5 flex items-center justify-center rounded text-success/50 hover:text-success hover:bg-success/10"
+          className="shrink-0 size-5 flex items-center justify-center rounded text-success/50 transition-all duration-150 hover:scale-110 active:scale-95 hover:text-success hover:bg-success/10"
           onClick={() => onSelectAndSendRequest(req)}
           title="Load & send"
         >
@@ -97,7 +97,7 @@ function RequestRow({
         </button>
       )}
       <button
-        className="shrink-0 size-5 flex items-center justify-center rounded text-muted-foreground/30 hover:text-destructive"
+        className="shrink-0 size-5 flex items-center justify-center rounded text-muted-foreground/30 transition-all duration-150 hover:scale-110 active:scale-95 hover:text-destructive hover:bg-destructive/10"
         onClick={() =>
           onConfirmDelete(`Remove "${req.name}"?`, () => onRemoveRequest(collectionId, req.id))
         }

@@ -231,7 +231,7 @@ export function HistoryPanel({
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="group flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-accent"
+                  className="group flex items-center gap-2 rounded-lg border border-border/40 bg-card px-2.5 py-2.5 transition-all duration-150 hover:translate-x-0.5 hover:border-border/80 hover:bg-accent hover:shadow-sm"
                 >
                   <button
                     onClick={() => onSelectRequest(item)}

@@ -10,6 +10,7 @@ import { ToolAssociationModal, type Tool } from "./tool-association-modal";
 import { buildMcpClientConfig } from "@/lib/mcp/config";
 import { isTauriAvailable, setBandwidthLimit } from "@/lib/tauri";
 import { persistence } from "@/lib/persistence";
+import { Plug, Cloud, Wifi } from "lucide-react";
 
 const TOOLS: Tool[] = [
   {
@@ -27,6 +28,21 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    id: "stripe",
+    name: "Stripe",
+    description: "Testez les endpoints Stripe en mode test.",
+    logoEmoji: "💳",
+    logo: "/icones/stripe.png",
+    scopes: [],
+    apiKey: {
+      endpoint: "/api/stripe-auth",
+      placeholder: "sk_test_xxxxxxxxxxxxxxxxxxxx",
+      instructions:
+        "Allez sur dashboard.stripe.com → Developers → API Keys. " +
+        "Copiez votre clé secrète de test (commence par sk_test_).",
+    },
+  },
+  {
     id: "github",
     name: "GitHub",
     description: "Accès à vos repositories et gists.",
@@ -34,6 +50,15 @@ const TOOLS: Tool[] = [
     logo: "/icones/github.png",
     scopes: ["Lecture de vos repositories", "Lecture de votre profil", "Création de gists"],
     oauthUrl: "/api/github-auth/start",
+  },
+  {
+    id: "gitlab",
+    name: "GitLab",
+    description: "Accès à vos repositories et profil GitLab.",
+    logoEmoji: "🦊",
+    logo: "/icones/gitlab.png",
+    scopes: ["Lecture de vos repositories", "Lecture de votre profil"],
+    oauthUrl: "/api/gitlab-auth/start",
   },
 ];
 
@@ -44,9 +69,13 @@ function useToolStatus(toolId: string, refreshKey = 0): "connected" | "disconnec
     const url =
       toolId === "github"
         ? "/api/github-auth/status"
-        : toolId === "postman"
-          ? "/api/postman-auth/status"
-          : null;
+        : toolId === "gitlab"
+          ? "/api/gitlab-auth/status"
+          : toolId === "postman"
+            ? "/api/postman-auth/status"
+            : toolId === "stripe"
+              ? "/api/stripe-auth/status"
+              : null;
     if (!url) {
       setStatus("disconnected");
       return;
@@ -181,13 +210,18 @@ export function ToolsSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold">Outils connectés</h2>
-        <p className="text-sm text-muted-foreground">
-          Connectez vos services tiers pour importer et synchroniser vos données.
-        </p>
+      <div className="flex items-start gap-3">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
+          <Plug className="size-4 text-violet-600 dark:text-violet-400" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-semibold">Outils connectés</h2>
+          <p className="text-sm text-muted-foreground">
+            Connectez vos services tiers pour importer et synchroniser vos données.
+          </p>
+        </div>
       </div>
-      <div className="divide-y divide-border rounded-lg border border-border px-4">
+      <div className="divide-y divide-border rounded-lg border border-border bg-card px-4 shadow-sm">
         {TOOLS.map((tool) => (
           <ToolRow
             key={tool.id}
@@ -208,13 +242,19 @@ export function ToolsSection() {
         onConnected={() => setRefreshKey((k) => k + 1)}
         connected={activeConnected}
       />
-      <div className="space-y-3 rounded-lg border border-border p-4">
-        <div>
-          <h3 className="text-lg font-semibold">Intégrations MCP</h3>
-          <p className="text-sm text-muted-foreground">
-            Connectez le serveur MCP local de Reqly à Claude Desktop ou Cursor. Copiez la
-            configuration ci-dessous et collez-la dans le fichier de configuration de votre client.
-          </p>
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Cloud className="size-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">Intégrations MCP</h3>
+            <p className="text-sm text-muted-foreground">
+              Connectez le serveur MCP local de Reqly à Claude Desktop ou Cursor. Copiez la
+              configuration ci-dessous et collez-la dans le fichier de configuration de votre
+              client.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Button size="sm" variant="default" onClick={copyMcpConfig}>
@@ -235,13 +275,18 @@ export function ToolsSection() {
           ) : null}
         </div>
       </div>
-      <div className="space-y-3 rounded-lg border border-border p-4">
-        <div>
-          <h3 className="text-lg font-semibold">Réseau</h3>
-          <p className="text-sm text-muted-foreground">
-            Limitez le débit des réponses capturées pour simuler un réseau contraint (proxy de
-            capture, application desktop uniquement).
-          </p>
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+            <Wifi className="size-4 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">Réseau</h3>
+            <p className="text-sm text-muted-foreground">
+              Limitez le débit des réponses capturées pour simuler un réseau contraint (proxy de
+              capture, application desktop uniquement).
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Switch

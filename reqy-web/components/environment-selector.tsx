@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Check, ChevronsUpDown, Plus, Settings2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRequestStore, type EnvironmentVariable } from "@/hooks/use-request-store";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AutocompleteInput, type AutocompleteGroup } from "@/components/ui/autocomplete-input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,6 +163,46 @@ function ManageEnvironmentsDialog({
 
   const selectedEnv = environments.find((e) => e.id === selectedId);
 
+  // Suggest variable keys from OTHER environments for quick reuse
+  const envKeySuggestions = useMemo((): AutocompleteGroup[] => {
+    const otherKeys = new Set<string>();
+    for (const env of environments) {
+      if (env.id === selectedId) continue;
+      for (const v of env.variables) {
+        if (v.enabled && v.key.trim()) otherKeys.add(v.key.trim());
+      }
+    }
+    if (otherKeys.size === 0) return [];
+    return [
+      {
+        label: "Clés des autres environnements",
+        items: Array.from(otherKeys).map((key) => ({
+          id: `ekey-${key}`,
+          label: key,
+          value: key,
+          description: "clé",
+        })),
+      },
+    ];
+  }, [environments, selectedId]);
+
+  const envValSuggestions = useMemo((): AutocompleteGroup[] => {
+    if (!selectedEnv) return [];
+    const vars = selectedEnv.variables
+      .filter((v) => v.enabled && v.key.trim())
+      .map((v) => v.key.trim());
+    const otherVars = vars.length > 0 ? [{ key: "self", vars }] : [];
+    // Also include env vars from themselves for {{VAR}} pattern
+    const items = vars.map((key) => ({
+      id: `eval-${key}`,
+      label: `{{${key}}}`,
+      value: `{{${key}}}`,
+      description: "variable",
+    }));
+    if (items.length === 0) return [];
+    return [{ label: "Variables", items }];
+  }, [selectedEnv]);
+
   const handleAddVar = () => {
     if (!selectedEnv) return;
     updateEnvironment(selectedEnv.id, {
@@ -287,17 +328,21 @@ function ManageEnvironmentsDialog({
                               onCheckedChange={(c) => updateVar(i, "enabled", !!c)}
                             />
                           </div>
-                          <Input
+                          <AutocompleteInput
                             value={v.key}
-                            onChange={(e) => updateVar(i, "key", e.target.value)}
+                            onChange={(value) => updateVar(i, "key", value)}
                             placeholder="KEY"
                             className="h-8 font-mono text-xs"
+                            suggestions={envKeySuggestions}
+                            emptyMessage=""
                           />
-                          <Input
+                          <AutocompleteInput
                             value={v.value}
-                            onChange={(e) => updateVar(i, "value", e.target.value)}
+                            onChange={(value) => updateVar(i, "value", value)}
                             placeholder="value"
                             className="h-8 font-mono text-xs"
+                            suggestions={envValSuggestions}
+                            emptyMessage=""
                           />
                           <Button
                             variant="ghost"

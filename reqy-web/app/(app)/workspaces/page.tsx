@@ -2,7 +2,17 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Copy, Users, UserPlus, AlertCircle, Shield, Building2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Copy,
+  Users,
+  UserPlus,
+  AlertCircle,
+  Shield,
+  Building2,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -63,6 +73,8 @@ export default function WorkspacesPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState<Workspace | null>(null);
   const [members, setMembers] = useState<MemberData[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [invitation, setInvitation] = useState<{ token: string; expiresAt: number } | null>(null);
   const [workspaceName, setWorkspaceName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -118,6 +130,8 @@ export default function WorkspacesPage() {
 
   const openMembers = async (ws: Workspace) => {
     setSelected(ws);
+    setMembers([]);
+    setMembersLoading(true);
     setMembersOpen(true);
     try {
       const res = await workspaceFetch(`/api/workspaces/${encodeURIComponent(ws.id)}/members`);
@@ -126,6 +140,8 @@ export default function WorkspacesPage() {
       setMembers(data.members ?? []);
     } catch {
       toast({ title: "Failed to load members", variant: "destructive" });
+    } finally {
+      setMembersLoading(false);
     }
   };
 
@@ -254,9 +270,9 @@ export default function WorkspacesPage() {
                   </div>
                   <div className="flex gap-2">
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="flex-1 border-blue-200/40 text-blue-700 transition-all duration-150 hover:scale-105 hover:bg-blue-50 hover:text-blue-800 hover:shadow-sm active:scale-95 dark:border-blue-800/30 dark:text-blue-400 dark:hover:bg-blue-950/50"
                       onClick={() => openMembers(ws)}
                     >
                       <Users className="mr-1.5 size-3.5" />
@@ -265,18 +281,18 @@ export default function WorkspacesPage() {
                     {(ws.role === "owner" || (!ws.role && ws.id === "ws-personal")) && (
                       <>
                         <Button
-                          variant="secondary"
+                          variant="outline"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 border-emerald-200/40 text-emerald-700 transition-all duration-150 hover:scale-105 hover:bg-emerald-50 hover:text-emerald-800 hover:shadow-sm active:scale-95 dark:border-emerald-800/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
                           onClick={() => openInvite(ws)}
                         >
                           <UserPlus className="mr-1.5 size-3.5" />
                           Invite
                         </Button>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="text-destructive hover:text-destructive"
+                          className="border-red-200/40 text-red-500 transition-all duration-150 hover:scale-105 hover:bg-red-50 hover:text-red-700 hover:shadow-sm active:scale-95 dark:border-red-800/30 dark:text-red-400 dark:hover:bg-red-950/50"
                           onClick={() => {
                             setSelected(ws);
                             setDeleteOpen(true);
@@ -298,7 +314,12 @@ export default function WorkspacesPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Workspace</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-full bg-primary/10">
+                <Plus className="size-4 text-primary" />
+              </div>
+              New Workspace
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
             <Input
@@ -309,7 +330,7 @@ export default function WorkspacesPage() {
               maxLength={100}
             />
             <DialogFooter>
-              <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={!workspaceName.trim() || creating}>
@@ -330,7 +351,12 @@ export default function WorkspacesPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="divide-y divide-border max-h-[60vh] overflow-auto">
-            {members.length === 0 ? (
+            {membersLoading ? (
+              <div className="flex items-center justify-center gap-2 py-8">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading members…</p>
+              </div>
+            ) : members.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">No members found.</p>
             ) : (
               members.map((m) => (
@@ -361,7 +387,9 @@ export default function WorkspacesPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="size-4 text-muted-foreground" />
+              <div className="flex size-7 items-center justify-center rounded-full bg-emerald-500/10">
+                <UserPlus className="size-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
               Invite to {selected?.name}
             </DialogTitle>
           </DialogHeader>
@@ -422,7 +450,12 @@ export default function WorkspacesPage() {
       <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Rejoindre un workspace</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-full bg-primary/10">
+                <UserPlus className="size-4 text-primary" />
+              </div>
+              Rejoindre un workspace
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Collez le lien d'invitation ou le jeton fourni par l'administrateur du workspace.
@@ -438,8 +471,9 @@ export default function WorkspacesPage() {
               Annuler
             </Button>
             <Button
-              disabled={!joinInput.trim()}
+              disabled={!joinInput.trim() || joining}
               onClick={() => {
+                setJoining(true);
                 const raw = joinInput.trim();
                 let token = raw;
                 try {
@@ -457,7 +491,14 @@ export default function WorkspacesPage() {
                 router.push(`/join?token=${encodeURIComponent(token)}`);
               }}
             >
-              Continuer
+              {joining ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Redirection…
+                </span>
+              ) : (
+                "Continuer"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -467,15 +508,22 @@ export default function WorkspacesPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Workspace</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-full bg-red-500/10">
+                <AlertCircle className="size-4 text-red-600 dark:text-red-400" />
+              </div>
+              Delete Workspace
+            </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete <strong>{selected?.name}</strong>? This will remove all
-            members, invitations, and data associated with this workspace. This action cannot be
-            undone.
-          </p>
+          <div className="rounded-lg border border-red-200/30 bg-red-50/30 p-3 text-sm dark:border-red-900/30 dark:bg-red-950/20">
+            <p className="text-foreground">
+              Are you sure you want to delete <strong>{selected?.name}</strong>? This will remove
+              all members, invitations, and data associated with this workspace. This action cannot
+              be undone.
+            </p>
+          </div>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>

@@ -6,6 +6,8 @@ import { PostmanManageModal } from "@/components/postman/manage-modal";
 import { PostmanImportModal } from "@/components/postman/import-modal";
 import { ExportPostmanModal } from "@/components/export-postman-modal";
 import { ImportOpenApiModal } from "@/components/import-openapi-modal";
+import { ImportBrunoModal } from "@/components/import-bruno-modal";
+import { GitLabImportModal } from "@/components/gitlab-import-modal";
 import { OpenApiExportModal } from "@/components/openapi-export-modal";
 import { Button } from "@/components/ui/button";
 import { useRequestStore, type Collection, type RequestItem } from "@/hooks/use-request-store";
@@ -18,7 +20,13 @@ import { postmanImportResponseSchema } from "@/lib/import-schemas";
 import { toast } from "@/hooks/use-toast";
 import type { HttpMethod } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, Download, FileJson, GitFork, Package, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 export default function CollectionsPage() {
   const router = useRouter();
@@ -51,6 +59,8 @@ export default function CollectionsPage() {
   const [postmanConnected, setPostmanConnected] = useState(false);
   const [postmanExportOpen, setPostmanExportOpen] = useState(false);
   const [openApiImportOpen, setOpenApiImportOpen] = useState(false);
+  const [brunoImportOpen, setBrunoImportOpen] = useState(false);
+  const [gitlabImportOpen, setGitlabImportOpen] = useState(false);
   const [exportingPostman, setExportingPostman] = useState(false);
   const [exportingOpenApi, setExportingOpenApi] = useState(false);
   const [openApiExportOpen, setOpenApiExportOpen] = useState(false);
@@ -213,6 +223,7 @@ export default function CollectionsPage() {
       authType: request.authType,
       authToken: request.authToken,
       queryParams: request.queryParams,
+      pathParams: request.pathParams,
       assertions: request.assertions,
       runnerAssertions: request.runnerAssertions,
       preRequestScript: request.preRequestScript,
@@ -238,6 +249,7 @@ export default function CollectionsPage() {
       authType: request.authType,
       authToken: request.authToken,
       queryParams: request.queryParams,
+      pathParams: request.pathParams,
       assertions: request.assertions,
       runnerAssertions: request.runnerAssertions,
       preRequestScript: request.preRequestScript,
@@ -383,32 +395,95 @@ export default function CollectionsPage() {
 
   return (
     <main className="flex-1 overflow-auto">
-      <div className="flex flex-col gap-4 border-b border-border bg-background/80 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 border-b border-border bg-background/80 px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="shrink-0">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Collections</h1>
           <p className="text-sm text-muted-foreground">
             Gérez vos groupes de requêtes et exportez-les en OpenAPI.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setOpenApiImportOpen(true)}>
-            Importer OpenAPI
-          </Button>
-          <Button variant="secondary" onClick={() => setPostmanManageOpen(true)}>
-            From Postman
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => setPostmanExportOpen(true)}
-            disabled={!postmanConnected || exportingPostman}
-          >
-            {exportingPostman ? <Loader2 className="size-3.5 animate-spin" /> : null}
-            {exportingPostman ? "Export..." : "Export to Postman"}
-          </Button>
-          <Button variant="secondary" onClick={() => setOpenApiExportOpen(true)}>
-            {exportingOpenApi ? <Loader2 className="size-3.5 animate-spin" /> : null}
-            {exportingOpenApi ? "Export..." : "Exporter OpenAPI"}
-          </Button>
+        <div className="flex flex-col items-start gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
+              Importer
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenApiImportOpen(true)}
+              className="border-blue-200/40 text-blue-700 transition-all duration-150 hover:scale-105 hover:bg-blue-50 hover:text-blue-800 hover:shadow-sm active:scale-95 dark:border-blue-800/30 dark:text-blue-400 dark:hover:bg-blue-950/50"
+            >
+              <FileJson className="mr-1.5 size-3.5" />
+              OpenAPI
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setGitlabImportOpen(true)}
+              className="border-orange-200/40 text-orange-700 transition-all duration-150 hover:scale-105 hover:bg-orange-50 hover:text-orange-800 hover:shadow-sm active:scale-95 dark:border-orange-800/30 dark:text-orange-400 dark:hover:bg-orange-950/50"
+            >
+              <GitFork className="mr-1.5 size-3.5" />
+              GitLab
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBrunoImportOpen(true)}
+              className="border-emerald-200/40 text-emerald-700 transition-all duration-150 hover:scale-105 hover:bg-emerald-50 hover:text-emerald-800 hover:shadow-sm active:scale-95 dark:border-emerald-800/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+            >
+              <Upload className="mr-1.5 size-3.5" />
+              Bruno
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-violet-200/40 text-violet-700 transition-all duration-150 hover:scale-105 hover:bg-violet-50 hover:text-violet-800 hover:shadow-sm active:scale-95 data-[state=open]:scale-105 data-[state=open]:bg-violet-50 dark:border-violet-800/30 dark:text-violet-400 dark:hover:bg-violet-950/50"
+                >
+                  <Package className="mr-1.5 size-3.5" />
+                  Postman
+                  <ChevronDown className="ml-1 size-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => setPostmanManageOpen(true)}>
+                  <Upload className="mr-2 size-4" />
+                  Importer depuis Postman
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setPostmanExportOpen(true)}
+                  disabled={!postmanConnected || exportingPostman}
+                >
+                  {exportingPostman ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 size-4" />
+                  )}
+                  {exportingPostman ? "Export en cours..." : "Exporter vers Postman"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
+              Exporter
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenApiExportOpen(true)}
+              className="border-blue-200/40 text-blue-700 transition-all duration-150 hover:scale-105 hover:bg-blue-50 hover:text-blue-800 hover:shadow-sm active:scale-95 dark:border-blue-800/30 dark:text-blue-400 dark:hover:bg-blue-950/50"
+            >
+              {exportingOpenApi ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <Download className="mr-1.5 size-3.5" />
+              )}
+              {exportingOpenApi ? "Export..." : "OpenAPI"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -417,6 +492,18 @@ export default function CollectionsPage() {
         onClose={() => setOpenApiImportOpen(false)}
         onImport={handleImportOpenApi}
         existingCollectionNames={collections.map((c) => c.name)}
+      />
+
+      <ImportBrunoModal
+        open={brunoImportOpen}
+        onClose={() => setBrunoImportOpen(false)}
+        onImport={handleImportOpenApi}
+      />
+
+      <GitLabImportModal
+        open={gitlabImportOpen}
+        onClose={() => setGitlabImportOpen(false)}
+        onImport={handleImportOpenApi}
       />
 
       <OpenApiExportModal

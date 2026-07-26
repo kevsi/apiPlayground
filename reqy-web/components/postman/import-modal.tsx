@@ -101,7 +101,7 @@ export function PostmanImportModal({
       .then((data) => {
         if (cancelled) return;
         if (!data.requests) {
-          setError(data.message ?? "R├®ponse invalide");
+          setError(data.message ?? "Réponse invalide");
           return;
         }
         // Store ALL requests ÔÇö preview only shows PREVIEW_LIMIT of them.
@@ -110,7 +110,7 @@ export function PostmanImportModal({
         setCollectionIdReturned(data.collectionId ?? collectionId);
       })
       .catch(() => {
-        if (!cancelled) setError("Erreur r├®seau");
+        if (!cancelled) setError("Erreur réseau");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -159,8 +159,8 @@ export function PostmanImportModal({
       }
 
       toast({
-        title: "Import├®",
-        description: `${requests.length} route${requests.length > 1 ? "s" : ""} ajout├®e${requests.length > 1 ? "s" : ""} ├á votre biblioth├¿que${
+        title: "Importé",
+        description: `${requests.length} route${requests.length > 1 ? "s" : ""} ajoutée${requests.length > 1 ? "s" : ""} à votre bibliothèque${
           folders.length > 0 ? ` (${folders.length} dossier${folders.length > 1 ? "s" : ""})` : ""
         }.`,
         meta: { event: "importExport" },
@@ -170,7 +170,7 @@ export function PostmanImportModal({
     } catch (e) {
       toast({
         title: "Erreur",
-        description: e instanceof Error ? e.message : "Import ├®chou├®",
+        description: e instanceof Error ? e.message : "Import échoué",
         variant: "destructive",
         meta: { event: "importExport" },
       } as any);
@@ -189,7 +189,7 @@ export function PostmanImportModal({
           <DialogTitle>Importer "{collectionName}"</DialogTitle>
           <DialogDescription>
             {loading
-              ? "Chargement de l'aper├ºuÔÇª"
+              ? "Chargement de l'aperçu…"
               : error
                 ? error
                 : requests.length > 0
@@ -197,8 +197,8 @@ export function PostmanImportModal({
                       folders.length > 0
                         ? ` dans ${folders.length} dossier${folders.length > 1 ? "s" : ""}`
                         : ""
-                    } (aper├ºu des ${PREVIEW_LIMIT} premi├¿res).`
-                  : "Aucune route ├á importer."}
+                    } (aperçu des ${PREVIEW_LIMIT} premières).`
+                  : "Aucune route à importer."}
           </DialogDescription>
         </DialogHeader>
 
@@ -223,7 +223,7 @@ export function PostmanImportModal({
             ))}
             {hiddenCount > 0 && (
               <p className="pt-1 text-center text-xs text-muted-foreground">
-                ÔÇªet {hiddenCount} autre{hiddenCount > 1 ? "s" : ""} route
+                …et {hiddenCount} autre{hiddenCount > 1 ? "s" : ""} route
                 {hiddenCount > 1 ? "s" : ""}
               </p>
             )}
@@ -241,7 +241,7 @@ export function PostmanImportModal({
           </Button>
           <Button onClick={handleConfirm} disabled={loading || saving || requests.length === 0}>
             {saving
-              ? "ImportationÔÇª"
+              ? "Importation…"
               : `Confirmer l'import${requests.length > 0 ? ` (${requests.length})` : ""}`}
           </Button>
         </DialogFooter>

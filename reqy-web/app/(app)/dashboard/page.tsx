@@ -356,28 +356,35 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   {/* Table header */}
-                  <div className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-2 border-b border-border bg-muted/30">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <div className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-2.5 border-b border-border bg-muted/40">
+                    <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="size-1 rounded-full bg-muted-foreground/30" />
                       Method
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="size-1 rounded-full bg-muted-foreground/30" />
                       Endpoint
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">
+                    <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider text-center">
                       Status
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">
+                    <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider text-right flex items-center justify-end gap-1.5">
+                      <Clock className="size-3" />
                       Time
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">
+                    <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider text-right">
                       When
                     </span>
                   </div>
-                  <div className="divide-y divide-border">
-                    {recentRequests.map((request) => (
+                  <div className="divide-y divide-border/60">
+                    {recentRequests.map((request, idx) => (
                       <div
                         key={request.endpoint + request.timestamp}
-                        className="grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center hover:bg-muted/20 transition-colors"
+                        className={cn(
+                          "grid grid-cols-[80px_1fr_60px_80px_80px] gap-2 px-6 py-3 items-center transition-all duration-150",
+                          idx % 2 === 0 ? "bg-background" : "bg-muted/10",
+                          "hover:bg-muted/30 hover:shadow-sm hover:-translate-y-[1px] active:translate-y-0",
+                        )}
                       >
                         <span
                           className={cn(
@@ -387,7 +394,8 @@ export default function DashboardPage() {
                         >
                           {request.method}
                         </span>
-                        <span className="font-mono text-xs text-foreground truncate">
+                        <span className="font-mono text-xs text-foreground truncate flex items-center gap-1.5">
+                          <span className="size-1 rounded-full bg-muted-foreground/20 shrink-0" />
                           {request.endpoint}
                         </span>
                         <span
@@ -398,7 +406,7 @@ export default function DashboardPage() {
                         >
                           {request.status || "—"}
                         </span>
-                        <span className="text-xs text-muted-foreground text-right">
+                        <span className="text-xs text-muted-foreground text-right font-mono">
                           {request.time}
                         </span>
                         <span className="text-xs text-muted-foreground text-right">

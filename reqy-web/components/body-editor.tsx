@@ -5,6 +5,7 @@ import { Plus, Trash2, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AutocompleteInput, type AutocompleteGroup } from "@/components/ui/autocomplete-input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -44,13 +45,40 @@ interface BodyEditorProps {
   bodyType: BodyType;
   onBodyChange: (body: string) => void;
   onBodyTypeChange: (bodyType: BodyType) => void;
+  /** Environment variable names for form-data value autocomplete. */
+  environmentVariableNames?: string[];
+  /** Recent form-data key suggestions from history. */
+  formDataKeySuggestions?: AutocompleteGroup[];
 }
 
-export function BodyEditor({ body, bodyType, onBodyChange, onBodyTypeChange }: BodyEditorProps) {
+export function BodyEditor({
+  body,
+  bodyType,
+  onBodyChange,
+  onBodyTypeChange,
+  environmentVariableNames,
+  formDataKeySuggestions,
+}: BodyEditorProps) {
   const [showRawBody, setShowRawBody] = useState(false);
   const [formPairs, setFormPairs] = useState<Array<{ key: string; value: string }>>(() =>
     parseFormBody(body),
   );
+
+  const formValueSuggestions = useMemo((): AutocompleteGroup[] => {
+    const vars = environmentVariableNames?.filter(Boolean) ?? [];
+    if (vars.length === 0) return [];
+    return [
+      {
+        label: "Variables",
+        items: vars.map((name) => ({
+          id: `fval-${name}`,
+          label: `{{${name}}}`,
+          value: `{{${name}}}`,
+          description: "variable",
+        })),
+      },
+    ];
+  }, [environmentVariableNames]);
   const bodyRef = useRef(body);
   if (bodyRef.current !== body) {
     bodyRef.current = body;
@@ -170,20 +198,24 @@ export function BodyEditor({ body, bodyType, onBodyChange, onBodyTypeChange }: B
                 key={index}
                 className="group/formpair flex items-center gap-2 rounded-lg transition-all duration-200 hover:bg-muted/20 -mx-1 px-1"
               >
-                <Input
+                <AutocompleteInput
                   type="text"
                   value={pair.key}
-                  onChange={(e) => updateFormPair(index, "key", e.target.value)}
+                  onChange={(value) => updateFormPair(index, "key", value)}
                   placeholder="Key"
                   className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
+                  suggestions={formDataKeySuggestions}
+                  emptyMessage=""
                 />
                 <span className="shrink-0 text-muted-foreground/30">=</span>
-                <Input
+                <AutocompleteInput
                   type="text"
                   value={pair.value}
-                  onChange={(e) => updateFormPair(index, "value", e.target.value)}
+                  onChange={(value) => updateFormPair(index, "value", value)}
                   placeholder="Value"
                   className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
+                  suggestions={formValueSuggestions}
+                  emptyMessage=""
                 />
                 <Button
                   variant="ghost"

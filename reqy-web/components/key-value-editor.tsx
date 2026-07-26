@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { AutocompleteInput, type AutocompleteGroup } from "@/components/ui/autocomplete-input";
 
 export interface KeyValuePair {
   key: string;
@@ -20,6 +21,10 @@ interface KeyValueEditorProps {
   addLabel?: string;
   emptyLabel?: string;
   showToggle?: boolean;
+  /** Suggestions for the key input (grouped). */
+  keySuggestions?: AutocompleteGroup[];
+  /** Suggestions for the value input (grouped). */
+  valueSuggestions?: AutocompleteGroup[];
 }
 
 export function KeyValueEditor({
@@ -30,6 +35,8 @@ export function KeyValueEditor({
   addLabel = "Add",
   emptyLabel = "No items added yet",
   showToggle = false,
+  keySuggestions,
+  valueSuggestions,
 }: KeyValueEditorProps) {
   const add = () => onChange([...pairs, { key: "", value: "", enabled: true }]);
 
@@ -69,20 +76,24 @@ export function KeyValueEditor({
                   className="shrink-0"
                 />
               )}
-              <Input
+              <AutocompleteInput
                 type="text"
                 value={pair.key}
-                onChange={(e) => update(index, "key", e.target.value)}
+                onChange={(value) => update(index, "key", value)}
                 placeholder={keyPlaceholder}
                 className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
+                suggestions={keySuggestions}
+                emptyMessage=""
               />
               <span className="shrink-0 text-muted-foreground/30">=</span>
-              <Input
+              <AutocompleteInput
                 type="text"
                 value={pair.value}
-                onChange={(e) => update(index, "value", e.target.value)}
+                onChange={(value) => update(index, "value", value)}
                 placeholder={valuePlaceholder}
                 className="flex-1 h-9 border-input bg-muted/20 text-sm transition-all duration-200 focus:bg-muted/40"
+                suggestions={valueSuggestions}
+                emptyMessage=""
               />
               <Button
                 variant="ghost"

@@ -1,8 +1,9 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Send, Square, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { AutocompleteInput, type AutocompleteGroup } from "@/components/ui/autocomplete-input";
 
 interface Props {
   endpoint: string;
@@ -10,6 +11,8 @@ interface Props {
   onSend: () => void;
   onStop?: () => void;
   running?: boolean;
+  historyUrls?: string[];
+  environmentVariableNames?: string[];
 }
 
 function validateGraphqlUrl(rawUrl: string): string | null {
@@ -28,8 +31,56 @@ function validateGraphqlUrl(rawUrl: string): string | null {
   return null;
 }
 
-export function GraphqlAddressBar({ endpoint, onEndpointChange, onSend, onStop, running }: Props) {
+export function GraphqlAddressBar({
+  endpoint,
+  onEndpointChange,
+  onSend,
+  onStop,
+  running,
+  historyUrls,
+  environmentVariableNames,
+}: Props) {
   const [urlError, setUrlError] = useState<string | null>(null);
+
+  const gqlAutocompleteGroups = useMemo((): AutocompleteGroup[] => {
+    const groups: AutocompleteGroup[] = [];
+
+    // Environment variables
+    const vars = environmentVariableNames?.filter(Boolean) ?? [];
+    if (vars.length > 0) {
+      groups.push({
+        label: "Variables",
+        items: vars.map((name) => ({
+          id: `gql-var-${name}`,
+          label: `{{${name}}}`,
+          value: `{{${name}}}`,
+          description: "variable",
+        })),
+      });
+    }
+
+    // GraphQL endpoint history
+    const seen = new Set<string>();
+    const historyItems: AutocompleteGroup["items"] = [];
+    for (const u of historyUrls ?? []) {
+      if (!u || seen.has(u)) continue;
+      seen.add(u);
+      historyItems.push({
+        id: `gql-url-${u}`,
+        label: u,
+        value: u,
+        description: "historique",
+      });
+    }
+    if (historyItems.length > 0) {
+      groups.push({
+        label: "Historique",
+        items: historyItems.slice(0, 20),
+      });
+    }
+
+    return groups;
+  }, [environmentVariableNames, historyUrls]);
 
   const handleChange = useCallback(
     (value: string) => {
@@ -56,12 +107,14 @@ export function GraphqlAddressBar({ endpoint, onEndpointChange, onSend, onStop, 
     <div className="border-b bg-card" data-testid="graphql-address-bar">
       <div className="flex items-center gap-2 p-3 pb-2">
         <span className="text-xs font-mono px-2 py-1 bg-primary/10 text-primary rounded">POST</span>
-        <Input
+        <AutocompleteInput
           value={endpoint}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={handleChange}
           placeholder="https://api.example.com/graphql"
           className="flex-1 font-mono text-sm"
           data-testid="graphql-endpoint-input"
+          suggestions={gqlAutocompleteGroups}
+          emptyMessage=""
         />
         {running ? (
           <Button

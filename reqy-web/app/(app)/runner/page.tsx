@@ -15,6 +15,11 @@ import {
   Upload,
   FileText,
   X,
+  Database,
+  Table2,
+  HardDrive,
+  Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -471,15 +476,21 @@ export default function RunnerPage() {
       </Card>
 
       {/* Dataset section */}
-      <Card className="bg-card mb-5">
+      <Card className="bg-card mb-5 overflow-hidden shadow-sm transition-all duration-150 hover:shadow-md">
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="text-sm font-medium text-foreground">
-              Dataset <span className="text-xs font-normal text-muted-foreground">(optional)</span>
-            </h2>
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10">
+                <Database className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h2 className="text-sm font-medium text-foreground">
+                Dataset{" "}
+                <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+              </h2>
+            </div>
             {datasetRows.length > 0 && (
               <Badge variant="secondary" className="gap-1.5 text-xs">
-                <FileText className="size-3" />
+                <Table2 className="size-3" />
                 {datasetRows.length} row{datasetRows.length !== 1 ? "s" : ""}
               </Badge>
             )}
@@ -489,29 +500,34 @@ export default function RunnerPage() {
             /* Loaded: show summary with columns and clear action */
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">
                   Columns
                 </span>
                 {columnNames.map((col) => (
-                  <Badge key={col} variant="outline" className="text-[11px] font-mono">
+                  <Badge
+                    key={col}
+                    variant="outline"
+                    className="text-[11px] font-mono border-emerald-200/40 dark:border-emerald-800/40"
+                  >
                     {col}
                   </Badge>
                 ))}
               </div>
               {datasetFileName && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                  <HardDrive className="size-3" />
                   File: <span className="font-medium text-foreground">{datasetFileName}</span>
                 </p>
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pt-1">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 gap-1.5 text-xs"
+                  className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
                   onClick={handleClearDataset}
                   disabled={isRunning}
                 >
-                  <X className="size-3" />
+                  <Trash2 className="size-3" />
                   Clear dataset
                 </Button>
               </div>
@@ -523,7 +539,7 @@ export default function RunnerPage() {
                 placeholder={`Paste a JSON array of objects or CSV data here…\n\nExample (JSON):\n[{"id":"1","name":"Alice"},{"id":"2","name":"Bob"}]\n\nExample (CSV):\nid,name\n1,Alice\n2,Bob`}
                 value={datasetText}
                 onChange={(e) => setDatasetText(e.target.value)}
-                className="min-h-24 text-xs font-mono"
+                className="min-h-24 text-xs font-mono border-dashed focus:border-emerald-500/50"
                 disabled={isRunning}
               />
               <div className="flex items-center gap-2 flex-wrap">
@@ -555,7 +571,12 @@ export default function RunnerPage() {
                   Upload .json/.csv
                 </Button>
               </div>
-              {datasetError && <p className="text-xs text-destructive">{datasetError}</p>}
+              {datasetError && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="size-3" />
+                  {datasetError}
+                </p>
+              )}
             </div>
           )}
         </CardContent>

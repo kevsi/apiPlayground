@@ -14,6 +14,7 @@ import {
   Terminal,
   Pencil,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -85,8 +86,11 @@ export function WorkspaceSelector() {
   }, [fetchWorkspacesFromApi]);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [renameLoading, setRenameLoading] = useState(false);
   const [renamingWorkspace, setRenamingWorkspace] = useState<Workspace | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [hoveredWsId, setHoveredWsId] = useState<string | null>(null);
 
@@ -94,6 +98,7 @@ export function WorkspaceSelector() {
 
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
+    setCreateLoading(true);
     try {
       const res = await workspaceFetch("/api/workspaces", {
         method: "POST",
@@ -123,10 +128,12 @@ export function WorkspaceSelector() {
     }
     setNewName("");
     setCreateOpen(false);
+    setCreateLoading(false);
   }, [newName, addWorkspace, addServerWorkspace, setActiveWorkspace]);
 
   const handleRename = useCallback(async () => {
     if (!renamingWorkspace || !newName.trim()) return;
+    setRenameLoading(true);
     const id = renamingWorkspace.id;
     const name = newName.trim();
     // If this is a server workspace with ownerId, try the API first
@@ -142,6 +149,7 @@ export function WorkspaceSelector() {
           setRenamingWorkspace(null);
           setNewName("");
           setRenameOpen(false);
+          setRenameLoading(false);
           return;
         }
       } catch {
@@ -153,6 +161,7 @@ export function WorkspaceSelector() {
     setRenamingWorkspace(null);
     setNewName("");
     setRenameOpen(false);
+    setRenameLoading(false);
   }, [renamingWorkspace, newName, updateWorkspace, fetchWorkspacesFromApi]);
 
   const handleDeleteWorkspace = useCallback(
@@ -160,6 +169,7 @@ export function WorkspaceSelector() {
       e.stopPropagation();
       if (!window.confirm(`Delete "${w.name}"? This cannot be undone.`)) return;
 
+      setDeletingId(w.id);
       if (w.ownerId) {
         // Server workspace — try API first
         try {
@@ -168,6 +178,7 @@ export function WorkspaceSelector() {
           });
           if (res.ok) {
             await fetchWorkspacesFromApi();
+            setDeletingId(null);
             return;
           }
         } catch {
@@ -175,6 +186,7 @@ export function WorkspaceSelector() {
         }
       }
       deleteWorkspace(w.id);
+      setDeletingId(null);
     },
     [deleteWorkspace, fetchWorkspacesFromApi],
   );
@@ -257,11 +269,16 @@ export function WorkspaceSelector() {
                   }}
                   className={cn(
                     "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-all hover:bg-destructive/10 hover:text-destructive",
-                    hoveredWsId === w.id ? "opacity-100" : "opacity-0",
+                    hoveredWsId === w.id || deletingId === w.id ? "opacity-100" : "opacity-0",
                   )}
+                  disabled={deletingId === w.id}
                   title="Supprimer"
                 >
-                  <Trash2 className="size-3.5" />
+                  {deletingId === w.id ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
                 </button>
               </DropdownMenuItem>
             );
@@ -298,11 +315,18 @@ export function WorkspaceSelector() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={createLoading}>
               Annuler
             </Button>
-            <Button onClick={handleCreate} disabled={!newName.trim()}>
-              Créer
+            <Button onClick={handleCreate} disabled={!newName.trim() || createLoading}>
+              {createLoading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Création…
+                </span>
+              ) : (
+                "Créer"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -338,11 +362,19 @@ export function WorkspaceSelector() {
                 setRenameOpen(false);
                 setRenamingWorkspace(null);
               }}
+              disabled={renameLoading}
             >
               Annuler
             </Button>
-            <Button onClick={handleRename} disabled={!newName.trim()}>
-              Renommer
+            <Button onClick={handleRename} disabled={!newName.trim() || renameLoading}>
+              {renameLoading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Renommage…
+                </span>
+              ) : (
+                "Renommer"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

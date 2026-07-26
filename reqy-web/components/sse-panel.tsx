@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { useSSE, type SSEAuthType, type SSEEvent } from "@/hooks/use-sse";
 import { KeyValueEditor, type KeyValuePair } from "@/components/key-value-editor";
+import { useRequestStore } from "@/hooks/use-request-store";
+import { AutocompleteInput, type AutocompleteGroup } from "@/components/ui/autocomplete-input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -96,6 +98,88 @@ export function SSEPanel() {
   const [url, setUrl] = useState("https://localhost:3000/sse");
   const [showOptions, setShowOptions] = useState(false);
   const eventsEndRef = useRef<HTMLDivElement>(null);
+
+  // Store data for autocomplete
+  const environments = useRequestStore((s) => s.environments);
+  const activeEnvironmentId = useRequestStore((s) => s.activeEnvironmentId);
+  const history = useRequestStore((s) => s.history);
+  const envVarNames = useMemo(() => {
+    const activeEnv = environments.find((e) => e.id === activeEnvironmentId);
+    return (activeEnv?.variables ?? [])
+      .filter((v) => v.enabled && v.key.trim())
+      .map((v) => v.key.trim());
+  }, [environments, activeEnvironmentId]);
+  const sseValueVarSuggestions = useMemo((): AutocompleteGroup[] => {
+    const vars = envVarNames;
+    if (vars.length === 0) return [];
+    return [
+      {
+        label: "Variables",
+        items: vars.map((name) => ({
+          id: `sse-val-${name}`,
+          label: `{{${name}}}`,
+          value: `{{${name}}}`,
+          description: "variable",
+        })),
+      },
+    ];
+  }, [envVarNames]);
+  const sseHeaderKeySuggestions = useMemo(
+    (): AutocompleteGroup[] => [
+      {
+        label: "En-têtes courants",
+        items: [
+          "Accept",
+          "Authorization",
+          "Cache-Control",
+          "Connection",
+          "Content-Type",
+          "Cookie",
+          "Origin",
+          "User-Agent",
+          "X-API-Key",
+          "X-Requested-With",
+        ].map((name) => ({
+          id: `sse-hdr-${name}`,
+          label: name,
+          value: name,
+          description: "en-tête",
+        })),
+      },
+    ],
+    [],
+  );
+
+  // URL autocomplete: history URLs + env vars
+  const sseHistoryUrls = useMemo(() => {
+    return history.map((h) => h.url).filter(Boolean) as string[];
+  }, [history]);
+  const sseUrlAutocompleteGroups = useMemo((): AutocompleteGroup[] => {
+    const groups: AutocompleteGroup[] = [];
+    // Environment variables
+    if (envVarNames.length > 0) {
+      groups.push({
+        label: "Variables",
+        items: envVarNames.map((name) => ({
+          id: `sse-url-var-${name}`,
+          label: `{{${name}}}`,
+          value: `{{${name}}}`,
+        })),
+      });
+    }
+    // History URLs
+    const seen = new Set<string>();
+    const urlItems: AutocompleteGroup["items"] = [];
+    for (const u of sseHistoryUrls) {
+      if (!u || seen.has(u)) continue;
+      seen.add(u);
+      urlItems.push({ id: `sse-uh-${u}`, label: u, value: u });
+    }
+    if (urlItems.length > 0) {
+      groups.push({ label: "Historique", items: urlItems.slice(0, 20) });
+    }
+    return groups;
+  }, [envVarNames, sseHistoryUrls]);
 
   // Custom headers
   const [headers, setHeaders] = useState<KeyValuePair[]>([]);
@@ -195,12 +279,14 @@ export function SSEPanel() {
 
           {/* URL input */}
           <div className="relative flex-1">
-            <Input
+            <AutocompleteInput
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={setUrl}
               placeholder="https://localhost:3000/sse"
               disabled={status === "open" || status === "connecting"}
-              className="font-mono text-sm"
+              className="font-mono text-sm h-9"
+              suggestions={sseUrlAutocompleteGroups}
+              emptyMessage="Aucun résultat"
             />
           </div>
 
@@ -211,20 +297,20 @@ export function SSEPanel() {
               size="sm"
               disabled={status === "connecting"}
               onClick={handleDisconnect}
-              className="shrink-0"
+              className="shrink-0 border-red-200/40 text-red-600 transition-all duration-150 hover:scale-105 hover:border-red-300/60 hover:bg-red-50 hover:text-red-700 hover:shadow-sm active:scale-95 dark:border-red-800/30 dark:text-red-400 dark:hover:bg-red-950/50"
             >
-              <WifiOff />
+              <WifiOff className="size-4" />
               Disconnect
             </Button>
           ) : (
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               onClick={handleConnect}
               disabled={!url.trim()}
-              className="shrink-0"
+              className="shrink-0 bg-emerald-600 text-white transition-all duration-150 hover:scale-105 hover:bg-emerald-700 hover:shadow-sm active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-500"
             >
-              <Wifi />
+              <Wifi className="size-4" />
               Connect
             </Button>
           )}
@@ -275,6 +361,8 @@ export function SSEPanel() {
                 addLabel="Add header"
                 emptyLabel="No custom headers"
                 showToggle
+                keySuggestions={sseHeaderKeySuggestions}
+                valueSuggestions={sseValueVarSuggestions}
               />
             </div>
 
@@ -303,16 +391,18 @@ export function SSEPanel() {
                   </Select>
                 </div>
                 {authType !== "none" && (
-                  <Input
+                  <AutocompleteInput
                     type="password"
                     value={authToken}
-                    onChange={(e) => setAuthToken(e.target.value)}
+                    onChange={setAuthToken}
                     placeholder={
                       authType === "bearer"
                         ? "eyJhbGciOiJIUzI1NiIs..."
                         : "base64(username:password)"
                     }
                     className="flex-1 h-9 border-input bg-muted/20 font-mono text-xs transition-all duration-200 focus:bg-muted/40"
+                    suggestions={sseValueVarSuggestions}
+                    emptyMessage="Aucune variable"
                   />
                 )}
               </div>

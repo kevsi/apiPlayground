@@ -45,7 +45,10 @@ function ApiKeyForm({ tool, onSuccess }: { tool: Tool; onSuccess: () => void }) 
   const [show, setShow] = useState(false);
   const config = tool.apiKey!;
 
-  const isValid = /^PMAK-[A-Za-z0-9_-]+$/.test(apiKey.trim());
+  const isValid =
+    tool.id === "stripe"
+      ? /^(sk_test|rk_test|sk_live|rk_live|whsec)_[A-Za-z0-9]+$/.test(apiKey.trim())
+      : /^PMAK-[A-Za-z0-9_-]+$/.test(apiKey.trim());
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -167,9 +170,13 @@ function DisconnectView({ tool, onDisconnected }: { tool: Tool; onDisconnected: 
   const endpoint =
     tool.id === "github"
       ? "/api/github-auth/logout"
-      : tool.id === "postman"
-        ? "/api/postman-auth"
-        : null;
+      : tool.id === "gitlab"
+        ? "/api/gitlab-auth/logout"
+        : tool.id === "postman"
+          ? "/api/postman-auth"
+          : tool.id === "stripe"
+            ? "/api/stripe-auth"
+            : null;
 
   async function handleDisconnect() {
     if (!endpoint) return;
