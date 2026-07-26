@@ -137,6 +137,7 @@ export function createHistoryMutations(commit: CommitFn) {
             enabled: true,
           }))
         : [],
+      pathParams: [],
       body: typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? ""),
       bodyType: "json",
       authType: "none",
