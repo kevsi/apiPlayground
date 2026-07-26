@@ -1,0 +1,42 @@
+openapi: "3.1.0"
+info:
+  title: Config Service (3.1.0)
+  version: "2.0.0"
+  description: OpenAPI 3.1 test spec
+servers:
+  - url: https://config.internal.example.com
+  - url: https://config.staging.example.com
+jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
+paths:
+  /config:
+    get:
+      summary: Get configuration
+      operationId: getConfig
+      tags:
+        - Configuration
+      responses:
+        "200":
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  features:
+                    type: object
+                    properties:
+                      darkMode:
+                        type: boolean
+                      beta:
+                        type: boolean
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        "200":
+          description: Service is healthy

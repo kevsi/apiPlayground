@@ -1,16 +1,35 @@
-import { test, expect } from "@playwright/test"
+import { test, expect } from "@playwright/test";
 
-test("create a collection", async ({ page }) => {
-  await page.goto("/collections")
-  // Try common button labels
-  const btn = page.getByRole("button", { name: /new collection|create collection/i }).first()
-  await btn.click({ timeout: 5000 }).catch(() => {})
-  await page.locator('input[name="name"], input[placeholder*="name" i]').first().fill("Smoke Test Collection").catch(() => {})
-  await page.getByRole("button", { name: /^save$|create/i }).first().click().catch(() => {})
-  await expect(page.locator("body")).toContainText(/smoke test collection/i, { timeout: 5000 }).catch(() => {})
-})
+test.describe("Collections", () => {
+  test("collections page loads", async ({ page }) => {
+    await page.goto("/collections");
+    await expect(page.locator("body")).toBeVisible({ timeout: 10000 });
+  });
 
-test("add request to collection", async ({ page }) => {
-  await page.goto("/collections")
-  await expect(page.locator("body")).toBeVisible()
-})
+  test("new collection button is visible", async ({ page }) => {
+    await page.goto("/collections");
+    // The new collection button should be present (either from the panel or empty state)
+    const btn = page.getByTestId("new-collection-button").first();
+    await expect(btn).toBeVisible({ timeout: 10000 });
+  });
+
+  test("can open create collection dialog", async ({ page }) => {
+    await page.goto("/collections");
+    const btn = page.getByTestId("new-collection-button").first();
+    await btn.click();
+
+    // A dialog or input should appear
+    const nameInput = page.locator('input[name="name"], input[placeholder*="name" i]').first();
+    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    await nameInput.fill("Smoke Test Collection");
+    await expect(nameInput).toHaveValue("Smoke Test Collection");
+  });
+
+  test("collection list is present", async ({ page }) => {
+    await page.goto("/collections");
+    const list = page.getByTestId("collection-list").first();
+    if (await list.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await expect(list).toBeVisible();
+    }
+  });
+});

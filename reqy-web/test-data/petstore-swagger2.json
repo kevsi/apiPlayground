@@ -1,0 +1,44 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Pet Store (Swagger 2.0)",
+    "version": "1.0.0",
+    "description": "A pet store API in Swagger 2.0 format"
+  },
+  "host": "petstore.example.com",
+  "basePath": "/v2",
+  "schemes": ["https"],
+  "paths": {
+    "/pets": {
+      "get": {
+        "summary": "List all pets",
+        "tags": ["Pets"],
+        "parameters": [{ "name": "limit", "in": "query", "required": false, "type": "integer" }],
+        "responses": {
+          "200": { "description": "A list of pets" }
+        }
+      },
+      "post": {
+        "summary": "Create a pet",
+        "tags": ["Pets"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Buddy" },
+                "species": { "type": "string", "enum": ["cat", "dog"] }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    }
+  }
+}
