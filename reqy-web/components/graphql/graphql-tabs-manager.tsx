@@ -201,6 +201,7 @@ export function GraphqlTabsManager() {
         onSelect={setActiveTabId}
         onAdd={addNewTab}
         onClose={closeTab}
+        onDuplicate={duplicateTab}
       />
       <GraphqlActiveToolbar
         activeTab={activeTab}

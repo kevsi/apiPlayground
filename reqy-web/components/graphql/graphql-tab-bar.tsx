@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Plus } from "lucide-react";
+import { X, Plus, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { GraphqlTab } from "@/lib/types";
 
@@ -10,9 +10,10 @@ interface Props {
   onSelect: (id: string) => void;
   onAdd: () => void;
   onClose: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }
 
-export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose }: Props) {
+export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose, onDuplicate }: Props) {
   return (
     <div
       className="flex items-center gap-1 border-b bg-card px-2 py-1 overflow-x-auto hide-scrollbar"
@@ -53,6 +54,16 @@ export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose }: P
           </button>
         );
       })}
+      {activeTabId && (
+        <button
+          onClick={() => onDuplicate(activeTabId)}
+          className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 shrink-0"
+          title="Duplicate current tab"
+          data-testid="graphql-tab-duplicate"
+        >
+          <Copy className="w-3 h-3" /> Duplicate
+        </button>
+      )}
       <button
         onClick={onAdd}
         className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 shrink-0"
