@@ -18,6 +18,8 @@ interface Props {
   onStop: () => void;
   onIntrospect: () => void;
   onPrettify: () => void;
+  onToggleSchema: () => void;
+  schemaOpen: boolean;
   running: boolean;
 }
 
@@ -54,6 +56,8 @@ export function GraphqlRequestPanel({
   onStop,
   onIntrospect,
   onPrettify,
+  onToggleSchema,
+  schemaOpen,
   running,
 }: Props) {
   const history = useRequestStore((s) => s.history);
@@ -99,9 +103,9 @@ export function GraphqlRequestPanel({
       />
       <GraphqlToolbar
         onIntrospect={onIntrospect}
-        onToggleSchema={() => {}}
+        onToggleSchema={onToggleSchema}
         onPrettify={onPrettify}
-        schemaOpen={false}
+        schemaOpen={schemaOpen}
         introspecting={tab.schemaLoading ?? false}
         canPrettify={!!tab.query.trim()}
         onToggleBuilder={() => setShowBuilder((s) => !s)}

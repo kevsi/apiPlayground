@@ -1,23 +1,20 @@
-"use client"
+"use client";
 
-import { useCallback, useState } from "react"
-import { useGraphqlTabsState } from "@/hooks/use-graphql-tabs-state"
-import { useGraphqlAI } from "@/hooks/use-graphql-ai"
-import { useRequestStore } from "@/hooks/use-request-store"
-import { useShallow } from "zustand/react/shallow"
-import { GraphqlTabBar } from "./graphql-tab-bar"
-import { GraphqlActiveToolbar } from "./graphql-active-toolbar"
-import { GraphqlRequestPanel } from "./graphql-request-panel"
-import { GraphqlResponsePanel } from "./graphql-response-panel"
-import { GraphqlAIDialog } from "./graphql-ai-dialog"
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable"
-import { CollectionsModal } from "@/components/collections-modal"
-import { RequestSaveDialog } from "@/components/request-save-dialog"
-import { toast } from "@/hooks/use-toast"
+import { useCallback, useState } from "react";
+import { useGraphqlTabsState } from "@/hooks/use-graphql-tabs-state";
+import { useGraphqlAI } from "@/hooks/use-graphql-ai";
+import { useRequestStore } from "@/hooks/use-request-store";
+import { useShallow } from "zustand/react/shallow";
+import { GraphqlTabBar } from "./graphql-tab-bar";
+import { GraphqlActiveToolbar } from "./graphql-active-toolbar";
+import { GraphqlRequestPanel } from "./graphql-request-panel";
+import { GraphqlResponsePanel } from "./graphql-response-panel";
+import { SchemaDocPanel } from "./graphql-schema-doc-panel";
+import { GraphqlAIDialog } from "./graphql-ai-dialog";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { CollectionsModal } from "@/components/collections-modal";
+import { RequestSaveDialog } from "@/components/request-save-dialog";
+import { toast } from "@/hooks/use-toast";
 
 export function GraphqlTabsManager() {
   const {
@@ -35,31 +32,32 @@ export function GraphqlTabsManager() {
     prettify,
     isLoading,
     loadGraphqlRequest,
-  } = useGraphqlTabsState()
+  } = useGraphqlTabsState();
 
-  const [collectionsOpen, setCollectionsOpen] = useState(false)
-  const [saveOpen, setSaveOpen] = useState(false)
-  const [saveName, setSaveName] = useState("")
-  const [saveCollectionId, setSaveCollectionId] = useState<string>("none")
-  const [aiDialogOpen, setAiDialogOpen] = useState(false)
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saveCollectionId, setSaveCollectionId] = useState<string>("none");
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [schemaDocOpen, setSchemaDocOpen] = useState(false);
 
   // Was: 3× `useRequestStore().x` — each call re-subscribed to the whole
   // store. Atomic selector for data + grouped actions via useShallow.
-  const collections = useRequestStore((s) => s.collections)
+  const collections = useRequestStore((s) => s.collections);
   const { addCollection, addRequestToCollection } = useRequestStore(
     useShallow((s) => ({
       addCollection: s.addCollection,
       addRequestToCollection: s.addRequestToCollection,
     })),
-  )
+  );
 
-  const { assistGraphql, fixGraphqlError, isLoading: aiLoading, error: aiError } = useGraphqlAI()
+  const { assistGraphql, fixGraphqlError, isLoading: aiLoading, error: aiError } = useGraphqlAI();
 
   const handleSave = useCallback(() => {
-    setSaveName(activeTab.name)
-    setSaveCollectionId("none")
-    setSaveOpen(true)
-  }, [activeTab])
+    setSaveName(activeTab.name);
+    setSaveCollectionId("none");
+    setSaveOpen(true);
+  }, [activeTab]);
 
   const handleSaveSubmit = useCallback(() => {
     const payload = {
@@ -75,37 +73,31 @@ export function GraphqlTabsManager() {
       },
       headers: (() => {
         try {
-          return JSON.parse(activeTab.headers || "{}")
+          return JSON.parse(activeTab.headers || "{}");
         } catch {
-          return {}
+          return {};
         }
       })(),
       body: "",
       bodyType: "raw" as const,
       authType: "none" as const,
       queryParams: [],
-    }
+    };
     if (saveCollectionId !== "none") {
-      addRequestToCollection(saveCollectionId, payload)
+      addRequestToCollection(saveCollectionId, payload);
       toast({
         title: "Saved to collection",
         description: payload.name,
-      })
+      });
     } else {
       toast({
         title: "Draft saved",
         description: "Open a collection to persist this request.",
-      })
+      });
     }
-    updateTab(activeTab.id, { saved: true, dirty: false, name: payload.name })
-    setSaveOpen(false)
-  }, [
-    saveName,
-    activeTab,
-    saveCollectionId,
-    addRequestToCollection,
-    updateTab,
-  ])
+    updateTab(activeTab.id, { saved: true, dirty: false, name: payload.name });
+    setSaveOpen(false);
+  }, [saveName, activeTab, saveCollectionId, addRequestToCollection, updateTab]);
 
   const handleExport = useCallback(() => {
     const blob = new Blob(
@@ -123,18 +115,18 @@ export function GraphqlTabsManager() {
         ),
       ],
       { type: "application/json" },
-    )
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${activeTab.name.replace(/[^a-z0-9-_]/gi, "_")}.graphql.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [activeTab])
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeTab.name.replace(/[^a-z0-9-_]/gi, "_")}.graphql.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeTab]);
 
   const handleAiAssist = useCallback(() => {
-    setAiDialogOpen(true)
-  }, [])
+    setAiDialogOpen(true);
+  }, []);
 
   const handleAiSubmit = useCallback(
     async (description: string) => {
@@ -143,24 +135,24 @@ export function GraphqlTabsManager() {
         schema: activeTab.schema,
         currentQuery: activeTab.query,
         applyQuery: (q) => updateTab(activeTab.id, { query: q }),
-      })
+      });
       if (result) {
-        setAiDialogOpen(false)
+        setAiDialogOpen(false);
       }
     },
     [activeTab, updateTab, assistGraphql],
-  )
+  );
 
   const handleAiFix = useCallback(async () => {
     const errMsg =
       (activeTab.response?.errors && activeTab.response.errors[0]?.message) ||
-      "Unknown GraphQL error"
+      "Unknown GraphQL error";
     await fixGraphqlError({
       query: activeTab.query,
       errorMessage: errMsg,
       applyQuery: (q) => updateTab(activeTab.id, { query: q }),
-    })
-  }, [activeTab, updateTab, fixGraphqlError])
+    });
+  }, [activeTab, updateTab, fixGraphqlError]);
 
   const handleSelectFromCollection = useCallback(
     (req: import("@/lib/types").RequestItem) => {
@@ -172,34 +164,34 @@ export function GraphqlTabsManager() {
           variables: req.graphql.variables,
           headers: JSON.stringify(req.headers ?? {}),
           operationName: req.graphql.operationName,
-        })
-        toast({ title: "Loaded", description: req.name })
+        });
+        toast({ title: "Loaded", description: req.name });
       } else {
         toast({
           title: "Not a GraphQL request",
           description: "Pick a request saved as GraphQL.",
           variant: "destructive",
-        })
+        });
       }
-      setCollectionsOpen(false)
+      setCollectionsOpen(false);
     },
     [loadGraphqlRequest],
-  )
+  );
 
   const variablesForRequest = (() => {
     try {
-      return JSON.parse(activeTab.variables || "{}")
+      return JSON.parse(activeTab.variables || "{}");
     } catch {
-      return {}
+      return {};
     }
-  })()
+  })();
   const headersForRequest = (() => {
     try {
-      return JSON.parse(activeTab.headers || "{}")
+      return JSON.parse(activeTab.headers || "{}");
     } catch {
-      return {}
+      return {};
     }
-  })()
+  })();
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -224,15 +216,8 @@ export function GraphqlTabsManager() {
         onLoadFromCollection={() => setCollectionsOpen(true)}
         running={isLoading || !!activeTab.schemaLoading}
       />
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="flex-1 min-h-0"
-      >
-        <ResizablePanel
-          defaultSize={55}
-          minSize={25}
-          className="min-w-0 min-h-0 overflow-hidden"
-        >
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+        <ResizablePanel defaultSize={55} minSize={25} className="min-w-0 min-h-0 overflow-hidden">
           <GraphqlRequestPanel
             tab={activeTab}
             onUpdate={(patch) => updateTab(activeTab.id, patch)}
@@ -240,15 +225,13 @@ export function GraphqlTabsManager() {
             onStop={stopSubscription}
             onIntrospect={introspect}
             onPrettify={prettify}
+            onToggleSchema={() => setSchemaDocOpen((o) => !o)}
+            schemaOpen={schemaDocOpen}
             running={isLoading || !!activeTab.schemaLoading}
           />
         </ResizablePanel>
         <ResizableHandle withHandle className="bg-border" />
-        <ResizablePanel
-          defaultSize={45}
-          minSize={25}
-          className="min-w-0 min-h-0 overflow-hidden"
-        >
+        <ResizablePanel defaultSize={45} minSize={25} className="min-w-0 min-h-0 overflow-hidden">
           <GraphqlResponsePanel
             response={activeTab.response}
             error={activeTab.response?.errors?.[0]?.message}
@@ -269,6 +252,10 @@ export function GraphqlTabsManager() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
+      {schemaDocOpen && (
+        <SchemaDocPanel schema={activeTab.schema} onClose={() => setSchemaDocOpen(false)} />
+      )}
+
       <CollectionsModal
         open={collectionsOpen}
         onOpenChange={setCollectionsOpen}
@@ -284,7 +271,7 @@ export function GraphqlTabsManager() {
         onDeleteCollection={() => {}}
         onRenameCollection={() => {}}
         onAddRequestToCollection={(collectionId, request) => {
-          if (request) addRequestToCollection(collectionId, request)
+          if (request) addRequestToCollection(collectionId, request);
         }}
         onRemoveRequestFromCollection={() => {}}
       />
@@ -309,5 +296,5 @@ export function GraphqlTabsManager() {
         hasSchema={!!activeTab.schema}
       />
     </div>
-  )
+  );
 }
