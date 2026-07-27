@@ -1,4 +1,4 @@
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { validateProxyPayload } from "@/lib/schemas/proxy";
 import { WORKSPACE_NORMALIZER } from "@/lib/workspace-utils";
