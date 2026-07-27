@@ -150,6 +150,7 @@ export function BodyEditor({
               <SelectItem value="form-data">Form Data</SelectItem>
               <SelectItem value="x-www-form">x-www-form</SelectItem>
               <SelectItem value="raw">Raw</SelectItem>
+              <SelectItem value="binary">Binary</SelectItem>
             </SelectContent>
           </Select>
           {bodyType === "json" && (
@@ -256,7 +257,13 @@ export function BodyEditor({
               }
               className="h-full w-full rounded-none border-0 bg-transparent p-4 font-mono text-sm leading-relaxed text-code-text resize-none placeholder:text-muted-foreground/30"
               spellCheck={false}
-              placeholder={bodyType === "json" ? '{\n  "key": "value"\n}' : "Enter request body..."}
+              placeholder={
+                bodyType === "json"
+                  ? '{\n  "key": "value"\n}'
+                  : bodyType === "binary"
+                    ? "Paste base64-encoded binary data..."
+                    : "Enter request body..."
+              }
               data-testid="request-body-textarea"
             />
           </div>

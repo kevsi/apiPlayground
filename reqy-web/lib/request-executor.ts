@@ -247,6 +247,8 @@ export const buildRequestPayload = (context: ExecuteRequestContext) => {
       headers["Content-Type"] = `multipart/form-data; boundary=${mp.boundary}`;
     } else if (tab.bodyType === "raw") {
       headers["Content-Type"] = "text/plain";
+    } else if (tab.bodyType === "binary") {
+      headers["Content-Type"] = "application/octet-stream";
     }
   }
 

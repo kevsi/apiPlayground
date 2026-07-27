@@ -31,7 +31,7 @@ const defaultProps = {
   pathParams: [],
   headers: [],
   body: "",
-  bodyType: "none" as const,
+  bodyType: "raw" as const,
   authType: "none" as const,
   authToken: "",
   onMethodChange: noop,
