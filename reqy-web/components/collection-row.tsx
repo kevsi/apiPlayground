@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -14,11 +14,11 @@ import {
   Square,
   Copy,
   Play,
+  FolderPlus,
 } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { cn, downloadJson } from "@/lib/utils";
-import { methodBadge } from "@/lib/http-method-colors";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,6 +32,7 @@ import { collectionColors, collectionIcons, safeColor } from "@/lib/collection-u
 import type { PendingDelete } from "@/components/collections-delete-dialog";
 import { DraggableRequestRow } from "@/components/drag-and-drop/draggable-request-row";
 import { collectionDropId, requestId } from "@/hooks/use-request-dnd";
+import { CollectionsFolderTree } from "@/components/collections-folder-tree";
 
 interface CollectionRowProps {
   collection: Collection;
@@ -56,6 +57,14 @@ interface CollectionRowProps {
   onConfirmDelete: (label: string, onConfirm: () => void) => void;
   onDeleteCollection: (id: string) => void;
   onRemoveRequest: (collectionId: string, requestId: string) => void;
+  // Folder callbacks
+  onAddFolder?: (collectionId: string, name: string, parentId: string | null) => string;
+  onRenameFolder?: (collectionId: string, folderId: string, name: string) => void;
+  onDeleteFolder?: (collectionId: string, folderId: string) => void;
+  onMoveRequestToFolder?: (collectionId: string, requestId: string, folderId: string | null) => void;
+  onMoveFolder?: (collectionId: string, folderId: string, newParentId: string | null) => void;
+  onReorderRequestsInCollection?: (collectionId: string, folderId: string | null, orderedRequestIds: string[]) => void;
+  onReorderFolders?: (collectionId: string, parentFolderId: string | null, orderedFolderIds: string[]) => void;
 }
 
 export function CollectionRow({
@@ -81,6 +90,13 @@ export function CollectionRow({
   onConfirmDelete,
   onDeleteCollection,
   onRemoveRequest,
+  onAddFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onMoveRequestToFolder,
+  onMoveFolder,
+  onReorderRequestsInCollection,
+  onReorderFolders,
 }: CollectionRowProps) {
   // ── Droppable for cross-collection moves ──
   const { setNodeRef: dropRef, isOver } = useDroppable({
@@ -88,8 +104,16 @@ export function CollectionRow({
     data: { type: "collection" as const, collectionId: collection.id },
   });
 
-  // ── Sortable request IDs ──
-  const requestIds = collection.requests.map((r) => requestId(r.id));
+  const hasFolders = (collection.folders ?? []).length > 0;
+
+  // Sortable request IDs (only for flat mode — folder tree handles its own DnD)
+  const flatRequestIds = collection.requests.map((r) => requestId(r.id));
+
+  // Uncategorized requests (used when folders exist)
+  const uncategorizedRequests = useMemo(
+    () => collection.requests.filter((r) => !r.folderId),
+    [collection.requests],
+  );
 
   return (
     <div ref={dropRef} className={cn(isOver && "bg-primary/[0.04]")}>
@@ -129,9 +153,7 @@ export function CollectionRow({
               value={renameValue}
               onChange={(e) => onRenameChange(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onRenameConfirm(collection.id);
-                }
+                if (e.key === "Enter") onRenameConfirm(collection.id);
                 if (e.key === "Escape") onRenameCancel();
               }}
               autoFocus
@@ -164,10 +186,15 @@ export function CollectionRow({
                 <MoreHorizontal className="size-3.5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onClick={() => onAddRequest(collection.id)}>
                 <Plus className="mr-2 size-3.5" /> Add request
               </DropdownMenuItem>
+              {onAddFolder && (
+                <DropdownMenuItem onClick={() => onAddFolder!(collection.id, "New Folder", null)}>
+                  <FolderPlus className="mr-2 size-3.5" /> New folder
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => onRenameStart(collection.id, collection.name)}>
                 <Edit2 className="mr-2 size-3.5" /> Rename
               </DropdownMenuItem>
@@ -199,22 +226,79 @@ export function CollectionRow({
         </div>
       </div>
 
-      {/* ── Expanded requests ── */}
+      {/* ── Expanded content ── */}
       {isExpanded && collection.requests.length > 0 && (
         <div className="border-t border-border/20">
-          <SortableContext items={requestIds} strategy={verticalListSortingStrategy}>
-            {collection.requests.map((req) => (
-              <DraggableRequestRow
-                key={req.id}
-                request={req}
-                collectionId={collection.id}
-                isSelected={selectedRequestIds.has(`${collection.id}::${req.id}`)}
-                onSelect={() => onSelectRequest(req)}
-                onSend={onSelectAndSendRequest ? () => onSelectAndSendRequest(req) : undefined}
-                onRemove={() => onRemoveRequest(collection.id, req.id)}
+          {hasFolders ? (
+            <>
+              {/* Folder tree */}
+              <CollectionsFolderTree
+                collection={collection}
+                folders={collection.folders ?? []}
+                requests={collection.requests}
+                selectedRequestIds={selectedRequestIds}
+                onToggleSelectRequest={onToggleSelectRequest}
+                onSelectRequest={onSelectRequest}
+                onSelectAndSendRequest={onSelectAndSendRequest}
+                onRemoveRequestFromCollection={onRemoveRequest}
+                onAddFolder={onAddFolder!}
+                onRenameFolder={onRenameFolder!}
+                onDeleteFolder={onDeleteFolder!}
+                onMoveRequestToFolder={onMoveRequestToFolder!}
+                onMoveFolder={onMoveFolder}
+                onReorderRequests={
+                  onReorderRequestsInCollection
+                    ? (colId, folderId, orderedIds) =>
+                        onReorderRequestsInCollection(colId, folderId, orderedIds)
+                    : undefined
+                }
+                onReorderFolders={onReorderFolders}
+                confirmDelete={onConfirmDelete}
               />
-            ))}
-          </SortableContext>
+              {/* Uncategorized requests below the tree */}
+              {uncategorizedRequests.length > 0 && (
+                <div className="border-t border-border/10">
+                  <SortableContext
+                    items={uncategorizedRequests.map((r) => requestId(r.id))}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {uncategorizedRequests.map((req) => (
+                      <DraggableRequestRow
+                        key={req.id}
+                        request={req}
+                        collectionId={collection.id}
+                        isSelected={selectedRequestIds.has(`${collection.id}::${req.id}`)}
+                        onSelect={() => onSelectRequest(req)}
+                        onSend={
+                          onSelectAndSendRequest
+                            ? () => onSelectAndSendRequest(req)
+                            : undefined
+                        }
+                        onRemove={() => onRemoveRequest(collection.id, req.id)}
+                      />
+                    ))}
+                  </SortableContext>
+                </div>
+              )}
+            </>
+          ) : (
+            /* Flat mode (no folders) */
+            <SortableContext items={flatRequestIds} strategy={verticalListSortingStrategy}>
+              {collection.requests.map((req) => (
+                <DraggableRequestRow
+                  key={req.id}
+                  request={req}
+                  collectionId={collection.id}
+                  isSelected={selectedRequestIds.has(`${collection.id}::${req.id}`)}
+                  onSelect={() => onSelectRequest(req)}
+                  onSend={
+                    onSelectAndSendRequest ? () => onSelectAndSendRequest(req) : undefined
+                  }
+                  onRemove={() => onRemoveRequest(collection.id, req.id)}
+                />
+              ))}
+            </SortableContext>
+          )}
         </div>
       )}
     </div>
