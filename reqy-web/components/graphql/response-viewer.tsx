@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Copy, Check, AlertCircle, CheckCircle2, AlertTriangle, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +68,25 @@ export function ResponseViewer({ data, errors, error, status, timeMs, loading }:
     status !== undefined && status >= 200 && status < 300 && graphqlErrors.length > 0;
   const isHttpError = status !== undefined && status >= 400;
   const hasErrors = isGraphQLError || isHttpError || !!error;
+  const isEmpty =
+    data === undefined &&
+    errors === undefined &&
+    error === undefined &&
+    status === undefined &&
+    !loading;
+
+  if (isEmpty) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center h-full text-muted-foreground p-8"
+        data-testid="graphql-response-empty"
+      >
+        <Play className="w-10 h-10 mb-3 opacity-30" />
+        <p className="text-sm font-medium">No response yet</p>
+        <p className="text-xs mt-1 opacity-60">Run a query to see the response here</p>
+      </div>
+    );
+  }
 
   return (
     <div className="border-t bg-card" data-testid="graphql-response-viewer">
