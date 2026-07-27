@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Plus, Trash2, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -79,11 +79,13 @@ export function BodyEditor({
       },
     ];
   }, [environmentVariableNames]);
-  const bodyRef = useRef(body);
-  if (bodyRef.current !== body) {
-    bodyRef.current = body;
-    setFormPairs(parseFormBody(body));
-  }
+  const lastBodyRef = useRef(body);
+  useEffect(() => {
+    if (lastBodyRef.current !== body) {
+      lastBodyRef.current = body;
+      setFormPairs(parseFormBody(body));
+    }
+  }, [body]);
 
   const updateFormPair = (index: number, field: "key" | "value", value: string) => {
     const newPairs = formPairs.map((p, i) => (i === index ? { ...p, [field]: value } : p));
