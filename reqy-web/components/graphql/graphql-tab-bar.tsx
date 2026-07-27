@@ -39,18 +39,25 @@ export function GraphqlTabBar({ tabs, activeTabId, onSelect, onAdd, onClose, onD
               {tab.name}
               {tab.dirty && !tab.saved && <span className="ml-1 text-warning">●</span>}
             </span>
-            <button
-              type="button"
+            <span
+              role="button"
+              tabIndex={0}
               aria-label={`Close ${tab.name}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onClose(tab.id);
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.stopPropagation();
+                  onClose(tab.id);
+                }
+              }}
               className="shrink-0 opacity-60 hover:opacity-100 hover:text-destructive cursor-pointer"
               data-testid={`graphql-tab-close-${tab.id}`}
             >
               <X className="w-3 h-3" />
-            </button>
+            </span>
           </button>
         );
       })}
