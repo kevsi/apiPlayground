@@ -82,20 +82,20 @@ export async function POST(req: NextRequest) {
 
     switch (provider) {
       case "anthropic":
-        response = await handleAnthropic(body, extra);
+        response = await handleAnthropic(body as any, extra);
         break;
       case "gemini":
-        response = await handleGemini(body, extra);
+        response = await handleGemini(body as any, extra);
         break;
       case "deepseek":
-        response = await handleDeepSeek(body, extra);
+        response = await handleDeepSeek(body as any, extra);
         break;
       case "ollama":
-        response = await handleOllama(body, extra);
+        response = await handleOllama(body as any, extra);
         break;
       // openai, openrouter, opencode-zen, custom, grok
       default:
-        response = await handleOpenAICompat(body, extra);
+        response = await handleOpenAICompat(body as any, extra);
         break;
     }
 

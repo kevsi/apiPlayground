@@ -701,7 +701,7 @@ async function parseFileContent(
     const { parseOpenApiSpec, convertToCollections } = await import("@/lib/openapi-import");
     const openApiResult = parseOpenApiSpec(content, fileName);
     if (openApiResult.success) {
-      const collections = convertToCollections(openApiResult);
+      const collections = convertToCollections(openApiResult, { groupByTag: true });
       if (collections.length > 0) return collections[0];
     }
 

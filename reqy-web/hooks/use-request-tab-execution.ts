@@ -261,6 +261,25 @@ export function useRequestTabExecution(state: RequestTabsState) {
         }));
         const allVarsAfterScript = [...allVars, ...scriptVars];
 
+        // Check for unresolved placeholders AFTER pre-request script,
+        // so script-set variables are included in the resolution check.
+        const resolvedUrl = interpolate(tab.url, allVarsAfterScript);
+        const resolvedBody = interpolate(tab.body || "", allVarsAfterScript);
+        const resolvedToken = interpolate(tab.authToken, allVarsAfterScript);
+        if (
+          hasUnresolvedPlaceholders(resolvedUrl) ||
+          hasUnresolvedPlaceholders(resolvedBody) ||
+          hasUnresolvedPlaceholders(resolvedToken)
+        ) {
+          notifyUnresolvedVariables();
+          toast({
+            title: "Unresolved variables",
+            description: "Resolve all {{placeholders}} before sending the request.",
+            variant: "destructive",
+          });
+          return null;
+        }
+
         const result = await executeRequest({
           tab,
           allVars: allVarsAfterScript,
@@ -366,25 +385,8 @@ export function useRequestTabExecution(state: RequestTabsState) {
           return null;
         }
 
-        const resolvedUrl = interpolate(tabToSend.url, allVars);
-        const resolvedBody = interpolate(tabToSend.body || "", allVars);
-        const resolvedToken = interpolate(tabToSend.authToken, allVars);
-        const unresolved =
-          hasUnresolvedPlaceholders(resolvedUrl) ||
-          hasUnresolvedPlaceholders(resolvedBody) ||
-          hasUnresolvedPlaceholders(resolvedToken);
-
-        if (unresolved) {
-          notifyUnresolvedVariables();
-          toast({
-            title: "Unresolved variables",
-            description: "Resolve all {{placeholders}} before sending the request.",
-            variant: "destructive",
-          });
-          return null;
-        }
-
         const result = await executeRequestWrapper(tabToSend, showLoading);
+        if (!result) return null;
         updateTab(tabToSend.id, {
           hasResponse: true,
           responseStatus: result.responseStatus,
@@ -502,6 +504,7 @@ export function useRequestTabExecution(state: RequestTabsState) {
           try {
             const backgroundTab = { ...activeTab, ...buildTabFromRequest(request) } as RequestTab;
             const result = await executeRequestWrapper(backgroundTab, false);
+            if (!result) continue;
             setCollectionRunLogs((logs) => [
               ...logs,
               `"${request.name}" → ${result.responseStatus ?? 0} en ${result.responseTime ?? 0}ms`,

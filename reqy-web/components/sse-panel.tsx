@@ -26,7 +26,7 @@ import {
   Radio,
   ChevronDown,
   ChevronRight,
-  HeadersIcon,
+  FileText,
   Shield,
   Filter,
   List,
@@ -337,7 +337,7 @@ export function SSEPanel() {
           Options
           {(headers.length > 0 || authType !== "none" || eventFilter || maxEvents !== 500) && (
             <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
-              {headers.length > 0 && <HeadersIcon className="size-3" />}
+              {headers.length > 0 && <FileText className="size-3" />}
               {authType !== "none" && <Shield className="size-3" />}
               {eventFilter && <Filter className="size-3" />}
               {maxEvents !== 500 && <List className="size-3" />}

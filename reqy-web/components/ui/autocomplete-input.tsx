@@ -55,11 +55,29 @@ function flattenAndFilter(
   query: string,
 ): Array<{ group: AutocompleteGroup; item: AutocompleteItem }> {
   const result: Array<{ group: AutocompleteGroup; item: AutocompleteItem }> = [];
+
+  // When user is typing inside {{...}}, extract what's after the last {{
+  // e.g. "{{BASE_URL}}/posts/{{"  → activeQuery = ""  (show all variables)
+  // e.g. "{{BASE_URL}}/posts/{{p" → activeQuery = "p"  (show matching variables)
+  // e.g. "hello world"            → activeQuery = "hello world"
+  const lastOpen = query.lastIndexOf("{{");
+  let activeQuery: string;
+  if (lastOpen >= 0) {
+    const afterOpen = query.slice(lastOpen + 2);
+    activeQuery = afterOpen;
+  } else {
+    activeQuery = query;
+  }
+
   for (const group of groups) {
     for (const item of group.items) {
       // Skip if the item's value is already present in the input
-      if (item.value && query.includes(item.value)) continue;
-      if (fuzzyMatch(item.label, query)) {
+      // But only if the cursor is NOT inside a new {{...}}
+      // (when inside {{}}, the user wants to insert another variable)
+      if (lastOpen < 0 && item.value && query.includes(item.value)) continue;
+
+      // Match against the active portion of the query
+      if (fuzzyMatch(item.label, activeQuery)) {
         result.push({ group, item });
       }
     }
@@ -186,12 +204,20 @@ export const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputP
     // ── Select an item ────────────────────────────────────────────────────────
     const selectItem = useCallback(
       (item: AutocompleteItem) => {
-        onChange(item.value);
+        // If the user is inside a {{...}} block, insert only at that position
+        // instead of replacing the entire input value.
+        const lastOpen = value.lastIndexOf("{{");
+        if (lastOpen >= 0) {
+          const before = value.slice(0, lastOpen);
+          onChange(before + item.value);
+        } else {
+          onChange(item.value);
+        }
         setIsOpen(false);
         setActiveIndex(-1);
         inputRef.current?.focus();
       },
-      [onChange],
+      [onChange, value],
     );
 
     // ── Handlers ──────────────────────────────────────────────────────────────

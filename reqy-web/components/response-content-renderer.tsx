@@ -1,7 +1,18 @@
 "use client";
 
 import React from "react";
-import { Eye, Code, FileImage, FileText, Music, Video, BarChart3, Check, Copy } from "lucide-react";
+import {
+  Eye,
+  Code,
+  FileImage,
+  FileText,
+  Music,
+  Video,
+  BarChart3,
+  Check,
+  Copy,
+  ListTree,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +38,7 @@ import {
   extractVideoUrls,
   extractImageUrls,
 } from "./response-utils";
+import { JsonTreeViewer } from "./json-tree-viewer";
 
 const formatOptions: Array<{
   value: ResponseFormat;
@@ -38,6 +50,7 @@ const formatOptions: Array<{
   { value: "preview", label: "Preview", icon: Eye },
   { value: "visualize", label: "Visualize", icon: BarChart3 },
   { value: "json", label: "JSON", icon: Code },
+  { value: "tree", label: "Tree", icon: ListTree },
   { value: "xml", label: "XML", icon: Code },
   { value: "html", label: "HTML", icon: Code },
   { value: "image", label: "Image", icon: FileImage },
@@ -111,6 +124,18 @@ export function ResponseContentRenderer({
         const parsed = JSON.parse(safeBody);
         const formatted = JSON.stringify(parsed, null, 2);
         return codeBlockHighlighted(highlightJson(formatted));
+      } catch {
+        return codeBlock("Error parsing JSON", "text-destructive");
+      }
+    }
+    return codeBlock(safeBody);
+  };
+
+  const renderJsonTree = () => {
+    if (isJson(safeBody, responseHeaders)) {
+      try {
+        const parsed = JSON.parse(safeBody);
+        return <JsonTreeViewer data={parsed} />;
       } catch {
         return codeBlock("Error parsing JSON", "text-destructive");
       }
@@ -424,6 +449,8 @@ export function ResponseContentRenderer({
       case "raw":
         return renderRaw();
       case "pretty":
+      case "tree":
+        return renderJsonTree();
       case "json":
         return renderJson();
       case "xml":

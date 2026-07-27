@@ -117,7 +117,7 @@ describe("proxy: protected routes without valid token return 401", () => {
     expect(res.status).toBe(401);
   });
 
-  // Phase 4: import/export and postman-auth routes must be gated too
+  // Phase 4: import/export routes must be gated too (postman-auth is exempt — it uses its own API key auth)
   // (they read stored Postman/GitHub tokens and trigger external API calls).
   it("rejects /api/postman-import with no Authorization header", async () => {
     const { proxy } = await import("../../proxy");
@@ -153,13 +153,13 @@ describe("proxy: protected routes without valid token return 401", () => {
     expect(res.status).toBe(401);
   });
 
-  it("rejects /api/postman-auth with no Authorization header", async () => {
+  it("passes /api/postman-auth through (no proxy auth needed)", async () => {
     const { proxy } = await import("../../proxy");
     const res = proxy(makeMockRequest({ pathname: "/api/postman-auth" }));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
   });
 
-  it("rejects /api/postman-auth/collections with wrong token", async () => {
+  it("passes /api/postman-auth/collections through (no proxy auth needed)", async () => {
     const { proxy } = await import("../../proxy");
     const res = proxy(
       makeMockRequest({
@@ -167,7 +167,7 @@ describe("proxy: protected routes without valid token return 401", () => {
         authorization: "Bearer " + "z".repeat(48),
       }),
     );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
   });
 
   // Phase 2 step 7: /api/mock and /api/mock/config routes are deleted.

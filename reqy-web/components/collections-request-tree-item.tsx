@@ -39,6 +39,12 @@ interface RequestTreeItemProps {
   onConfirmDelete: (label: string, onConfirm: () => void) => void;
   onReorder?: (collectionId: string, folderId: string | null, orderedRequestIds: string[]) => void;
   onDragStateChange: (dragId: string | null) => void;
+  /** Returns the folder ID currently being hovered over during drag, or null. */
+  getDropTargetFolderId?: () => string | null;
+  /** Called when a request is dropped on a different folder. */
+  onMoveToFolder?: (requestId: string, folderId: string | null) => void;
+  /** Called on drag start / hovering a request to clear the folder drop target ref. */
+  onClearFolderDropTarget?: () => void;
 }
 
 export function RequestTreeItem({
@@ -59,27 +65,48 @@ export function RequestTreeItem({
   onConfirmDelete,
   onReorder,
   onDragStateChange,
+  getDropTargetFolderId,
+  onMoveToFolder,
+  onClearFolderDropTarget,
 }: RequestTreeItemProps) {
   const dragOverRef = React.useRef<string | null>(null);
   const indent = depth * 20;
 
   const handleDragEnd = useCallback(() => {
-    const targetId = dragOverRef.current;
     const draggedId = request.id;
-    if (draggedId && targetId && onReorder && draggedId !== targetId) {
-      const folderId = request.folderId ?? null;
-      const siblings = allRequests.filter((r) => r.folderId === folderId).map((r) => r.id);
-      const fromIdx = siblings.indexOf(draggedId);
-      const toIdx = siblings.indexOf(targetId);
-      if (fromIdx !== -1 && toIdx !== -1) {
-        siblings.splice(fromIdx, 1);
-        siblings.splice(toIdx, 0, draggedId);
-        onReorder(collectionId, folderId, siblings);
+
+    // Check if dropped on a folder (cross-folder move)
+    const dropFolderId = getDropTargetFolderId?.();
+    if (dropFolderId && dropFolderId !== request.folderId && onMoveToFolder) {
+      onMoveToFolder(draggedId, dropFolderId);
+    } else {
+      // Existing sibling reorder logic
+      const targetId = dragOverRef.current;
+      if (draggedId && targetId && onReorder && draggedId !== targetId) {
+        const folderId = request.folderId ?? null;
+        const siblings = allRequests.filter((r) => r.folderId === folderId).map((r) => r.id);
+        const fromIdx = siblings.indexOf(draggedId);
+        const toIdx = siblings.indexOf(targetId);
+        if (fromIdx !== -1 && toIdx !== -1) {
+          siblings.splice(fromIdx, 1);
+          siblings.splice(toIdx, 0, draggedId);
+          onReorder(collectionId, folderId, siblings);
+        }
       }
     }
+
     onDragStateChange(null);
     dragOverRef.current = null;
-  }, [request.id, request.folderId, allRequests, onReorder, collectionId, onDragStateChange]);
+  }, [
+    request.id,
+    request.folderId,
+    allRequests,
+    onReorder,
+    collectionId,
+    onDragStateChange,
+    getDropTargetFolderId,
+    onMoveToFolder,
+  ]);
 
   return (
     <div className="relative group">
@@ -120,11 +147,13 @@ export function RequestTreeItem({
           e.dataTransfer.effectAllowed = "move";
           e.dataTransfer.setData("text/plain", request.id);
           dragOverRef.current = null;
+          onClearFolderDropTarget?.();
         }}
         onDragOver={(e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
           dragOverRef.current = request.id;
+          onClearFolderDropTarget?.();
         }}
         onDragEnd={handleDragEnd}
       >

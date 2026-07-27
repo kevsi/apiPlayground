@@ -1,7 +1,19 @@
 "use client";
 
-import { useState, useRef, useMemo, useEffect } from "react";
-import { Plus, Trash2, Play, Code, Braces, Check, Copy, Loader2, FlaskConical } from "lucide-react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import {
+  Plus,
+  Trash2,
+  Play,
+  Code,
+  Braces,
+  Check,
+  Copy,
+  Loader2,
+  FlaskConical,
+  Terminal,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HttpMethod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -33,6 +45,7 @@ import { methodBg, methodDot } from "@/lib/http-method-colors";
 import { KeyValueEditor } from "@/components/key-value-editor";
 import { AuthSection } from "@/components/auth-section";
 import { BodyEditor } from "@/components/body-editor";
+import { toast } from "@/hooks/use-toast";
 
 interface RequestPanelProps {
   method: HttpMethod;
@@ -112,6 +125,8 @@ export function RequestPanel({
   const [exportFormat, setExportFormat] = useState<"curl" | "fetch">("curl");
 
   const [exportCopied, setExportCopied] = useState(false);
+  const [curlImportOpen, setCurlImportOpen] = useState(false);
+  const [curlInput, setCurlInput] = useState("");
   const urlInputRef = useRef<HTMLInputElement>(null);
 
   // Sync path params when URL changes — auto-add/remove :param patterns
@@ -122,6 +137,51 @@ export function RequestPanel({
     lastSyncedUrlRef.current = url;
     const synced = syncPathParams(url, pathParams);
     onPathParamsChange(synced);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
+  // Auto-parse query params from the URL and merge with existing ones.
+  // Preserves existing user-added params that aren't in the URL.
+  const lastParsedUrlRef = useRef(url);
+  const queryParamsRef = useRef(queryParams);
+  queryParamsRef.current = queryParams;
+  useEffect(() => {
+    if (url === lastParsedUrlRef.current) return;
+    lastParsedUrlRef.current = url;
+    const qIndex = url.indexOf("?");
+    if (qIndex === -1) return;
+    const qs = url.slice(qIndex + 1).split("#")[0]; // strip hash
+    if (!qs.trim()) return;
+
+    // Parse ?key=value&... from the URL
+    const urlParams = new URLSearchParams(qs);
+    const current = queryParamsRef.current ?? [];
+    const merged = new Map<string, QueryParam>();
+
+    // Start with existing params (preserved if not overwritten by URL)
+    for (const p of current) {
+      merged.set(p.key, { ...p });
+    }
+
+    // URL params override (or add) existing ones, enabled by default
+    for (const [key, value] of urlParams.entries()) {
+      const existing = merged.get(key);
+      if (existing && !existing.key.startsWith("__")) {
+        // Update value but keep enabled/disabled state if user set it
+        merged.set(key, { ...existing, value });
+      } else {
+        merged.set(key, { key, value, enabled: true });
+      }
+    }
+
+    const mergedArr = Array.from(merged.values());
+
+    // Only fire if something actually changed
+    const currentJson = JSON.stringify(current);
+    const mergedJson = JSON.stringify(mergedArr);
+    if (currentJson !== mergedJson) {
+      onQueryParamsChange(mergedArr);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
@@ -395,6 +455,108 @@ ${bodyPart}})
               suggestions={urlAutocompleteGroups}
               emptyMessage="Aucun résultat"
             />
+          </div>
+
+          {/* Paste cURL */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-foreground"
+              onClick={() => {
+                setCurlImportOpen(!curlImportOpen);
+                setCurlInput("");
+              }}
+              title="Coller une commande cURL"
+            >
+              <Terminal className="size-3.5" />
+            </Button>
+            {curlImportOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-[420px] rounded-lg border border-border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95">
+                <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border/40">
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Coller une commande cURL
+                  </span>
+                  <button
+                    onClick={() => setCurlImportOpen(false)}
+                    className="rounded p-0.5 text-muted-foreground/50 hover:text-foreground transition-colors"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                <div className="p-3 space-y-2">
+                  <textarea
+                    value={curlInput}
+                    onChange={(e) => setCurlInput(e.target.value)}
+                    placeholder={`curl -X POST https://api.example.com/data \\\n  -H "Content-Type: application/json" \\\n  -d '{"key": "value"}'`}
+                    className="w-full h-24 rounded-md border border-input bg-muted/20 px-3 py-2 text-xs font-mono resize-none outline-none focus:border-primary/50 transition-colors"
+                    spellCheck={false}
+                  />
+                  <div className="flex justify-end gap-1.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setCurlImportOpen(false)}
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      disabled={!curlInput.trim()}
+                      onClick={async () => {
+                        try {
+                          const { parseCurlCommand } = await import("@/lib/curl-parser");
+                          const parsed = parseCurlCommand(curlInput);
+                          if (!parsed) {
+                            toast({
+                              title: "Impossible de parser la commande",
+                              description: "Vérifiez le format de la commande cURL",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          onMethodChange(parsed.method as HttpMethod);
+                          onUrlChange(parsed.url);
+                          const parsedHeaders = Object.entries(parsed.headers).map(
+                            ([key, value]) => ({
+                              key,
+                              value,
+                              enabled: true,
+                            }),
+                          );
+                          onHeadersChange([...headers, ...parsedHeaders]);
+                          if (parsed.body) {
+                            onBodyChange(parsed.body);
+                            onBodyTypeChange("raw");
+                          }
+                          if (parsed.auth)
+                            onAuthChange(
+                              "basic",
+                              btoa(`${parsed.auth.username}:${parsed.auth.password}`),
+                            );
+                          setCurlImportOpen(false);
+                          toast({
+                            title: "cURL importé",
+                            description: `${parsed.method} ${parsed.url.slice(0, 60)}…`,
+                          });
+                        } catch (err) {
+                          toast({
+                            title: "Erreur d'import",
+                            description: String(err),
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      <Terminal className="size-3" />
+                      Importer
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Variables dropdown */}

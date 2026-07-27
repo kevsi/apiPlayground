@@ -13,16 +13,14 @@ test.describe("Collections", () => {
     await expect(btn).toBeVisible({ timeout: 10000 });
   });
 
-  test("can open create collection dialog", async ({ page }) => {
+  test("can create a new collection", async ({ page }) => {
     await page.goto("/collections");
     const btn = page.getByTestId("new-collection-button").first();
     await btn.click();
 
-    // A dialog or input should appear
-    const nameInput = page.locator('input[name="name"], input[placeholder*="name" i]').first();
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
-    await nameInput.fill("Smoke Test Collection");
-    await expect(nameInput).toHaveValue("Smoke Test Collection");
+    // "New" creates the collection immediately — wait for a collection row to appear
+    const rows = page.getByTestId("collection-row");
+    await expect(rows.first()).toBeVisible({ timeout: 10000 });
   });
 
   test("collection list is present", async ({ page }) => {

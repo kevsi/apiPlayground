@@ -56,10 +56,10 @@ export function getStatusGaugeClass(timeMs?: number | null): string {
 export function getStatusWatermarkClass(status?: number | null): string {
   if (status == null) return "text-muted-foreground/5";
   const h = band(status);
-  if (h === "emerald") return "text-emerald-500/5";
-  if (h === "blue") return "text-blue-500/5";
-  if (h === "amber") return "text-amber-500/5";
-  if (h === "red") return "text-red-500/5";
+  if (h === "emerald") return "text-emerald-500/10";
+  if (h === "blue") return "text-blue-500/10";
+  if (h === "amber") return "text-amber-500/10";
+  if (h === "red") return "text-red-500/10";
   return "text-muted-foreground/5";
 }
 

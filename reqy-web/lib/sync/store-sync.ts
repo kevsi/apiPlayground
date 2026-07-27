@@ -171,7 +171,7 @@ export async function pullAndMerge(
 ): Promise<{ applied: number }> {
   const changes: SyncChange[] = [];
   for await (const c of pollAllSyncChanges({ workspaceId, since }, { token: opts.token })) {
-    changes.push(c);
+    changes.push(c as SyncChange);
   }
   if (changes.length > 0 && opts.apply) {
     opts.apply(changes);

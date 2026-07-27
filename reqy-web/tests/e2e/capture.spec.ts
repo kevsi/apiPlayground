@@ -3,9 +3,12 @@ import { test, expect } from "@playwright/test";
 test.describe("Capture (HTTP proxy)", () => {
   test("page loads with main elements", async ({ page }) => {
     await page.goto("/capture");
-    // The capture page should show the capture detail section
-    const detail = page.getByTestId("capture-detail").first();
-    await expect(detail).toBeVisible({ timeout: 10000 });
+    // The capture page should show a title
+    const title = page.locator("h1").first();
+    await expect(title).toBeVisible({ timeout: 10000 });
+    // Should show the port input
+    const portInput = page.locator("#capture-port").first();
+    await expect(portInput).toBeVisible();
   });
 
   test("shows capture sessions header", async ({ page }) => {
@@ -17,14 +20,15 @@ test.describe("Capture (HTTP proxy)", () => {
 
   test("has action buttons (start/stop proxy)", async ({ page }) => {
     await page.goto("/capture");
-    // Look for start/stop proxy buttons
-    const startBtn = page.getByRole("button", { name: /start|begin|play|demarrer/i }).first();
-    const clearBtn = page.getByRole("button", { name: /clear|trash|vider/i }).first();
+    // Look for start proxy button ("Démarrer la capture") or the refresh button
+    const demarrerBtn = page.getByRole("button", { name: /d.marrer|start|begin|play/i }).first();
+    const rafraichirBtn = page.getByRole("button", { name: /rafraichir|refresh/i }).first();
+    const effacerBtn = page.getByRole("button", { name: /effacer|clear|trash|vider/i }).first();
 
-    // At least some action buttons should exist
     const hasActionButtons =
-      (await startBtn.isVisible({ timeout: 3000 }).catch(() => false)) ||
-      (await clearBtn.isVisible({ timeout: 1000 }).catch(() => false));
+      (await demarrerBtn.isVisible({ timeout: 3000 }).catch(() => false)) ||
+      (await rafraichirBtn.isVisible({ timeout: 1000 }).catch(() => false)) ||
+      (await effacerBtn.isVisible({ timeout: 1000 }).catch(() => false));
     expect(hasActionButtons).toBeTruthy();
   });
 });

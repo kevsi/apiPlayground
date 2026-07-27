@@ -9,7 +9,6 @@ const PROTECTED_PREFIXES = [
   "/api/postman-import",
   "/api/postman-export",
   "/api/github-import",
-  "/api/postman-auth",
 ];
 
 function isExempt(pathname: string): boolean {

@@ -115,7 +115,10 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     get,
     commit,
     addNotification: (n) => {
-      mutations.addNotification?.(n);
+      mutations.addNotification?.({
+        ...n,
+        type: n.type as "info" | "success" | "warning" | "error",
+      });
     },
   });
 
@@ -127,13 +130,7 @@ export const requestStore = create<RequestStoreState>()((set, get) => {
     ...createNotificationsMutations(commit),
     ...createHistoryMutations(commit),
     ...createCollectionsMutations(commit),
-    addFolder: createFoldersMutations(commit).addFolder,
-    renameFolder: createFoldersMutations(commit).renameFolder,
-    deleteFolder: createFoldersMutations(commit).deleteFolder,
-    moveRequestToFolder: createFoldersMutations(commit).moveRequestToFolder,
-    moveFolder: createFoldersMutations(commit).moveFolder,
-    reorderRequestsInCollection: createFoldersMutations(commit).reorderRequestsInCollection,
-    reorderFolders: createFoldersMutations(commit).reorderFolders,
+    ...createFoldersMutations(commit),
     ...createVariableMappingsMutations(commit),
     ...createProjectsMutations(commit),
     ...createEnvironmentsMutations(commit),

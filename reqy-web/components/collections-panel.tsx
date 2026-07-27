@@ -688,13 +688,6 @@ export function CollectionsPanel({
                 onConfirmDelete={confirmDelete}
                 onDeleteCollection={onDeleteCollection}
                 onRemoveRequest={onRemoveRequestFromCollection}
-                onAddFolder={onAddFolder}
-                onRenameFolder={onRenameFolder}
-                onDeleteFolder={onDeleteFolder}
-                onMoveRequestToFolder={onMoveRequestToFolder}
-                onMoveFolder={onMoveFolder}
-                onReorderRequestsInCollection={onReorderRequestsInCollection}
-                onReorderFolders={onReorderFolders}
               />
             ))}
           </div>

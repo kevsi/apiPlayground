@@ -482,7 +482,7 @@ export function RestSnapshotModal({
   // ── Render ────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[620px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
+      <DialogContent className="sm:max-w-[1000px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
         {/* ── Sticky Header ─────────────────────────────────────────── */}
         <DialogHeader className="px-6 pt-5 pb-3 shrink-0 border-b border-border/40">
           <div className="flex items-center gap-3">
@@ -505,219 +505,229 @@ export function RestSnapshotModal({
           </div>
         </DialogHeader>
 
-        {/* ── Scrollable body ─────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {/* ── Non-JSON warning / No response ─────────────────────────── */}
-          {hasResponse && !isJson && (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="size-3.5 shrink-0" />
-              Les snapshots ne fonctionnent qu'avec des réponses JSON
+        {/* ── Body: côte à côte ──────────────────────────────────────── */}
+        {!hasResponse ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="rounded-2xl bg-muted/20 p-5 mb-3 ring-1 ring-border/40">
+              <Camera className="size-8 text-muted-foreground/20" />
             </div>
-          )}
+            <p className="text-sm font-medium text-foreground/80">Aucune réponse</p>
+            <p className="text-xs text-muted-foreground/60 mt-1 max-w-[280px]">
+              Envoyez une requête pour capturer un snapshot de sa réponse JSON
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1 flex overflow-hidden">
+            {/* ── Panneau gauche : snapshots ───────────────────────────── */}
+            <div className="w-[380px] shrink-0 border-r border-border/40 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                {/* Non-JSON warning */}
+                {!isJson && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="size-3.5 shrink-0" />
+                    Les snapshots ne fonctionnent qu'avec des réponses JSON
+                  </div>
+                )}
 
-          {!hasResponse && (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <div className="rounded-2xl bg-muted/20 p-5 mb-3 ring-1 ring-border/40">
-                <Camera className="size-8 text-muted-foreground/20" />
-              </div>
-              <p className="text-sm font-medium text-foreground/80">Aucune réponse</p>
-              <p className="text-xs text-muted-foreground/60 mt-1 max-w-[280px]">
-                Envoyez une requête pour capturer un snapshot de sa réponse JSON
-              </p>
-            </div>
-          )}
-
-          {/* ── Save new snapshot ──────────────────────────────────────── */}
-          {isJson && hasResponse && (
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10">
-                  <Plus className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <h3 className="text-sm font-semibold">Nouveau snapshot</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newName}
-                  onChange={(e) => {
-                    setNewName(e.target.value);
-                    setPendingOverwrite(null);
-                  }}
-                  placeholder="Nom du snapshot…"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSave();
-                    if (e.key === "Escape") handleCancelOverwrite();
-                  }}
-                  className="h-9 text-sm flex-1"
-                  autoFocus
-                />
-                <div className="flex items-center gap-1">
-                  {pendingOverwrite && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 px-2 text-xs"
-                      onClick={handleCancelOverwrite}
-                    >
-                      Annuler
-                    </Button>
-                  )}
-                  <Button
-                    variant={pendingOverwrite ? "destructive" : "default"}
-                    className={cn(
-                      "h-9 gap-1.5 shrink-0 transition-all duration-150",
-                      pendingOverwrite && "animate-pulse",
+                {/* New snapshot */}
+                {isJson && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-md bg-emerald-500/10">
+                        <Plus className="size-3 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Nouveau</h3>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        value={newName}
+                        onChange={(e) => {
+                          setNewName(e.target.value);
+                          setPendingOverwrite(null);
+                        }}
+                        placeholder="Nom du snapshot…"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSave();
+                          if (e.key === "Escape") handleCancelOverwrite();
+                        }}
+                        className="h-8 text-xs flex-1"
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-1 shrink-0">
+                        {pendingOverwrite && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-xs"
+                            onClick={handleCancelOverwrite}
+                          >
+                            Annuler
+                          </Button>
+                        )}
+                        <Button
+                          variant={pendingOverwrite ? "destructive" : "default"}
+                          className={cn(
+                            "h-8 gap-1 text-xs transition-all",
+                            pendingOverwrite && "animate-pulse",
+                          )}
+                          onClick={handleSave}
+                          disabled={!canSave}
+                          data-testid="rest-snapshot-save"
+                        >
+                          <Save className="size-3" />
+                          {pendingOverwrite ? "Écraser" : "Sauver"}
+                        </Button>
+                      </div>
+                    </div>
+                    {pendingOverwrite && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                        « {pendingOverwrite} » existe. Cliquez Écraser pour confirmer.
+                      </p>
                     )}
-                    onClick={handleSave}
-                    disabled={!canSave}
-                    data-testid="rest-snapshot-save"
-                  >
-                    <Save className="size-3.5" />
-                    {pendingOverwrite ? "Écraser ?" : "Sauvegarder"}
-                  </Button>
-                </div>
-              </div>
-              {pendingOverwrite && (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                  <AlertTriangle className="size-3" />
-                  Un snapshot nommé « {pendingOverwrite} » existe déjà. Cliquez à nouveau sur
-                  <strong> Écraser </strong> pour confirmer.
-                </p>
-              )}
-            </div>
-          )}
+                  </div>
+                )}
 
-          {/* ── Existing snapshots ──────────────────────────────────────── */}
-          {snapshotNames.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-md bg-violet-500/10">
-                  <History className="size-3.5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <h3 className="text-sm font-semibold">Snapshots existants</h3>
-              </div>
+                {/* Snapshots list */}
+                {snapshotNames.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-md bg-violet-500/10">
+                        <History className="size-3 text-violet-600 dark:text-violet-400" />
+                      </div>
+                      <h3 className="text-sm font-semibold">
+                        Enregistrés
+                        <Badge variant="secondary" className="ml-2 text-[9px] h-3.5 px-1">
+                          {snapshotNames.length}
+                        </Badge>
+                      </h3>
+                    </div>
 
-              {/* List */}
-              <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-                {snapshotNames.map((name) => {
-                  const entry = getSnapshotEntry(name);
-                  return (
-                    <div
-                      key={name}
-                      className={cn(
-                        "group flex items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-150",
-                        selectedName === name
-                          ? "border-primary/30 bg-primary/5 shadow-sm"
-                          : "border-border/60 hover:border-border hover:bg-muted/20 hover:shadow-sm",
-                      )}
-                    >
-                      {/* ── Rename mode ─────────────────────────────── */}
-                      {renameTarget === name ? (
-                        <div className="flex flex-1 items-center gap-1.5">
-                          <Input
-                            value={renameDraft}
-                            onChange={(e) => setRenameDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") commitRename();
-                              if (e.key === "Escape") cancelRename();
-                            }}
-                            onBlur={commitRename}
-                            className="h-7 text-sm flex-1"
-                            autoFocus
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          {/* ── Clickable label ──────────────────────── */}
-                          <button
+                    <div className="space-y-1 max-h-[400px] overflow-y-auto pr-1">
+                      {snapshotNames.map((name) => {
+                        const entry = getSnapshotEntry(name);
+                        return (
+                          <div
+                            key={name}
+                            className={cn(
+                              "group flex items-center gap-1.5 rounded-lg border px-2.5 py-2 transition-all duration-150 cursor-pointer",
+                              selectedName === name
+                                ? "border-primary/30 bg-primary/5 shadow-sm"
+                                : "border-border/60 hover:border-border hover:bg-muted/20",
+                            )}
                             onClick={() => {
                               selectEntry(name);
                               setShowDetail(true);
                               setDiff(null);
                             }}
-                            className="flex flex-1 items-center gap-2 min-w-0"
                           >
-                            <span
-                              className={cn(
-                                "size-2 rounded-full shrink-0",
-                                statusDot(entry?.statusCode),
-                              )}
-                            />
-                            <span className="text-sm truncate">{name}</span>
-                            {entry?.statusCode && (
-                              <Badge
-                                variant="outline"
-                                className="text-[9px] h-4 px-1 font-mono shrink-0"
-                              >
-                                {entry.statusCode}
-                              </Badge>
+                            {renameTarget === name ? (
+                              <div className="flex flex-1 items-center gap-1">
+                                <Input
+                                  value={renameDraft}
+                                  onChange={(e) => setRenameDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") commitRename();
+                                    if (e.key === "Escape") cancelRename();
+                                  }}
+                                  onBlur={commitRename}
+                                  className="h-6 text-xs flex-1"
+                                  autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                <span
+                                  className={cn(
+                                    "size-2 rounded-full shrink-0",
+                                    statusDot(entry?.statusCode),
+                                  )}
+                                />
+                                <span className="text-xs truncate flex-1">{name}</span>
+                                {entry?.statusCode && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[8px] h-3.5 px-1 font-mono shrink-0"
+                                  >
+                                    {entry.statusCode}
+                                  </Badge>
+                                )}
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startRename(name);
+                                    }}
+                                    title="Renommer"
+                                  >
+                                    <PencilLine className="size-2.5 text-muted-foreground/70" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDelete(name);
+                                    }}
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 className="size-2.5" />
+                                  </Button>
+                                </div>
+                              </>
                             )}
-                            <span className="text-[10px] text-muted-foreground/40 shrink-0 ml-auto hidden sm:inline">
-                              {relativeDate(entry?.updatedAt ?? 0)}
-                            </span>
-                          </button>
-
-                          {/* ── Action buttons ───────────────────────── */}
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => startRename(name)}
-                              title="Renommer"
-                            >
-                              <PencilLine className="size-3 text-muted-foreground/70" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs gap-1"
-                              onClick={() => handleCompareWith(name)}
-                              disabled={!isJson}
-                              title="Comparer avec la réponse actuelle"
-                            >
-                              <GitCompare className="size-3" />
-                              <span className="hidden sm:inline">Diff</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(name)}
-                              title="Supprimer"
-                            >
-                              <Trash2 className="size-3" />
-                            </Button>
                           </div>
-                        </>
-                      )}
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {/* Empty saved */}
+                {isJson && snapshotNames.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <FileJson className="size-6 text-muted-foreground/20 mb-2" />
+                    <p className="text-xs font-medium text-foreground/60">Aucun snapshot</p>
+                    <p className="text-[10px] text-muted-foreground/40 mt-0.5">
+                      Donnez un nom et sauvegardez
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-          )}
 
-          {/* ── Rich detail card ─────────────────────────────────────── */}
-          {selectedEntry && showDetail && renderDetailCard()}
-
-          {/* ── Diff results ─────────────────────────────────────────── */}
-          {diff && renderDiffPanel()}
-
-          {/* ── Empty saved state ────────────────────────────────────── */}
-          {isJson && hasResponse && snapshotNames.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="rounded-xl bg-muted/10 p-4 mb-3 ring-1 ring-border/30">
-                <FileJson className="size-7 text-muted-foreground/20" />
+            {/* ── Panneau droit : détail ou diff ──────────────────────── */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-5 py-4">
+                {diff ? (
+                  renderDiffPanel()
+                ) : selectedEntry && showDetail ? (
+                  renderDetailCard()
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div className="rounded-xl bg-muted/10 p-4 mb-3 ring-1 ring-border/30">
+                      <Camera className="size-7 text-muted-foreground/20" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground/60">
+                      {snapshotNames.length > 0
+                        ? "Sélectionnez un snapshot"
+                        : "Créez votre premier snapshot"}
+                    </p>
+                    <p className="text-xs text-muted-foreground/40 mt-1 max-w-[260px]">
+                      {snapshotNames.length > 0
+                        ? "Cliquez sur un snapshot à gauche pour voir son détail"
+                        : "Sauvegardez la réponse actuelle pour la comparer plus tard"}
+                    </p>
+                  </div>
+                )}
               </div>
-              <p className="text-sm font-medium text-foreground/60">Aucun snapshot enregistré</p>
-              <p className="text-xs text-muted-foreground/40 mt-1 max-w-[260px]">
-                Donnez un nom ci-dessus et cliquez Sauvegarder pour capturer la structure JSON
-                actuelle
-              </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
