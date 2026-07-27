@@ -4,6 +4,7 @@ import { RequestPanel } from "@/components/request-panel";
 import { ResponsePanel } from "@/components/response-panel";
 import { CollectionsModal } from "@/components/collections-modal";
 import { HistoryPanel } from "@/components/history-panel";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { BatchRunProgress } from "@/components/batch-run-progress";
 import { RequestTabBar } from "@/components/request-tab-bar";
 import { RequestChainingDialog } from "@/components/request-chaining-dialog";
@@ -25,7 +26,7 @@ import type { RequestTab } from "@/lib/request-executor";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { RestSnapshotModal } from "@/components/rest-snapshot-modal";
-import { Camera } from "lucide-react";
+import { Camera, AlertTriangle } from "lucide-react";
 import {
   proposeAssertionCorrection,
   suggestionToAssertion,
@@ -437,55 +438,66 @@ export function RequestTabsManager() {
               className="min-w-0 min-h-0 overflow-hidden"
             >
               <div className="min-h-0 h-full overflow-auto hide-scrollbar border-r border-border max-[916px]:border-r-0 max-[916px]:border-b request-panel-scroll">
-                <RequestPanel
-                  key={activeTab.id}
-                  method={activeTab.method}
-                  url={activeTab.url}
-                  queryParams={activeTab.queryParams}
-                  pathParams={activeTab.pathParams}
-                  headers={activeTab.headers}
-                  body={activeTab.body}
-                  bodyType={activeTab.bodyType}
-                  authType={activeTab.authType}
-                  authToken={activeTab.authToken}
-                  assertions={activeTab.assertions}
-                  runnerAssertions={activeTab.runnerAssertions}
-                  preRequestScript={activeTab.preRequestScript}
-                  postResponseScript={activeTab.postResponseScript}
-                  onMethodChange={(method) => updateTab(activeTab.id, { method })}
-                  onUrlChange={(url) => {
-                    const endpoint = url.replace(/^https?:\/\/[^/]+/, "") || "/";
-                    updateTab(activeTab.id, { url, endpoint });
-                  }}
-                  onQueryParamsChange={(queryParams) => updateTab(activeTab.id, { queryParams })}
-                  onPathParamsChange={(pathParams) => updateTab(activeTab.id, { pathParams })}
-                  onHeadersChange={(headers) => updateTab(activeTab.id, { headers })}
-                  onBodyChange={(body) => updateTab(activeTab.id, { body })}
-                  onBodyTypeChange={(bodyType) => updateTab(activeTab.id, { bodyType })}
-                  onAuthChange={(authType, authToken) =>
-                    updateTab(activeTab.id, { authType, authToken })
+                <ErrorBoundary
+                  fallback={
+                    <div className="flex flex-col items-center justify-center p-8 text-center">
+                      <AlertTriangle className="size-6 text-destructive mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        Request editor crashed. Retry or reload.
+                      </p>
+                    </div>
                   }
-                  onAssertionsChange={(assertions) => updateTab(activeTab.id, { assertions })}
-                  onRunnerAssertionsChange={(runnerAssertions) =>
-                    updateTab(activeTab.id, { runnerAssertions })
-                  }
-                  onPreRequestScriptChange={(preRequestScript) =>
-                    updateTab(activeTab.id, { preRequestScript })
-                  }
-                  onPostResponseScriptChange={(postResponseScript) =>
-                    updateTab(activeTab.id, { postResponseScript })
-                  }
-                  onRunTests={sendRequest}
-                  onSend={sendRequest}
-                  isLoading={isLoading}
-                  variableNames={variableMappings
-                    .filter((m) => m.enabled && m.name.trim())
-                    .map((m) => m.name.trim())}
-                  historyUrls={historyUrls}
-                  environmentVariableNames={envVariableNames}
-                  queryParamKeySuggestions={queryParamKeySuggestions}
-                  formDataKeySuggestions={formDataKeySuggestions}
-                />
+                >
+                  <RequestPanel
+                    key={activeTab.id}
+                    method={activeTab.method}
+                    url={activeTab.url}
+                    queryParams={activeTab.queryParams}
+                    pathParams={activeTab.pathParams}
+                    headers={activeTab.headers}
+                    body={activeTab.body}
+                    bodyType={activeTab.bodyType}
+                    authType={activeTab.authType}
+                    authToken={activeTab.authToken}
+                    assertions={activeTab.assertions}
+                    runnerAssertions={activeTab.runnerAssertions}
+                    preRequestScript={activeTab.preRequestScript}
+                    postResponseScript={activeTab.postResponseScript}
+                    onMethodChange={(method) => updateTab(activeTab.id, { method })}
+                    onUrlChange={(url) => {
+                      const endpoint = url.replace(/^https?:\/\/[^/]+/, "") || "/";
+                      updateTab(activeTab.id, { url, endpoint });
+                    }}
+                    onQueryParamsChange={(queryParams) => updateTab(activeTab.id, { queryParams })}
+                    onPathParamsChange={(pathParams) => updateTab(activeTab.id, { pathParams })}
+                    onHeadersChange={(headers) => updateTab(activeTab.id, { headers })}
+                    onBodyChange={(body) => updateTab(activeTab.id, { body })}
+                    onBodyTypeChange={(bodyType) => updateTab(activeTab.id, { bodyType })}
+                    onAuthChange={(authType, authToken) =>
+                      updateTab(activeTab.id, { authType, authToken })
+                    }
+                    onAssertionsChange={(assertions) => updateTab(activeTab.id, { assertions })}
+                    onRunnerAssertionsChange={(runnerAssertions) =>
+                      updateTab(activeTab.id, { runnerAssertions })
+                    }
+                    onPreRequestScriptChange={(preRequestScript) =>
+                      updateTab(activeTab.id, { preRequestScript })
+                    }
+                    onPostResponseScriptChange={(postResponseScript) =>
+                      updateTab(activeTab.id, { postResponseScript })
+                    }
+                    onRunTests={sendRequest}
+                    onSend={sendRequest}
+                    isLoading={isLoading}
+                    variableNames={variableMappings
+                      .filter((m) => m.enabled && m.name.trim())
+                      .map((m) => m.name.trim())}
+                    historyUrls={historyUrls}
+                    environmentVariableNames={envVariableNames}
+                    queryParamKeySuggestions={queryParamKeySuggestions}
+                    formDataKeySuggestions={formDataKeySuggestions}
+                  />
+                </ErrorBoundary>
                 {/* Payload size — real byte count of the request body */}
                 {requestByteSize > 0 && (
                   <div
@@ -514,57 +526,70 @@ export function RequestTabsManager() {
               <div className="min-h-0 h-full flex flex-col">
                 {/* Response panel — scrollable area */}
                 <div className="flex-1 min-h-0 overflow-auto hide-scrollbar">
-                  <ResponsePanel
-                    key={activeTab.id}
-                    responseBody={activeTab.responseBody}
-                    responseData={activeTab.responseData}
-                    responseStatus={activeTab.responseStatus}
-                    responseTime={activeTab.responseTime}
-                    responseTimings={activeTab.responseTimings}
-                    responseSize={activeTab.responseSize}
-                    responseHeaders={activeTab.responseHeaders}
-                    responseCookies={activeTab.responseCookies}
-                    testResults={activeTab.testResults}
-                    isLoading={isLoading || aiEngine.isLoading}
-                    aiIsLoading={aiEngine.isLoading}
-                    onRun={sendRequest}
-                    onRunAndSave={sendAndSave}
-                    onRunAndDownload={sendAndDownload}
-                    onAnalyze={handleAnalyzeRequest}
-                    onGenerateTests={handleGenerateTests}
-                    onPatchRequest={(patch) => {
-                      const tabPatch: Record<string, unknown> = {};
-                      if (patch.method !== undefined) tabPatch.method = patch.method;
-                      if (patch.url !== undefined) {
-                        tabPatch.url = patch.url;
-                        tabPatch.endpoint = patch.url.replace(/^https?:\/\/[^/]+/, "") || "/";
-                      }
-                      if (patch.headers !== undefined) {
-                        tabPatch.headers = Object.entries(patch.headers).map(([key, value]) => ({
-                          key,
-                          value,
-                        }));
-                      }
-                      if (patch.body !== undefined)
-                        tabPatch.body =
-                          typeof patch.body === "string" ? patch.body : JSON.stringify(patch.body);
-                      if (patch.authType !== undefined) tabPatch.authType = patch.authType;
-                      updateTab(activeTab.id, tabPatch as Parameters<typeof updateTab>[1]);
-                    }}
-                    aiSummary={aiEngine.lastSummary ?? undefined}
-                    aiError={aiEngine.error ?? undefined}
-                    proposeAskAI={correctionAskAI}
-                    onApplyCorrection={handleApplyCorrection}
-                    method={activeTab.method}
-                    url={activeTab.url}
-                    queryParams={activeTab.queryParams}
-                    requestHeaders={activeTab.headers}
-                    body={activeTab.body}
-                    bodyType={activeTab.bodyType}
-                    authType={activeTab.authType}
-                    authToken={activeTab.authToken}
-                    history={history}
-                  />
+                  <ErrorBoundary
+                    fallback={
+                      <div className="flex flex-col items-center justify-center p-8 text-center">
+                        <AlertTriangle className="size-6 text-destructive mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Response panel crashed. Send the request again to retry.
+                        </p>
+                      </div>
+                    }
+                  >
+                    <ResponsePanel
+                      key={activeTab.id}
+                      responseBody={activeTab.responseBody}
+                      responseData={activeTab.responseData}
+                      responseStatus={activeTab.responseStatus}
+                      responseTime={activeTab.responseTime}
+                      responseTimings={activeTab.responseTimings}
+                      responseSize={activeTab.responseSize}
+                      responseHeaders={activeTab.responseHeaders}
+                      responseCookies={activeTab.responseCookies}
+                      testResults={activeTab.testResults}
+                      isLoading={isLoading || aiEngine.isLoading}
+                      aiIsLoading={aiEngine.isLoading}
+                      onRun={sendRequest}
+                      onRunAndSave={sendAndSave}
+                      onRunAndDownload={sendAndDownload}
+                      onAnalyze={handleAnalyzeRequest}
+                      onGenerateTests={handleGenerateTests}
+                      onPatchRequest={(patch) => {
+                        const tabPatch: Record<string, unknown> = {};
+                        if (patch.method !== undefined) tabPatch.method = patch.method;
+                        if (patch.url !== undefined) {
+                          tabPatch.url = patch.url;
+                          tabPatch.endpoint = patch.url.replace(/^https?:\/\/[^/]+/, "") || "/";
+                        }
+                        if (patch.headers !== undefined) {
+                          tabPatch.headers = Object.entries(patch.headers).map(([key, value]) => ({
+                            key,
+                            value,
+                          }));
+                        }
+                        if (patch.body !== undefined)
+                          tabPatch.body =
+                            typeof patch.body === "string"
+                              ? patch.body
+                              : JSON.stringify(patch.body);
+                        if (patch.authType !== undefined) tabPatch.authType = patch.authType;
+                        updateTab(activeTab.id, tabPatch as Parameters<typeof updateTab>[1]);
+                      }}
+                      aiSummary={aiEngine.lastSummary ?? undefined}
+                      aiError={aiEngine.error ?? undefined}
+                      proposeAskAI={correctionAskAI}
+                      onApplyCorrection={handleApplyCorrection}
+                      method={activeTab.method}
+                      url={activeTab.url}
+                      queryParams={activeTab.queryParams}
+                      requestHeaders={activeTab.headers}
+                      body={activeTab.body}
+                      bodyType={activeTab.bodyType}
+                      authType={activeTab.authType}
+                      authToken={activeTab.authToken}
+                      history={history}
+                    />
+                  </ErrorBoundary>
                 </div>
 
                 {/* Snapshots — trigger button pinned at bottom of response area */}
