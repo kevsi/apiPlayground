@@ -5,8 +5,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: [
-      "lib/__tests__/**/*.test.ts",
-      "lib/**/__tests__/**/*.test.ts",
+      "lib/__tests__/**/*.test.{ts,tsx}",
+      "lib/**/__tests__/**/*.test.{ts,tsx}",
       "src/ai/**/__tests__/**/*.test.{ts,tsx}",
       "src/ai/**/*.test.{ts,tsx}",
       "hooks/**/__tests__/**/*.test.{ts,tsx}",
