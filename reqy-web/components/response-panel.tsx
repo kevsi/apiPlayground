@@ -51,7 +51,6 @@ import type { HistoryItem, TestResult } from "@/lib/types";
 import { formatDataSize } from "@/lib/network/format";
 import {
   getStatusBorderAccentClass,
-  getStatusWatermarkClass,
   getStatusGaugeClass,
   getStatusBadgeClass,
   getStatusTextClass,
@@ -413,20 +412,6 @@ export function ResponsePanel({
               data-testid="response-size"
             >
               Taille : {formatDataSize(responseByteSize)}
-            </div>
-          )}
-
-          {/* Giant floating status code background */}
-          {hasResponse && responseStatus != null && !isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-              <span
-                className={cn(
-                  "text-[140px] font-bold leading-none",
-                  getStatusWatermarkClass(responseStatus),
-                )}
-              >
-                {responseStatus}
-              </span>
             </div>
           )}
 
