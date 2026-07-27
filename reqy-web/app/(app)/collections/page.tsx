@@ -47,6 +47,7 @@ export default function CollectionsPage() {
     moveFolder,
     reorderRequestsInCollection,
     reorderFolders,
+    moveRequestBetweenCollections,
   } = useRequestStore();
 
   const [postmanImportOpen, setPostmanImportOpen] = useState(false);
@@ -587,6 +588,7 @@ export default function CollectionsPage() {
         onMoveFolder={moveFolder}
         onReorderRequestsInCollection={reorderRequestsInCollection}
         onReorderFolders={reorderFolders}
+        onMoveBetweenCollections={moveRequestBetweenCollections}
       />
     </main>
   );

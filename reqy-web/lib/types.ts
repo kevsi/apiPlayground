@@ -1,6 +1,20 @@
 export type HttpMethod =
   "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "GRAPHQL";
 
+/** Compute the next order value (fractional between prev/next). */
+export function computeOrder(
+  prevOrder?: number | null,
+  nextOrder?: number | null,
+  base?: number,
+): number {
+  const prev = prevOrder ?? 0;
+  const next = nextOrder ?? base ?? prev + 2000;
+  // If no gap, shift everything — but in practice fractional insertion gives
+  // ~2^53 distinct positions, so hitting this is extremely unlikely.
+  if (next - prev < 0.001) return prev + 1;
+  return (prev + next) / 2;
+}
+
 /** Per-phase response timing, surfaced in the response timeline. */
 export interface ResponseTimings {
   dnsMs?: number;
@@ -23,6 +37,8 @@ export interface RequestItem {
   id: string;
   name: string;
   method: HttpMethod;
+  /** Display order within its collection/folder. Store assigns a default. */
+  order?: number;
   url: string;
   endpoint: string;
   headers?: Record<string, string>;

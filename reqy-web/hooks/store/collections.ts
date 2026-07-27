@@ -1,4 +1,5 @@
 import type { Collection, RequestItem } from "@/hooks/request-types";
+import { computeOrder } from "@/lib/types";
 import { CommitFn, WORKSPACE_PERSONAL_ID } from "./types";
 import { toast } from "sonner";
 
@@ -97,26 +98,33 @@ export function createCollectionsMutations(commit: CommitFn) {
     data: Omit<RequestItem, "id" | "createdAt" | "updatedAt">,
   ) => {
     const id = `req-${crypto.randomUUID()}`;
-    commit((prev) => ({
-      ...prev,
-      collections: prev.collections.map((c) =>
-        c.id === collectionId
-          ? {
-              ...c,
-              updatedAt: Date.now(),
-              requests: [
-                ...c.requests,
-                {
-                  ...data,
-                  id,
-                  createdAt: Date.now(),
-                  updatedAt: Date.now(),
-                },
-              ],
-            }
-          : c,
-      ),
-    }));
+    commit((prev) => {
+      const collection = prev.collections.find((c) => c.id === collectionId);
+      const maxOrder = collection
+        ? Math.max(0, ...collection.requests.map((r) => r.order ?? 0))
+        : 0;
+      return {
+        ...prev,
+        collections: prev.collections.map((c) =>
+          c.id === collectionId
+            ? {
+                ...c,
+                updatedAt: Date.now(),
+                requests: [
+                  ...c.requests,
+                  {
+                    ...data,
+                    id,
+                    order: data.order ?? maxOrder + 1000,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                  },
+                ],
+              }
+            : c,
+        ),
+      };
+    });
     return id;
   };
 
@@ -169,6 +177,60 @@ export function createCollectionsMutations(commit: CommitFn) {
     }));
   };
 
+  const moveRequestBetweenCollections = (
+    sourceCollectionId: string,
+    targetCollectionId: string,
+    requestId: string,
+    targetIndex?: number,
+  ) => {
+    if (sourceCollectionId === targetCollectionId) return;
+    commit((prev) => {
+      const sourceCol = prev.collections.find((c) => c.id === sourceCollectionId);
+      const targetCol = prev.collections.find((c) => c.id === targetCollectionId);
+      if (!sourceCol || !targetCol) return prev;
+
+      const request = sourceCol.requests.find((r) => r.id === requestId);
+      if (!request) return prev;
+
+      const now = Date.now();
+      const targetRequests = targetCol.requests;
+      const insertAt = targetIndex ?? targetRequests.length;
+      const prevOrder = insertAt > 0 ? (targetRequests[insertAt - 1]?.order ?? 0) : null;
+      const nextOrder =
+        insertAt < targetRequests.length ? (targetRequests[insertAt]?.order ?? null) : null;
+      const order = computeOrder(prevOrder, nextOrder, 2000);
+
+      const movedRequest: RequestItem = {
+        ...request,
+        order,
+        updatedAt: now,
+      };
+
+      return {
+        ...prev,
+        collections: prev.collections.map((c) => {
+          if (c.id === sourceCollectionId) {
+            return {
+              ...c,
+              updatedAt: now,
+              requests: c.requests.filter((r) => r.id !== requestId),
+            };
+          }
+          if (c.id === targetCollectionId) {
+            const newRequests = [...c.requests];
+            newRequests.splice(insertAt, 0, movedRequest);
+            return {
+              ...c,
+              updatedAt: now,
+              requests: newRequests,
+            };
+          }
+          return c;
+        }),
+      };
+    });
+  };
+
   return {
     addCollection,
     updateCollection,
@@ -179,5 +241,6 @@ export function createCollectionsMutations(commit: CommitFn) {
     removeRequestFromCollection,
     updateRequestInCollection,
     updateRequestById,
+    moveRequestBetweenCollections,
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CollectionFolder, RequestItem, Collection } from "@/hooks/request-types";
+import { computeOrder } from "@/lib/types";
 import type { CommitFn } from "./types";
 import { toast } from "sonner";
 
@@ -132,16 +133,25 @@ export function createFoldersMutations(commit: CommitFn) {
       ...prev,
       collections: prev.collections.map((c) => {
         if (c.id !== collectionId) return c;
-        const requestsInLevel = c.requests.filter((r) => r.folderId === folderId);
-        const requestsNotInLevel = c.requests.filter((r) => r.folderId !== folderId);
+        // null/undefined are equivalent: both mean "not in a folder"
+        const inLevel = (r: RequestItem) => r.folderId === folderId || (!r.folderId && !folderId);
+        const requestsInLevel = c.requests.filter(inLevel);
+        const requestsNotInLevel = c.requests.filter((r) => !inLevel(r));
         const requestMap = new Map(requestsInLevel.map((r) => [r.id, r]));
         const reordered = orderedRequestIds
           .map((id) => requestMap.get(id))
           .filter(Boolean) as RequestItem[];
         const remaining = requestsInLevel.filter((r) => !orderedRequestIds.includes(r.id));
+        // Assign fractional order values based on new position
+        const withOrder = reordered.map((r, i) => {
+          const prevOrder = i > 0 ? (reordered[i - 1].order ?? i * 1000) : null;
+          const nextOrder =
+            i < reordered.length - 1 ? (reordered[i + 1].order ?? (i + 1) * 1000) : null;
+          return { ...r, order: computeOrder(prevOrder, nextOrder, i * 1000 + 1000) };
+        });
         return {
           ...c,
-          requests: [...reordered, ...remaining, ...requestsNotInLevel],
+          requests: [...withOrder, ...remaining, ...requestsNotInLevel],
           updatedAt: Date.now(),
         };
       }),
@@ -159,8 +169,11 @@ export function createFoldersMutations(commit: CommitFn) {
       if (!collection) return prev;
 
       const folders = collection.folders ?? [];
-      const foldersInLevel = folders.filter((f) => f.parentId === parentFolderId);
-      const foldersNotInLevel = folders.filter((f) => f.parentId !== parentFolderId);
+      // null/undefined are equivalent: both mean "root level"
+      const atLevel = (f: CollectionFolder) =>
+        f.parentId === parentFolderId || (!f.parentId && !parentFolderId);
+      const foldersInLevel = folders.filter(atLevel);
+      const foldersNotInLevel = folders.filter((f) => !atLevel(f));
       const folderMap = new Map(foldersInLevel.map((f) => [f.id, f]));
       const reordered = orderedFolderIds
         .map((id) => folderMap.get(id))
