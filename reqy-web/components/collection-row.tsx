@@ -19,6 +19,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { cn, downloadJson } from "@/lib/utils";
 import { methodBadge } from "@/lib/http-method-colors";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -154,9 +155,12 @@ export function CollectionRow({
             {collection.name}
           </span>
         )}
-        <span className="shrink-0 text-xs text-muted-foreground/50 font-mono">
-          {collection.requests.length} req
-        </span>
+        <Badge
+          variant="outline"
+          className="shrink-0 text-[10px] px-1.5 py-0 h-4 font-mono text-muted-foreground/60 border-muted-foreground/20"
+        >
+          {collection.requests.length}
+        </Badge>
         <div className="flex items-center gap-0.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
