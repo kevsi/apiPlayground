@@ -17,6 +17,7 @@ import type { Collection } from "@/lib/types";
 
 export const REQUEST_PREFIX = "req::";
 export const COLLECTION_PREFIX = "col::";
+export const FOLDER_PREFIX = "fld::";
 
 export function requestId(id: string) {
   return `${REQUEST_PREFIX}${id}`;
@@ -24,6 +25,10 @@ export function requestId(id: string) {
 
 export function collectionDropId(id: string) {
   return `${COLLECTION_PREFIX}${id}`;
+}
+
+export function folderDropId(collectionId: string, folderId: string) {
+  return `${FOLDER_PREFIX}${collectionId}__${folderId}`;
 }
 
 export function parseRequestId(composite: string) {
@@ -34,6 +39,16 @@ export function parseCollectionDropId(composite: string) {
   return composite.startsWith(COLLECTION_PREFIX)
     ? composite.slice(COLLECTION_PREFIX.length)
     : composite;
+}
+
+export function parseFolderDropId(
+  composite: string,
+): { collectionId: string; folderId: string } | null {
+  if (!composite.startsWith(FOLDER_PREFIX)) return null;
+  const rest = composite.slice(FOLDER_PREFIX.length);
+  const sep = rest.indexOf("__");
+  if (sep === -1) return null;
+  return { collectionId: rest.slice(0, sep), folderId: rest.slice(sep + 2) };
 }
 
 // ── Drag item descriptor ─────────────────────────────────────────────────

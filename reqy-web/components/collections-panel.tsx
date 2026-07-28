@@ -210,12 +210,19 @@ export function CollectionsPanel({
       const overId = String(over.id);
       const activeData = active.data.current as
         { type?: string; collectionId?: string } | undefined;
-      const overData = over.data.current as { type?: string; collectionId?: string } | undefined;
+      const overData = over.data.current as
+        { type?: string; collectionId?: string; folderId?: string } | undefined;
       if (!activeData || !overData) return;
 
       const requestId = activeId.replace(/^req::/, "");
       const sourceColId = activeData.collectionId ?? "";
       const targetColId = overData.collectionId ?? "";
+
+      // ── Dropped on a folder: move request to that folder ──
+      if (overData.type === "folder" && overData.folderId && onMoveRequestToFolder) {
+        onMoveRequestToFolder(targetColId, requestId, overData.folderId);
+        return;
+      }
 
       // ── Ctrl/Meta+Drag: duplicate instead of move ──
       if (isCtrl) {
@@ -291,6 +298,7 @@ export function CollectionsPanel({
       onReorderRequestsInCollection,
       onMoveBetweenCollections,
       onAddRequestToCollection,
+      onMoveRequestToFolder,
     ],
   );
 
@@ -738,6 +746,7 @@ export function CollectionsPanel({
                 onConfirmDelete={confirmDelete}
                 onDeleteCollection={onDeleteCollection}
                 onRemoveRequest={onRemoveRequestFromCollection}
+                onMoveRequestToFolder={onMoveRequestToFolder}
               />
             ))}
           </div>

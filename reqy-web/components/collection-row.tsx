@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -14,6 +14,7 @@ import {
   Square,
   Copy,
   Play,
+  Folder,
 } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -28,11 +29,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Collection, RequestItem } from "@/hooks/request-types";
+import type { Collection, CollectionFolder, RequestItem } from "@/hooks/request-types";
 import { collectionColors, collectionIcons, safeColor } from "@/lib/collection-utils";
 import type { PendingDelete } from "@/components/collections-delete-dialog";
 import { DraggableRequestRow } from "@/components/drag-and-drop/draggable-request-row";
-import { collectionDropId, requestId } from "@/hooks/use-request-dnd";
+import { collectionDropId, requestId, folderDropId } from "@/hooks/use-request-dnd";
 
 interface CollectionRowProps {
   collection: Collection;
@@ -57,6 +58,39 @@ interface CollectionRowProps {
   onConfirmDelete: (label: string, onConfirm: () => void) => void;
   onDeleteCollection: (id: string) => void;
   onRemoveRequest: (collectionId: string, requestId: string) => void;
+  onMoveRequestToFolder?: (
+    collectionId: string,
+    requestId: string,
+    folderId: string | null,
+  ) => void;
+}
+
+function FolderDropZone({
+  collectionId,
+  folder,
+  children,
+}: {
+  collectionId: string;
+  folder: CollectionFolder;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef: folderDropRef, isOver } = useDroppable({
+    id: folderDropId(collectionId, folder.id),
+    data: { type: "folder" as const, collectionId, folderId: folder.id },
+  });
+  return (
+    <div
+      ref={folderDropRef}
+      className={cn(
+        "relative",
+        isOver && "bg-primary/[0.04]",
+        isOver &&
+          "before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-r before:bg-primary/60",
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function CollectionRow({
@@ -82,6 +116,7 @@ export function CollectionRow({
   onConfirmDelete,
   onDeleteCollection,
   onRemoveRequest,
+  onMoveRequestToFolder,
 }: CollectionRowProps) {
   // ── Droppable for cross-collection moves ──
   const { setNodeRef: dropRef, isOver } = useDroppable({
@@ -91,6 +126,62 @@ export function CollectionRow({
 
   // ── Sortable request IDs ──
   const requestIds = collection.requests.map((r) => requestId(r.id));
+
+  const renderRequestsByFolder = useCallback(() => {
+    const folders = collection.folders ?? [];
+    const folderMap = new Map<string | null, RequestItem[]>();
+    for (const req of collection.requests) {
+      const key = req.folderId ?? "__root__";
+      if (!folderMap.has(key)) folderMap.set(key, []);
+      folderMap.get(key)!.push(req);
+    }
+    const rootReqs = folderMap.get("__root__") ?? [];
+    const result: React.ReactNode[] = [];
+
+    // Root-level requests first
+    for (const req of rootReqs) {
+      result.push(
+        <DraggableRequestRow
+          key={req.id}
+          request={req}
+          collectionId={collection.id}
+          isSelected={selectedRequestIds.has(`${collection.id}::${req.id}`)}
+          onSelect={() => onSelectRequest(req)}
+          onSend={onSelectAndSendRequest ? () => onSelectAndSendRequest(req) : undefined}
+          onRemove={() => onRemoveRequest(collection.id, req.id)}
+        />,
+      );
+    }
+
+    // Folder sections
+    for (const folder of folders) {
+      const folderReqs = folderMap.get(folder.id) ?? [];
+      result.push(
+        <FolderDropZone key={`fld-${folder.id}`} collectionId={collection.id} folder={folder}>
+          <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/10 border-b border-border/10">
+            <Folder className="size-3 text-muted-foreground/60" />
+            <span className="text-xs font-medium text-muted-foreground/80">{folder.name}</span>
+            <span className="text-[10px] font-mono text-muted-foreground/40">
+              ({folderReqs.length})
+            </span>
+          </div>
+          {folderReqs.map((req) => (
+            <DraggableRequestRow
+              key={req.id}
+              request={req}
+              collectionId={collection.id}
+              isSelected={selectedRequestIds.has(`${collection.id}::${req.id}`)}
+              onSelect={() => onSelectRequest(req)}
+              onSend={onSelectAndSendRequest ? () => onSelectAndSendRequest(req) : undefined}
+              onRemove={() => onRemoveRequest(collection.id, req.id)}
+            />
+          ))}
+        </FolderDropZone>,
+      );
+    }
+
+    return result;
+  }, [collection, selectedRequestIds, onSelectRequest, onSelectAndSendRequest, onRemoveRequest]);
 
   return (
     <div
@@ -212,21 +303,23 @@ export function CollectionRow({
         </div>
       </div>
 
-      {/* ── Expanded requests ── */}
+      {/* ── Expanded requests (grouped by folder if folders exist) ── */}
       {isExpanded && collection.requests.length > 0 && (
         <div className="border-t border-border/20">
           <SortableContext items={requestIds} strategy={verticalListSortingStrategy}>
-            {collection.requests.map((req) => (
-              <DraggableRequestRow
-                key={req.id}
-                request={req}
-                collectionId={collection.id}
-                isSelected={selectedRequestIds.has(`${collection.id}::${req.id}`)}
-                onSelect={() => onSelectRequest(req)}
-                onSend={onSelectAndSendRequest ? () => onSelectAndSendRequest(req) : undefined}
-                onRemove={() => onRemoveRequest(collection.id, req.id)}
-              />
-            ))}
+            {collection.folders && collection.folders.length > 0
+              ? renderRequestsByFolder()
+              : collection.requests.map((req) => (
+                  <DraggableRequestRow
+                    key={req.id}
+                    request={req}
+                    collectionId={collection.id}
+                    isSelected={selectedRequestIds.has(`${collection.id}::${req.id}`)}
+                    onSelect={() => onSelectRequest(req)}
+                    onSend={onSelectAndSendRequest ? () => onSelectAndSendRequest(req) : undefined}
+                    onRemove={() => onRemoveRequest(collection.id, req.id)}
+                  />
+                ))}
           </SortableContext>
         </div>
       )}
