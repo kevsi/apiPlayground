@@ -24,6 +24,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set CI secret fallback (forks without secrets configured)
+        if: env.AUTH_SIGNING_SECRET == ''
+        run: echo "AUTH_SIGNING_SECRET=ci-test-secret-must-be-at-least-32-characters-long" >> $GITHUB_ENV
+
       - name: Install Playwright browsers
         run: pnpm --dir reqy-web exec playwright install --with-deps chromium
 

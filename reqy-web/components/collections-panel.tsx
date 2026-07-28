@@ -328,7 +328,6 @@ export function CollectionsPanel({
             if (onAddRequestToCollection) {
               const parsed = requestItemSchema.safeParse(req);
               if (parsed.success) {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const {
                   id: _id,
                   createdAt: _createdAt,

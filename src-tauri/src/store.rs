@@ -213,6 +213,41 @@ pub fn mark_sent(id: String) -> Result<(), AppError> {
     default_store().mark_sent(&id)
 }
 
+// ── Session encryption passphrase ──────────────────────────────────
+//
+// Used by the frontend `secure-storage.ts` to encrypt API keys and
+// tokens stored in IndexedDB.  The passphrase is generated once at
+// startup, lives only in the Rust process memory, and is transmitted
+// to the renderer via IPC exactly once.  It is never persisted to
+// disk, which means that a filesystem attacker cannot recover the
+// plaintext values even if they read the IndexedDB files directly.
+//
+// Trade-off: the passphrase is lost on app restart, so previously
+// encrypted values become unreadable.  In that case the frontend
+// simply stores new values in plaintext (transparent fallback) until
+// the user re-saves their credentials.
+static SESSION_ENCRYPTION_KEY: OnceLock<String> = OnceLock::new();
+
+/// Initialise the session encryption passphrase.  Call from Tauri
+/// `setup` before any command runs.
+pub fn init_session_encryption_key() {
+    let _ = SESSION_ENCRYPTION_KEY
+        .set(uuid::Uuid::new_v4().to_string());
+}
+
+/// Return the session passphrase to the renderer so it can encrypt
+/// values stored in IndexedDB.  The passphrase is held only in Rust
+/// process memory and is never written to disk.
+#[tauri::command]
+pub fn get_encryption_passphrase() -> Result<String, AppError> {
+    SESSION_ENCRYPTION_KEY
+        .get()
+        .cloned()
+        .ok_or_else(|| AppError::Internal(
+            "Session encryption key not initialised".into(),
+        ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

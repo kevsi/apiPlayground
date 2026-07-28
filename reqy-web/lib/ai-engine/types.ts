@@ -49,7 +49,7 @@ export type TestAssertion = {
 
 export type FillRequestAction = {
   type: "FILL_REQUEST";
-  payload: Partial<CurrentRequest> & { reason?: string };
+  payload: Partial<CurrentRequest> & { reason?: string; run?: boolean };
 };
 
 export type AddAssertionsAction = {

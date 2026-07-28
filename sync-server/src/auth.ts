@@ -23,10 +23,17 @@ export function parseSessionCookie(cookieValue: string | undefined): SessionPayl
   return parseSession(cookieValue);
 }
 
-const DEV_SECRET_PLACEHOLDER = "replace_me_with_a_random_64_char_hex_string";
-
-function isDevMode(): boolean {
-  return process.env.NODE_ENV !== "production" || getSecretRaw() === DEV_SECRET_PLACEHOLDER;
+/**
+ * Explicit opt-in flag to bypass auth in development.
+ *
+ * WARNING: Enabling this disables ALL authentication on the sync server.
+ * Anyone with network access can read/write any workspace. Only use this
+ * for local development when OAuth providers are not configured.
+ *
+ * Default: false (auth is enforced even in dev environments).
+ */
+function isAuthBypassEnabled(): boolean {
+  return process.env.AUTH_BYPASS === "true";
 }
 
 function getSecretRaw(): string {
@@ -108,9 +115,13 @@ export async function requireAuth(c: Context, next: Next) {
     return next();
   }
 
-  // Dev mode: create a mock session when no valid auth cookie exists.
-  // This lets the workspace pages work without setting up OAuth providers.
-  if (isDevMode()) {
+  // Auth bypass: create a mock session when AUTH_BYPASS=true is set.
+  // Intended for local development without OAuth providers.
+  if (isAuthBypassEnabled()) {
+    console.warn(
+      "[auth] AUTH_BYPASS is enabled — authentication is disabled. " +
+        "Set AUTH_BYPASS=false in production.",
+    );
     c.set("auth", {
       userId: "dev-user-1",
       email: "dev@reqly.local",

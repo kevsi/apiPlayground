@@ -182,6 +182,7 @@ export function maskSensitiveObject(obj: Record<string, unknown>): Record<string
 
 import { requestStore } from "@/hooks/use-request-store";
 import type { Collection, Environment, RequestItem } from "@/hooks/request-types";
+import type { HttpMethod } from "@/lib/types";
 
 function findCollectionIdByName(name: string): string | undefined {
   const store = requestStore.getState();
@@ -323,7 +324,7 @@ async function handleCreateRequest(args: Record<string, unknown>): Promise<ToolR
 
   const requestItem: Partial<RequestItem> = {
     name: requestName || `${method} ${url}`,
-    method: method as any,
+    method: method as HttpMethod,
     url,
     endpoint: url,
     headers: {},
@@ -382,7 +383,7 @@ async function handleExecuteRequest(args: Record<string, unknown>): Promise<Tool
 
   const requestItem: Partial<RequestItem> = {
     name: `${method} ${url}`,
-    method: method as any,
+    method: method as HttpMethod,
     url,
     endpoint: url,
     headers,

@@ -80,6 +80,10 @@ describe("isOllamaHostAllowed", () => {
     expect(isOllamaHostAllowed("localhost")).toBe(false);
   });
 
+  it("rejects hostnames that resolve to private ranges via DNS rebinding", () => {
+    expect(isOllamaHostAllowed("internal.example.test")).toBe(false);
+  });
+
   it("rejects 127.0.0.1", () => {
     expect(isOllamaHostAllowed("127.0.0.1")).toBe(false);
   });

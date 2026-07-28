@@ -9,8 +9,9 @@ on:
 env:
   NODE_VERSION: "22"
   PNPM_VERSION: "9"
-  # Test-only secret — production secrets must come from GitHub Actions secrets.
-  AUTH_SIGNING_SECRET: "ci-test-secret-must-be-at-least-32-characters-long"
+  # CI secret from GitHub Actions secrets. Forks without secrets configured
+  # get a fallback via the "Set CI secret fallback" step below.
+  AUTH_SIGNING_SECRET: ${{ secrets.AUTH_SIGNING_SECRET }}
 
 jobs:
   lint:
@@ -108,6 +109,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set CI secret fallback (forks without secrets configured)
+        if: env.AUTH_SIGNING_SECRET == ''
+        run: echo "AUTH_SIGNING_SECRET=ci-test-secret-must-be-at-least-32-characters-long" >> $GITHUB_ENV
+
       # Runs the full suite: reqy-web, reqy-mcp, sync-server and recli.
       # (Previously this only ran reqy-web's tests, so sync-server/mcp/recli
       # regressions went undetected.)
@@ -174,6 +179,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Set CI secret fallback (forks without secrets configured)
+        if: env.AUTH_SIGNING_SECRET == ''
+        run: echo "AUTH_SIGNING_SECRET=ci-test-secret-must-be-at-least-32-characters-long" >> $GITHUB_ENV
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

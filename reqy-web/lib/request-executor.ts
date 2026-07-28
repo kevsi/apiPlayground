@@ -406,7 +406,7 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
     // produced) is queued for automatic replay when connectivity returns.
     // Application errors (4xx/5xx) keep a real status and are never queued.
     if (classifyError(error) === "network") {
-      enqueueOnNetworkFailure(
+      await enqueueOnNetworkFailure(
         {
           method: tab.method,
           url: finalUrl,
@@ -414,8 +414,13 @@ export const executeRequest = async (context: ExecuteRequestContext) => {
           body: finalBody || undefined,
         },
         { error },
-      ).catch(() => {
-        /* queue hiccups must never break the request flow */
+      ).catch((queueError) => {
+        const queueMessage =
+          queueError instanceof Error
+            ? queueError.message
+            : String(queueError ?? "unknown queue error");
+        responseBody = `Error: ${responseBody}\nQueueing failed: ${queueMessage}`;
+        responseData = responseBody;
       });
     }
   } finally {

@@ -1,8 +1,16 @@
 packages:
-  - 'reqy-web'
-  - 'reqy-mcp'
-  - 'recli'
-  - 'packages/*'
+  - "reqy-web"
+  - "reqy-mcp"
+  - "recli"
+  - "packages/*"
+overrides:
+  fast-uri: ^3.1.4
+  lodash: ^4.17.24
+  lodash-es: ^4.17.24
+  postcss: ^8.5.18
+  sharp: ^0.35.0
+  js-yaml: ^4.3.0
+  "@hono/node-server": ^2.0.5
 allowBuilds:
   esbuild: false
   sharp: true

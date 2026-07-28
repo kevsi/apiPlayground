@@ -58,6 +58,7 @@
     "allow-git-clone",
     "allow-git-sync-collections",
     "allow-git-write-collection-file",
-    "allow-git-ls-remote"
+    "allow-git-ls-remote",
+    "allow-get-encryption-passphrase"
   ]
 }

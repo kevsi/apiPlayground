@@ -1,6 +1,32 @@
 import { isIP } from "node:net";
 import { isBlockedIp } from "@/lib/security/ssrf";
 
+const BLOCKED_HOSTNAME_TOKENS = new Set([
+  "localhost",
+  "localdomain",
+  "local",
+  "internal",
+  "private",
+  "intranet",
+  "corp",
+  "home",
+  "lan",
+]);
+
+function isHostnameBlocked(hostname: string): boolean {
+  const lower = hostname.toLowerCase().trim();
+  if (!lower) return true;
+  if (lower === "localhost" || lower === "127.0.0.1" || lower === "0.0.0.0" || lower === "::1") {
+    return true;
+  }
+  const labels = lower.split(".");
+  return labels.some((label) => {
+    if (!label) return false;
+    if (BLOCKED_HOSTNAME_TOKENS.has(label)) return true;
+    return label.endsWith("local") || label.endsWith("internal");
+  });
+}
+
 export function getCustomUrl(body: Record<string, unknown>): string {
   const raw = typeof body.openaiUrl === "string" ? body.openaiUrl.trim() : "";
   if (!raw) {
@@ -16,9 +42,7 @@ export function getCustomUrl(body: Record<string, unknown>): string {
     throw new Error("URL must use http or https");
   }
   if (
-    parsed.hostname === "localhost" ||
-    parsed.hostname === "127.0.0.1" ||
-    parsed.hostname === "0.0.0.0" ||
+    isHostnameBlocked(parsed.hostname) ||
     (isIP(parsed.hostname) && isBlockedIp(parsed.hostname))
   ) {
     throw new Error("Custom provider URL cannot point to localhost or private IP");
@@ -27,8 +51,9 @@ export function getCustomUrl(body: Record<string, unknown>): string {
 }
 
 export function isOllamaHostAllowed(host: string): boolean {
-  const lower = host.toLowerCase();
-  if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(lower)) return false;
+  const lower = host.toLowerCase().trim();
+  if (!lower) return false;
+  if (isHostnameBlocked(lower)) return false;
   if (isIP(lower) && isBlockedIp(lower)) return false;
   return true;
 }

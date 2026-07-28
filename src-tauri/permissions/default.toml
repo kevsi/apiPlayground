@@ -91,6 +91,11 @@ description = "Allows the dequeue_ready command"
 commands.allow = ["dequeue_ready"]
 
 [[permission]]
+identifier = "allow-get-encryption-passphrase"
+description = "Allows the get_encryption_passphrase command"
+commands.allow = ["get_encryption_passphrase"]
+
+[[permission]]
 identifier = "allow-mark-sent"
 description = "Allows the mark_sent command"
 commands.allow = ["mark_sent"]

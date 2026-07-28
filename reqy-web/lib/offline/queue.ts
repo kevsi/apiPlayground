@@ -176,7 +176,7 @@ export async function replayPending(
       const res = await opts.execute(req);
       ok = res?.ok === true;
     } catch {
-      ok = false;
+      // keep the default false value
     }
 
     replayed++;

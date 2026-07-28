@@ -49,7 +49,7 @@ export function replaceLocalhostPort(url: string, port: number): string {
 
 export async function downloadJson(data: any, filename: string) {
   const content = JSON.stringify(data, null, 2);
-  const isTauri = typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
   if (isTauri) {
     try {

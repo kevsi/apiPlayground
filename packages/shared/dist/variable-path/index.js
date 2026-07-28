@@ -109,6 +109,11 @@ export function getValueByPath(value, path) {
         return { success: true, value };
     }
     const trimmedPath = path.trim();
+    // Reject invalid path formats early so callers can surface a clear
+    // 'Invalid path format' error instead of a generic 'Path not found'.
+    if (!isSourcePathSyntaxValid(trimmedPath)) {
+        return { success: false, error: "Invalid path format" };
+    }
     try {
         // Strip optional JSONPath-style $ prefix so "$.id" matches "id".
         const normalizedPath = trimmedPath.replace(/^\$\.?/, "");
@@ -164,7 +169,7 @@ export function isSourcePathSyntaxValid(path) {
     if (typeof path !== "string")
         return false;
     if (path === "")
-        return false;
+        return true;
     // Reject consecutive dots
     if (path.includes(".."))
         return false;

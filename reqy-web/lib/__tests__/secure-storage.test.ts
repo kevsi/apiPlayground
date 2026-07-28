@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 /**
  * Tests for the EphemeralStore (lib/secure-storage).
@@ -10,70 +10,83 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
  * deterministic and does not touch IndexedDB / localStorage.
  */
 
-const memoryStore = new Map<string, string>()
+const memoryStore = new Map<string, string>();
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue("test-passphrase"),
+}));
 
 vi.mock("@/lib/persistence", () => ({
   persistence: {
     getItem: <T = unknown>(key: string): T | null =>
       (memoryStore.get(key) as T | undefined) ?? null,
     setItem: async (key: string, value: unknown): Promise<void> => {
-      memoryStore.set(key, value as string)
+      memoryStore.set(key, value as string);
     },
     removeItem: async (key: string): Promise<void> => {
-      memoryStore.delete(key)
+      memoryStore.delete(key);
     },
     keys: (): string[] => Array.from(memoryStore.keys()),
     clear: (): void => {
-      memoryStore.clear()
+      memoryStore.clear();
     },
   },
-}))
+}));
 
-const STORAGE_PREFIX = "reqly-secure-"
+const STORAGE_PREFIX = "reqly-secure-";
 
 /** Poll until predicate() returns true or timeout elapses. */
 async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
-  const start = Date.now()
+  const start = Date.now();
   while (!predicate()) {
     if (Date.now() - start > timeoutMs) {
-      throw new Error("waitFor: timed out")
+      throw new Error("waitFor: timed out");
     }
-    await new Promise((r) => setTimeout(r, 10))
+    await new Promise((r) => setTimeout(r, 10));
   }
 }
 
 describe("lib/secure-storage", () => {
   beforeEach(() => {
-    memoryStore.clear()
+    memoryStore.clear();
     // Provide `window` so the module builds a real EphemeralStore rather
     // than the SSR no-op stub. Node 19+ exposes globalThis.crypto with
     // `subtle` + `randomUUID` which is what Web Crypto needs.
-    ;(globalThis as { window?: unknown }).window = {}
-    vi.resetModules()
-  })
+    (globalThis as { window?: unknown }).window = {};
+    vi.resetModules();
+  });
 
   it("silently skips a corrupted ciphertext entry instead of throwing on init", async () => {
     // 1. Encrypt + persist a value through the first store.
-    const mod1 = await import("../secure-storage")
-    mod1.secureKeys.set("foo", "bar")
-    await waitFor(() => memoryStore.has(STORAGE_PREFIX + "foo"))
-    expect(mod1.secureKeys.get("foo")).toBe("bar")
+    const mod1 = await import("../secure-storage");
+    mod1.secureKeys.set("foo", "bar");
+    await waitFor(() => memoryStore.has(STORAGE_PREFIX + "foo"));
+    expect(mod1.secureKeys.get("foo")).toBe("bar");
 
     // 2. Corrupt the ciphertext in storage so decryptValue() will throw
     //    (invalid base64 / wrong GCM tag).
-    memoryStore.set(STORAGE_PREFIX + "foo", "!!!not-valid-ciphertext!!!")
+    memoryStore.set(STORAGE_PREFIX + "foo", "!!!not-valid-ciphertext!!!");
 
     // 3. Module reload forces a fresh EphemeralStore that re-walks the
     //    persistence keys during initialize(). The corrupted entry must
     //    be swallowed by the inner try/catch.
-    vi.resetModules()
-    const mod2 = await import("../secure-storage")
-    await mod2.secureKeys.waitForReady()
+    vi.resetModules();
+    const mod2 = await import("../secure-storage");
+    await mod2.secureKeys.waitForReady();
 
     // 4. get() returns undefined (the entry was skipped), and the
     //    store stays usable for other keys.
-    expect(mod2.secureKeys.get("foo")).toBeUndefined()
-    mod2.secureKeys.set("other", "value")
-    expect(mod2.secureKeys.get("other")).toBe("value")
-  })
-})
+    expect(mod2.secureKeys.get("foo")).toBeUndefined();
+    mod2.secureKeys.set("other", "value");
+    expect(mod2.secureKeys.get("other")).toBe("value");
+  });
+
+  it("does not persist secure-storage entries to localStorage", async () => {
+    localStorage.clear();
+    const { persistence } = await import("../persistence");
+
+    await persistence.setItem("reqly-secure-token", "ciphertext");
+
+    expect(localStorage.getItem("reqly-secure-token")).toBeNull();
+  });
+});

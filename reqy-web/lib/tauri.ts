@@ -71,13 +71,15 @@ export async function invokeTauriFetch(
   }
 
   const { invoke } = await import("@tauri-apps/api/core");
-  const result = await invoke<RawTauriFetchResponse>("fetch_proxy", {
+  const invokeArgs: Record<string, any> = {
     method,
     url,
     headers: Object.entries(headers),
     body,
-    acceptInvalidCerts: acceptInvalidCerts === true,
-  });
+  };
+  if (acceptInvalidCerts === true) invokeArgs.acceptInvalidCerts = true;
+
+  const result = await invoke<RawTauriFetchResponse>("fetch_proxy", invokeArgs);
 
   return {
     status: result.status,

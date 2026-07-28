@@ -108,6 +108,7 @@ pub fn run() {
       store::list_pending,
       store::dequeue_ready,
       store::mark_sent,
+      store::get_encryption_passphrase,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -123,6 +124,7 @@ pub fn run() {
       // to a temp dir if it cannot be resolved).
       if let Ok(app_data_dir) = app.path().app_data_dir() {
         crate::store::init_queue_store(app_data_dir.clone());
+        crate::store::init_session_encryption_key();
         crate::capture::init_capture_store(app_data_dir);
       }
       Ok(())

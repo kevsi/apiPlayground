@@ -77,13 +77,9 @@ export async function authSignup(
   email: string,
   password: string,
   name?: string,
-): Promise<SignupResult> {
+): Promise<AuthResult> {
   const data = await postJson("/signup", { email, password, name });
-  return {
-    userId: data.userId as string,
-    email: data.email as string,
-    message: data.message as string,
-  };
+  return { user: data.user as AuthUser, token: data.token as string };
 }
 
 export async function authVerify(email: string, code: string): Promise<AuthResult> {

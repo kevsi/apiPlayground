@@ -34,7 +34,6 @@ export async function executeGraphQL(input: GraphQLRequest): Promise<GraphQLExec
       method: "POST",
       headers: {
         ...(input.headers ?? {}),
-        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         query: input.query,

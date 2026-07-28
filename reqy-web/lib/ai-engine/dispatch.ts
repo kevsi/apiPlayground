@@ -65,9 +65,9 @@ export async function dispatchAIActions(
           await handlers.setRequest?.(action.payload, action.payload.reason);
           // If AI requested to run the request (payload.run === true) and autoApply allowed, execute it
           try {
-            const shouldRun = !!(action.payload as any).run;
+            const shouldRun = !!action.payload.run;
             if (shouldRun && options?.allowAutoApply) {
-              const res = await handlers.executeRequest?.(action.payload as any);
+              const res = await handlers.executeRequest?.(action.payload);
               await handlers.audit?.({
                 actionType: "FILL_REQUEST_RUN",
                 detail: action.payload,
@@ -201,7 +201,7 @@ export async function dispatchAIActions(
       }
 
       default: {
-        await handlers.notify?.(`Unknown action type: ${(action as any).type}`);
+        await handlers.notify?.(`Unknown action type: ${(action as { type: string }).type}`);
         break;
       }
     }

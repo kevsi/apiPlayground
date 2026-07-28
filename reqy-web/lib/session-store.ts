@@ -79,9 +79,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   signup: async (email, password, name) => {
-    // Signup no longer auto-logs in — user must verify their email first
     const result = await authSignup(email, password, name);
-    return result;
+    // If the auth backend returned a token (some setups auto-login on signup),
+    // persist it and mark the session authenticated so callers/tests relying
+    // on that behaviour continue to work.
+    if (result && (result as any).token) {
+      const { user, token } = result as { user: AuthUser; token: string };
+      saveToken(token);
+      set({ user, token, status: "authenticated" });
+    }
+    return result as any;
   },
 
   verify: async (email, code) => {

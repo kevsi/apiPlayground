@@ -1,25 +1,26 @@
 "use client";
 
+import { invoke } from "@tauri-apps/api/core";
+
 /**
  * Secure storage for API keys and tokens.
  *
  * Uses AES-256-GCM encryption via the Web Crypto API with a key derived
- * from a passphrase (PBKDF2, 600k iterations).
+ * from a passphrase provided by the Tauri backend (per-session secret).
  *
- * THREAT MODEL DECISION (2026-07-28): See `docs/adr/2026-07-28-indexdb-encryption-threat-model.md`.
+ * THREAT MODEL DECISION (2026-07-28): See `docs/adr/001-indexdb-encryption-threat-model.md`.
  * Decision chosen: Session secret via Tauri IPC. The encryption passphrase
- * is derived from a per-session secret provided by the Tauri backend, not
- * stored in the same IndexedDB/localStorage as the ciphertext. This protects
- * against XSS-based exfiltration and casual filesystem access, but NOT against
- * a compromised Tauri sidecar. For a desktop mono-user app, this provides
- * the right threat/cost trade-off.
+ * is provided by the Tauri backend at startup and held only in Rust process memory,
+ * never written to disk.  This protects against XSS-based exfiltration and
+ * casual filesystem access, but NOT against a compromised Tauri sidecar.
+ * For a desktop mono-user app, this provides the right threat/cost trade-off.
  *
- * Security note: encryption prevents casual reading from memory dumps or
- * devtools, not targeted offline attacks or a compromised Tauri process.
+ * Security note: this is NOT suitable for high-value secrets against a
+ * determined attacker with full filesystem access, but the session secret
+ * model provides the right protection for the current threat model.
  */
 
 const STORAGE_PREFIX = "reqly-secure-";
-const PASSPHRASE_KEY = "reqly-crypto-passphrase";
 const SALT_KEY = "reqly-crypto-salt";
 
 // ---- Storage helpers (IndexedDB via persistence layer) -----------------
@@ -52,13 +53,42 @@ async function storeRemove(key: string): Promise<void> {
 }
 
 // ---- Crypto helpers ---------------------------------------------------
+// Passphrase comes from Tauri (not stored persistently in localStorage).
 
-function getOrCreatePassphrase(): string {
-  const existing = storeGet(PASSPHRASE_KEY);
-  if (existing) return existing;
-  const passphrase = crypto.randomUUID();
-  storeSet(PASSPHRASE_KEY, passphrase);
-  return passphrase;
+let cachedKey: CryptoKey | null = null;
+let keyPromise: Promise<CryptoKey> | null = null;
+
+async function getKey(passphrase: string): Promise<CryptoKey> {
+  if (cachedKey) return cachedKey;
+  if (!keyPromise) {
+    keyPromise = deriveKey(passphrase);
+  }
+  cachedKey = await keyPromise;
+  return cachedKey;
+}
+
+async function deriveKey(passphrase: string): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const saltBytes = getOrCreateSalt();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(passphrase),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: saltBytes,
+      iterations: 600000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
 }
 
 function getOrCreateSalt(): Uint8Array {
@@ -71,44 +101,9 @@ function getOrCreateSalt(): Uint8Array {
     }
   }
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const encoded = btoa(salt.reduce((acc, b) => acc + String.fromCharCode(b), ""));
+  const encoded = btoa(String.fromCharCode(...salt));
   storeSet(SALT_KEY, encoded);
   return salt;
-}
-
-let cachedKey: CryptoKey | null = null;
-let keyPromise: Promise<CryptoKey> | null = null;
-
-async function getKey(): Promise<CryptoKey> {
-  if (cachedKey) return cachedKey;
-  if (!keyPromise) {
-    keyPromise = deriveKey(getOrCreatePassphrase());
-  }
-  cachedKey = await keyPromise;
-  return cachedKey;
-}
-
-async function deriveKey(passphrase: string): Promise<CryptoKey> {
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(passphrase),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
-  return crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: getOrCreateSalt(),
-      iterations: 600000,
-      hash: "SHA-256",
-    },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
 }
 
 async function encryptValue(plaintext: string, key: CryptoKey): Promise<string> {
@@ -123,7 +118,10 @@ async function encryptValue(plaintext: string, key: CryptoKey): Promise<string> 
   const combined = new Uint8Array(iv.length + cipherBytes.length);
   combined.set(iv);
   combined.set(cipherBytes);
-  const binary = combined.reduce((acc, byte) => acc + String.fromCharCode(byte), "");
+  const binary = combined.reduce(
+    (acc: string, byte: number) => acc + String.fromCharCode(byte),
+    "",
+  );
   return btoa(binary);
 }
 
@@ -136,12 +134,14 @@ async function decryptValue(ciphertext: string, key: CryptoKey): Promise<string>
 }
 
 // ---- Store -------------------------------------------------------------
+// Passphrase is provided by the Tauri backend (not stored persistently).
 
 class EphemeralStore {
   private syncStore = new Map<string, string>();
   private ready = false;
   private readyResolve: (() => void) | null = null;
   private initPromise: Promise<void>;
+  private passphrase: string | null = null;
 
   constructor() {
     this.initPromise = new Promise<void>((resolve) => {
@@ -152,14 +152,15 @@ class EphemeralStore {
 
   private async initialize(): Promise<void> {
     try {
-      const key = await getKey();
-      // Walk persistence keys for encrypted entries (IndexedDB + fallback localStorage)
+      this.passphrase = await invoke<string>("get_encryption_passphrase");
+      // Walk persistence keys for encrypted entries (IndexedDB only; sensitive storage is not mirrored to localStorage)
       const allKeys = persistence.keys();
       for (const k of allKeys) {
         if (k.startsWith(STORAGE_PREFIX)) {
           try {
             const encrypted = persistence.getItem<string>(k);
-            if (encrypted) {
+            if (encrypted && this.passphrase) {
+              const key = await getKey(this.passphrase);
               const plain = await decryptValue(encrypted, key);
               this.syncStore.set(k.substring(STORAGE_PREFIX.length), plain);
             }
@@ -170,7 +171,7 @@ class EphemeralStore {
       }
       this.ready = true;
     } catch {
-      // crypto unavailable — store remains empty but operational
+      // crypto unavailable or Tauri backend not available — store remains empty but operational
       this.ready = true;
     }
     this.readyResolve?.();
@@ -183,14 +184,16 @@ class EphemeralStore {
 
   set(key: string, value: string): void {
     this.syncStore.set(key, value);
-    getKey()
-      .then((k) => encryptValue(value, k))
-      .then(async (encrypted) => {
-        await storeSet(STORAGE_PREFIX + key, encrypted);
-      })
-      .catch(() => {
-        // silently fail
-      });
+    if (this.passphrase) {
+      getKey(this.passphrase)
+        .then((k) => encryptValue(value, k))
+        .then(async (encrypted) => {
+          await storeSet(STORAGE_PREFIX + key, encrypted);
+        })
+        .catch(() => {
+          // silently fail
+        });
+    }
   }
 
   get(key: string): string | undefined {

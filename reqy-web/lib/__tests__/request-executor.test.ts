@@ -1,12 +1,35 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   normalizeUrl,
   buildUrl,
   buildHeaders,
   sanitizeUrl,
   buildRequestPayload,
+  executeRequest,
 } from "@/lib/request-executor";
 import type { Header, QueryParam, BodyType, RequestTab } from "@/lib/request-executor";
+
+const { enqueueMock } = vi.hoisted(() => ({
+  enqueueMock: vi.fn(),
+}));
+
+vi.mock("@/lib/offline/queue", () => ({
+  classifyError: (error: unknown) => {
+    if (error instanceof TypeError) return "network";
+    if (error instanceof Error && error.name === "AbortError") return "network";
+    return "unknown";
+  },
+  enqueueOnNetworkFailure: enqueueMock,
+}));
+
+vi.mock("@/lib/tauri", () => ({
+  invokeTauriFetch: vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+}));
+
+beforeEach(() => {
+  enqueueMock.mockReset();
+  enqueueMock.mockRejectedValue(new Error("queue unavailable"));
+});
 
 describe("sanitizeUrl", () => {
   it("trims whitespace", () => {
@@ -213,5 +236,53 @@ describe("buildRequestPayload", () => {
       nativeMode: false,
     });
     expect(finalBody).toBe('{"name":"John"}');
+  });
+});
+
+describe("executeRequest", () => {
+  const baseTabForExecution = {
+    method: "POST" as const,
+    url: "https://example.com/api",
+    endpoint: "https://example.com/api",
+    body: "",
+    bodyType: "raw" as BodyType,
+    headers: [] as Header[],
+    queryParams: [] as QueryParam[],
+    pathParams: [],
+    authType: "none" as const,
+    authToken: "",
+    preRequestScript: "",
+    postResponseScript: "",
+    assertions: [],
+    hasResponse: false,
+    isSaved: false,
+  };
+
+  it("surfaces queueing failures to the caller instead of silently swallowing them", async () => {
+    const result = await executeRequest({
+      tab: {
+        ...baseTabForExecution,
+        method: "GET",
+        url: "https://example.com",
+        body: "",
+        headers: [],
+        queryParams: [],
+        pathParams: [],
+        authType: "none",
+        authToken: "",
+        hasResponse: false,
+        isSaved: false,
+        responseBody: "",
+        responseData: "",
+      } as RequestTab,
+      allVars: [],
+      activeProjectPort: 0,
+      activeProject: false,
+      nativeMode: true,
+      activeWorkspaceId: null,
+    });
+
+    expect(result.responseBody).toContain("Queueing failed");
+    expect(result.responseStatus).toBe(0);
   });
 });
