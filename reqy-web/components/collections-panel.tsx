@@ -143,7 +143,16 @@ export function CollectionsPanel({
   onMoveBetweenCollections,
   onRunCollection,
 }: CollectionsPanelProps) {
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const stored = localStorage.getItem("collections-expanded");
+      if (stored) return new Set<string>(JSON.parse(stored));
+    } catch {
+      /* ignore corrupt data */
+    }
+    return new Set<string>();
+  });
   const [activeDragItem, setActiveDragItem] = useState<{
     id: string;
     name: string;
@@ -372,6 +381,11 @@ export function CollectionsPanel({
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      try {
+        localStorage.setItem("collections-expanded", JSON.stringify([...next]));
+      } catch {
+        /* storage full or unavailable */
+      }
       return next;
     });
   };
