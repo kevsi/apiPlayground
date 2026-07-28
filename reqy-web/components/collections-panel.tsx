@@ -191,8 +191,11 @@ export function CollectionsPanel({
   const handleDndEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveDragItem(null);
-      const { active, over } = event;
+      const { active, over, activatorEvent } = event;
       if (!over) return;
+
+      const isCtrl =
+        (activatorEvent as MouseEvent).ctrlKey || (activatorEvent as MouseEvent).metaKey;
 
       const activeId = String(active.id);
       const overId = String(over.id);
@@ -204,6 +207,34 @@ export function CollectionsPanel({
       const requestId = activeId.replace(/^req::/, "");
       const sourceColId = activeData.collectionId ?? "";
       const targetColId = overData.collectionId ?? "";
+
+      // ── Ctrl/Meta+Drag: duplicate instead of move ──
+      if (isCtrl) {
+        const sourceCol = collections.find((c) => c.id === sourceColId);
+        if (!sourceCol) return;
+        const sourceReq = sourceCol.requests.find((r) => r.id === requestId);
+        if (!sourceReq) return;
+        const duplicate: Omit<RequestItem, "id" | "createdAt" | "updatedAt"> = {
+          name: `${sourceReq.name} (copy)`,
+          method: sourceReq.method,
+          url: sourceReq.url,
+          endpoint: sourceReq.endpoint,
+          headers: sourceReq.headers,
+          body: sourceReq.body,
+          bodyType: sourceReq.bodyType,
+          authType: sourceReq.authType,
+          authToken: sourceReq.authToken,
+          queryParams: sourceReq.queryParams,
+          pathParams: sourceReq.pathParams,
+          protocol: sourceReq.protocol,
+          graphql: sourceReq.graphql ? { ...sourceReq.graphql } : undefined,
+          preRequestScript: sourceReq.preRequestScript,
+          postResponseScript: sourceReq.postResponseScript,
+          datasetKey: sourceReq.datasetKey,
+        };
+        onAddRequestToCollection(targetColId, duplicate);
+        return;
+      }
 
       if (overData.type === "request") {
         const targetRequestId = overId.replace(/^req::/, "");
@@ -246,7 +277,12 @@ export function CollectionsPanel({
         );
       }
     },
-    [collections, onReorderRequestsInCollection, onMoveBetweenCollections],
+    [
+      collections,
+      onReorderRequestsInCollection,
+      onMoveBetweenCollections,
+      onAddRequestToCollection,
+    ],
   );
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
