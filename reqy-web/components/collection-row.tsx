@@ -93,7 +93,16 @@ export function CollectionRow({
   const requestIds = collection.requests.map((r) => requestId(r.id));
 
   return (
-    <div ref={dropRef} data-testid="collection-row" className={cn(isOver && "bg-primary/[0.04]")}>
+    <div
+      ref={dropRef}
+      data-testid="collection-row"
+      className={cn(
+        "relative",
+        isOver && "bg-primary/[0.04]",
+        isOver &&
+          "before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-r before:bg-primary/60",
+      )}
+    >
       {/* ── Collection header ── */}
       <div className={cn("flex items-center gap-3 px-3 py-2.5", isSelected && "bg-primary/[0.03]")}>
         <button
