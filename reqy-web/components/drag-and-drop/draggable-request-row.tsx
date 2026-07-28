@@ -57,6 +57,7 @@ export function DraggableRequestRow({
         {...listeners}
         tabIndex={0}
         aria-label={`Drag ${request.name}`}
+        data-testid={`drag-handle-${request.id}`}
       >
         <GripVertical className="size-3" />
       </button>

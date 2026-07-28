@@ -81,6 +81,7 @@ function FolderDropZone({
   return (
     <div
       ref={folderDropRef}
+      data-testid={`folder-drop-${folder.name}`}
       className={cn(
         "relative",
         isOver && "bg-primary/[0.04]",
