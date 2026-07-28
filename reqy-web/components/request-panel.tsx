@@ -432,9 +432,7 @@ ${bodyPart}})
               <SelectValue placeholder={method} />
             </SelectTrigger>
             <SelectContent>
-              {(
-                ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "GRAPHQL"] as const
-              ).map((m) => (
+              {(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const).map((m) => (
                 <SelectItem key={m} value={m}>
                   <span className="flex items-center gap-2">
                     <span className={cn("size-1.5 rounded-full shrink-0", methodDot[m])} />

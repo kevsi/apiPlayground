@@ -1,23 +1,23 @@
-"use client"
+"use client";
 
-import { Search, X, CheckSquare, Square, SlidersHorizontal, ArrowUpDown } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import type { HttpMethod } from "@/hooks/use-request-store"
-import { methodBadge } from "@/lib/http-method-colors"
+import { Search, X, CheckSquare, Square, SlidersHorizontal, ArrowUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import type { HttpMethod } from "@/hooks/use-request-store";
+import { methodBadge } from "@/lib/http-method-colors";
 
 interface SearchFilterBarProps {
-  searchQuery: string
-  onSearchChange: (value: string) => void
-  allSelected: boolean
-  onToggleSelectAll: () => void
-  showFilters: boolean
-  onToggleFilters: () => void
-  methodFilter: Set<HttpMethod>
-  onToggleMethodFilter: (method: HttpMethod) => void
-  sortBy: "name" | "updated" | "requests"
-  onSortChange: (sort: "name" | "updated" | "requests") => void
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  allSelected: boolean;
+  onToggleSelectAll: () => void;
+  showFilters: boolean;
+  onToggleFilters: () => void;
+  methodFilter: Set<HttpMethod>;
+  onToggleMethodFilter: (method: HttpMethod) => void;
+  sortBy: "name" | "updated" | "requests";
+  onSortChange: (sort: "name" | "updated" | "requests") => void;
 }
 
 export function SearchFilterBar({
@@ -57,10 +57,7 @@ export function SearchFilterBar({
             variant="ghost"
             size="sm"
             onClick={onToggleSelectAll}
-            className={cn(
-              "h-9 w-9 p-0",
-              allSelected && "text-primary"
-            )}
+            className={cn("h-9 w-9 p-0", allSelected && "text-primary")}
             title={allSelected ? "Tout désélectionner" : "Tout sélectionner"}
           >
             {allSelected ? <CheckSquare className="size-4.5" /> : <Square className="size-4.5" />}
@@ -71,7 +68,7 @@ export function SearchFilterBar({
             onClick={onToggleFilters}
             className={cn(
               "h-9 w-9 p-0",
-              (methodFilter.size > 0 || sortBy !== "name") && "text-primary"
+              (methodFilter.size > 0 || sortBy !== "name") && "text-primary",
             )}
             title="Filtres & tri"
           >
@@ -83,23 +80,25 @@ export function SearchFilterBar({
       {showFilters && (
         <div className="flex items-center gap-3 pt-1.5 pb-0.5">
           <div className="flex items-center gap-1 flex-wrap">
-            {(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "GRAPHQL"] as HttpMethod[]).map((method) => {
-              const active = methodFilter.has(method)
-              return (
-                <button
-                  key={method}
-                  onClick={() => onToggleMethodFilter(method)}
-                  className={cn(
-                    "px-3 py-1 text-xs font-bold rounded-md border transition-colors",
-                    active
-                      ? `${methodBadge[method]} border-transparent`
-                      : "text-muted-foreground/60 border-border/50 hover:border-border hover:text-foreground"
-                  )}
-                >
-                  {method}
-                </button>
-              )
-            })}
+            {(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as HttpMethod[]).map(
+              (method) => {
+                const active = methodFilter.has(method);
+                return (
+                  <button
+                    key={method}
+                    onClick={() => onToggleMethodFilter(method)}
+                    className={cn(
+                      "px-3 py-1 text-xs font-bold rounded-md border transition-colors",
+                      active
+                        ? `${methodBadge[method]} border-transparent`
+                        : "text-muted-foreground/60 border-border/50 hover:border-border hover:text-foreground",
+                    )}
+                  >
+                    {method}
+                  </button>
+                );
+              },
+            )}
           </div>
           <div className="ml-auto flex items-center gap-1">
             <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
@@ -116,5 +115,5 @@ export function SearchFilterBar({
         </div>
       )}
     </div>
-  )
+  );
 }

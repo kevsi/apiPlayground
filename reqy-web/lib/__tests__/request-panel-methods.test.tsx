@@ -1,6 +1,6 @@
 /**
  * Test: the method selector (HTTP method dropdown) supports all expected methods:
- * GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, GRAPHQL.
+ * GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS.
  *
  * Note: Radix UI Select in jsdom doesn't reflect prop changes reliably,
  * so we test the type definition and basic rendering.
@@ -10,16 +10,7 @@ import { render, screen } from "@testing-library/react";
 import { RequestPanel } from "@/components/request-panel";
 import type { HttpMethod } from "@/lib/types";
 
-const ALL_METHODS: HttpMethod[] = [
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "HEAD",
-  "OPTIONS",
-  "GRAPHQL",
-];
+const ALL_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
 const noop = () => {};
 const noopPromise = async () => {};
@@ -46,9 +37,9 @@ const defaultProps = {
 };
 
 describe("RequestPanel method selector", () => {
-  it("has all 8 HTTP methods in the type definition", () => {
+  it("has all 7 HTTP methods in the type definition", () => {
     const methods: HttpMethod[] = ALL_METHODS;
-    expect(methods).toHaveLength(8);
+    expect(methods).toHaveLength(7);
     expect(methods).toContain("GET");
     expect(methods).toContain("POST");
     expect(methods).toContain("PUT");
@@ -56,7 +47,6 @@ describe("RequestPanel method selector", () => {
     expect(methods).toContain("DELETE");
     expect(methods).toContain("HEAD");
     expect(methods).toContain("OPTIONS");
-    expect(methods).toContain("GRAPHQL");
   });
 
   it("renders method selector trigger without crashing", () => {
@@ -76,12 +66,6 @@ describe("RequestPanel method selector", () => {
 
   it("accepts OPTIONS as a valid method prop", () => {
     render(<RequestPanel {...defaultProps} method="OPTIONS" />);
-    const triggers = screen.getAllByTestId("method-selector");
-    expect(triggers.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("accepts GRAPHQL as a valid method prop", () => {
-    render(<RequestPanel {...defaultProps} method="GRAPHQL" />);
     const triggers = screen.getAllByTestId("method-selector");
     expect(triggers.length).toBeGreaterThanOrEqual(1);
   });

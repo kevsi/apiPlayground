@@ -1,16 +1,15 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Session 1 & 2 — REST editor + GraphQL fixes", () => {
-  test("method selector includes HEAD, OPTIONS, GRAPHQL", async ({ page }) => {
+  test("method selector includes HEAD and OPTIONS", async ({ page }) => {
     await page.goto("/");
     const trigger = page.getByTestId("method-selector").first();
     await expect(trigger).toBeVisible();
     await trigger.click();
-    // Check that all 8 methods appear in the dropdown
+    // Check that HEAD and OPTIONS appear in the dropdown (GRAPHQL is available only on /graphql page)
     const dropdown = page.locator('[role="listbox"]');
     await expect(dropdown.locator('text="HEAD"')).toBeVisible({ timeout: 3000 });
     await expect(dropdown.locator('text="OPTIONS"')).toBeVisible();
-    await expect(dropdown.locator('text="GRAPHQL"')).toBeVisible();
   });
 
   test("binary body type is selectable", async ({ page }) => {
