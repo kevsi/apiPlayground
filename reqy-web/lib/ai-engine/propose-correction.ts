@@ -57,12 +57,13 @@ export interface ProposeCorrectionResult {
 function buildPrompt(input: ProposeCorrectionInput): string {
   const assertion = JSON.stringify(input.assertion);
   const status = input.response.status ?? "unknown";
-  let bodyStr = "none";
+  let bodyStr: string;
   try {
     bodyStr = input.response.body !== undefined ? JSON.stringify(input.response.body) : "none";
   } catch {
     bodyStr = String(input.response.body);
   }
+  if (!bodyStr) bodyStr = "none";
   if (bodyStr.length > 4000) bodyStr = `${bodyStr.slice(0, 4000)}…`;
 
   return `This assertion failed: ${assertion}.

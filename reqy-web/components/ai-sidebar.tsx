@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/refs */
 
 import { useEffect, useCallback } from "react";
 import { Sparkles, PanelRightClose, Clock, Loader2, GripVerticalIcon } from "lucide-react";

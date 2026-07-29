@@ -125,6 +125,32 @@ export function ResponsePanel({
   proposeAskAI,
   onApplyCorrection,
 }: ResponsePanelProps) {
+  function getAutoFormat(): ResponseFormat {
+    if (responseData instanceof Blob && responseData.type === "application/pdf") {
+      return "pdf";
+    }
+    if (isJson(responseBody, responseHeaders)) {
+      try {
+        const parsed = JSON.parse(responseBody as string);
+        const videoUrls = extractVideoUrls(parsed);
+        if (videoUrls.length > 0) return "preview";
+        const imageUrls = extractImageUrls(parsed);
+        if (imageUrls.length > 0) return "preview";
+      } catch {
+        // ignore
+      }
+      return "json";
+    }
+    if (isXml(responseBody, responseHeaders)) return "xml";
+    if (isHtml(responseBody, responseHeaders)) return "html";
+    if (isImage(responseData, responseHeaders)) return "image";
+    if (isPdf(responseData, responseHeaders)) return "pdf";
+    if (isAudio(responseData, responseHeaders)) return "audio";
+    if (isVideo(responseData, responseHeaders)) return "video";
+    if (isBinary(responseData, responseHeaders)) return "binary";
+    return "pretty";
+  }
+
   const [responseFormat, setResponseFormat] = useState<ResponseFormat>(() => {
     if (!responseBody && !responseData) return "pretty";
     return getAutoFormat();
@@ -225,32 +251,7 @@ export function ResponsePanel({
     }
   }, [responseTime, hasResponse, isLoading]);
 
-  // ── Auto-format ────────────────────────────────────────────────
-  function getAutoFormat(): ResponseFormat {
-    if (responseData instanceof Blob && responseData.type === "application/pdf") {
-      return "pdf";
-    }
-    if (isJson(responseBody, responseHeaders)) {
-      try {
-        const parsed = JSON.parse(responseBody as string);
-        const videoUrls = extractVideoUrls(parsed);
-        if (videoUrls.length > 0) return "preview";
-        const imageUrls = extractImageUrls(parsed);
-        if (imageUrls.length > 0) return "preview";
-      } catch {
-        // ignore
-      }
-      return "json";
-    }
-    if (isXml(responseBody, responseHeaders)) return "xml";
-    if (isHtml(responseBody, responseHeaders)) return "html";
-    if (isImage(responseData, responseHeaders)) return "image";
-    if (isPdf(responseData, responseHeaders)) return "pdf";
-    if (isAudio(responseData, responseHeaders)) return "audio";
-    if (isVideo(responseData, responseHeaders)) return "video";
-    if (isBinary(responseData, responseHeaders)) return "binary";
-    return "pretty";
-  }
+  // ── Auto-format helper is declared earlier to be available for useState init
 
   const handleExport = useCallback(() => {
     if (!responseBody) return;

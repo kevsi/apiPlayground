@@ -74,18 +74,6 @@ export function AiProviderModal({
   }, [open, provider, currentApiKey, currentModel, currentBaseUrl, clearTestResult]);
 
   // Auto-fetch models after typing API key (same as existing AISection)
-  useEffect(() => {
-    if (!apiKey || provider === "ollama" || ANTHROPIC_NO_FETCH.has(provider)) return;
-    if (isCustom && !baseUrl.trim()) return;
-
-    const timeout = setTimeout(() => {
-      void handleFetchModels();
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, provider, baseUrl]);
-
   const handleFetchModels = useCallback(async () => {
     if (loadingModels) return;
     setLoadingModels(true);
@@ -129,6 +117,19 @@ export function AiProviderModal({
       setLoadingModels(false);
     }
   }, [provider, apiKey, baseUrl, isCustom, loadingModels]);
+
+  // Auto-fetch models after typing API key (same as existing AISection)
+  useEffect(() => {
+    if (!apiKey || provider === "ollama" || ANTHROPIC_NO_FETCH.has(provider)) return;
+    if (isCustom && !baseUrl.trim()) return;
+
+    const timeout = setTimeout(() => {
+      void handleFetchModels();
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, provider, baseUrl]);
 
   const handleAddModel = useCallback((modelId: string) => {
     setModels((prev) => [...prev, { id: modelId, label: modelId }]);

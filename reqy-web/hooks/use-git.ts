@@ -31,134 +31,155 @@ import type {
 export function useGit(collections: Collection[]) {
   // Instance stable du service (créée une fois)
   const serviceRef = useRef<GitService | null>(null);
-  if (!serviceRef.current) {
-    serviceRef.current = new GitService(new TauriGitBackend());
-  }
-  const service = serviceRef.current;
+  const [state, setState] = useState<GitState>({
+    isInitialized: false,
+    currentBranch: "",
+    commits: [],
+    status: [],
+    branches: [],
+    remotes: [],
+    error: null,
+    repoPath: null,
+  });
 
-  const [state, setState] = useState<GitState>(service.getState());
-
-  // S'abonner aux changements d'état du service
+  // S'abonner aux changements d'état du service et initialiser l'instance
   useEffect(() => {
-    const unsub = service.subscribe((newState) => {
-      setState(newState);
-    });
-    return unsub;
-  }, [service]);
+    if (!serviceRef.current) serviceRef.current = new GitService(new TauriGitBackend());
+    const svc = serviceRef.current;
+    setState(svc.getState());
+    const unsub = svc.subscribe((newState) => setState(newState));
 
-  // ── Auto-detect on mount ───────────────────────────────────────────
-  useEffect(() => {
+    // Auto-detect on mount
     let cancelled = false;
     (async () => {
       try {
-        const initialized = await service.checkInitialized();
+        const initialized = await svc.checkInitialized();
         if (!cancelled && initialized) {
-          await service.refreshAll();
+          await svc.refreshAll();
         }
       } catch {
         // Pas de repo
       }
     })();
+
     return () => {
       cancelled = true;
+      unsub();
     };
-  }, [service]);
+  }, []);
 
   // ── Auto-sync collections to disk (debounced) ──────────────────────
   useEffect(() => {
+    const svc = serviceRef.current;
+    if (!svc) return;
     if (state.isInitialized && state.repoPath) {
-      service.startAutoSync(collections, state.repoPath);
+      svc.startAutoSync(collections, state.repoPath);
     }
-    return () => service.stopAutoSync();
-  }, [collections, state.isInitialized, state.repoPath, service]);
+    return () => svc.stopAutoSync();
+  }, [collections, state.isInitialized, state.repoPath]);
 
   // ── Callbacks stabilisés (délèguent au service) ────────────────────
 
   const initRepo = useCallback(
     async (repoPath: string) => {
-      await service.init(repoPath);
+      const svc = serviceRef.current!;
+      await svc.init(repoPath);
       // Sync collections immediately after init
-      await service.syncCollections(collections, repoPath);
+      await svc.syncCollections(collections, repoPath);
     },
-    [service, collections],
+    [collections],
   );
 
   const openRepo = useCallback(
     async (repoPath: string) => {
-      await service.open(repoPath);
-      await service.syncCollections(collections, repoPath);
+      const svc = serviceRef.current!;
+      await svc.open(repoPath);
+      await svc.syncCollections(collections, repoPath);
     },
-    [service, collections],
+    [collections],
   );
 
   const doCommit = useCallback(
     async (message: string, authorName?: string, authorEmail?: string) => {
+      const svc = serviceRef.current!;
       // Safeguard: sync one last time before commit
       const path = state.repoPath;
-      if (path) await service.syncCollections(collections, path);
-      return await service.commit(message, authorName, authorEmail);
+      if (path) await svc.syncCollections(collections, path);
+      return await svc.commit(message, authorName, authorEmail);
     },
-    [service, collections, state.repoPath],
+    [collections, state.repoPath],
   );
 
-  const doStage = useCallback(async (filepath: string) => service.stage(filepath), [service]);
+  const doStage = useCallback(async (filepath: string) => serviceRef.current!.stage(filepath), []);
 
-  const doStageAll = useCallback(async () => service.stageAll(), [service]);
+  const doStageAll = useCallback(async () => serviceRef.current!.stageAll(), []);
 
-  const doUnstage = useCallback(async (filepath: string) => service.unstage(filepath), [service]);
+  const doUnstage = useCallback(
+    async (filepath: string) => serviceRef.current!.unstage(filepath),
+    [],
+  );
 
   const doBranchCreate = useCallback(
-    async (name: string, fromOid?: string) => service.branchCreate(name, fromOid),
-    [service],
+    async (name: string, fromOid?: string) => serviceRef.current!.branchCreate(name, fromOid),
+    [],
   );
 
-  const doBranchDelete = useCallback(async (name: string) => service.branchDelete(name), [service]);
+  const doBranchDelete = useCallback(
+    async (name: string) => serviceRef.current!.branchDelete(name),
+    [],
+  );
 
-  const doBranchSwitch = useCallback(async (name: string) => service.branchSwitch(name), [service]);
+  const doBranchSwitch = useCallback(
+    async (name: string) => serviceRef.current!.branchSwitch(name),
+    [],
+  );
 
   const doRemoteAdd = useCallback(
-    async (name: string, url: string) => service.remoteAdd(name, url),
-    [service],
+    async (name: string, url: string) => serviceRef.current!.remoteAdd(name, url),
+    [],
   );
 
-  const doRemoteRemove = useCallback(async (name: string) => service.remoteRemove(name), [service]);
+  const doRemoteRemove = useCallback(
+    async (name: string) => serviceRef.current!.remoteRemove(name),
+    [],
+  );
 
   const doLsRemote = useCallback(
-    async (url: string): Promise<string[]> => service.lsRemote(url),
-    [service],
+    async (url: string): Promise<string[]> => serviceRef.current!.lsRemote(url),
+    [],
   );
 
   const doPush = useCallback(
-    async (remote: string, branch: string) => service.push(remote, branch),
-    [service],
+    async (remote: string, branch: string) => serviceRef.current!.push(remote, branch),
+    [],
   );
 
   const doForcePush = useCallback(
-    async (remote: string, branch: string) => service.forcePush(remote, branch),
-    [service],
+    async (remote: string, branch: string) => serviceRef.current!.forcePush(remote, branch),
+    [],
   );
 
   const doPull = useCallback(
-    async (remote: string, branch: string) => service.pull(remote, branch),
-    [service],
+    async (remote: string, branch: string) => serviceRef.current!.pull(remote, branch),
+    [],
   );
 
-  const doFetch = useCallback(async (remote: string) => service.fetch(remote), [service]);
+  const doFetch = useCallback(async (remote: string) => serviceRef.current!.fetch(remote), []);
 
   const doClone = useCallback(
     async (url: string, destPath: string): Promise<void> => {
-      await service.clone(url, destPath);
-      await service.syncCollections(collections, destPath);
+      await serviceRef.current!.clone(url, destPath);
+      await serviceRef.current!.syncCollections(collections, destPath);
     },
-    [service, collections],
+    [collections],
   );
 
   const doDiff = useCallback(
-    async (oidA: string, oidB: string): Promise<DiffFile[]> => service.diff(oidA, oidB),
-    [service],
+    async (oidA: string, oidB: string): Promise<DiffFile[]> => serviceRef.current!.diff(oidA, oidB),
+    [],
   );
 
-  const doRefresh = useCallback(async () => service.refreshAll(), [service]);
+  const doRefresh = useCallback(async () => serviceRef.current!.refreshAll(), []);
 
   // ── Return ─────────────────────────────────────────────────────────
 

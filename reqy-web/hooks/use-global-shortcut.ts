@@ -25,12 +25,7 @@ export interface ShortcutOptions {
 function isFormElement(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   const tag = el.tagName;
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    el.isContentEditable
-  );
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
 }
 
 /**
@@ -41,10 +36,13 @@ function isFormElement(el: EventTarget | null): boolean {
  */
 export function useGlobalShortcut(
   options: ShortcutOptions,
-  callback: (e: KeyboardEvent) => void
+  callback: (e: KeyboardEvent) => void,
 ): void {
   const cbRef = useRef(callback);
-  cbRef.current = callback;
+  // Keep latest callback in a ref outside of render lifecycle
+  useEffect(() => {
+    cbRef.current = callback;
+  }, [callback]);
 
   useEffect(() => {
     const key = options.key.toLowerCase();

@@ -113,7 +113,9 @@ export function RequestPanel({
   // Preserves existing user-added params that aren't in the URL.
   const lastParsedUrlRef = useRef(url);
   const queryParamsRef = useRef(queryParams);
-  queryParamsRef.current = queryParams;
+  useEffect(() => {
+    queryParamsRef.current = queryParams;
+  }, [queryParams]);
   useEffect(() => {
     if (url === lastParsedUrlRef.current) return;
     lastParsedUrlRef.current = url;
