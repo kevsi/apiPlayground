@@ -1,4 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("@/lib/security/dns-cache", () => ({
+  resolveCached: vi.fn(async (hostname: string) => {
+    if (
+      hostname === "example.com" ||
+      hostname === "myproxy.example.com" ||
+      hostname === "ollama.example.com"
+    ) {
+      return "93.184.216.34";
+    }
+    return null;
+  }),
+}));
+
 import { structuredError } from "../lib/errors";
 import { getCustomUrl, isOllamaHostAllowed } from "../lib/url-utils";
 import {
@@ -26,102 +40,104 @@ describe("structuredError", () => {
 });
 
 describe("getCustomUrl", () => {
-  it("appends /chat/completions to a valid URL", () => {
-    expect(getCustomUrl({ openaiUrl: "https://example.com/v1" })).toBe(
+  it("appends /chat/completions to a valid URL", async () => {
+    await expect(getCustomUrl({ openaiUrl: "https://example.com/v1" })).resolves.toBe(
       "https://example.com/v1/chat/completions",
     );
   });
 
-  it("throws for missing URL", () => {
-    expect(() => getCustomUrl({})).toThrow("Custom provider requires a base URL");
+  it("throws for missing URL", async () => {
+    await expect(getCustomUrl({})).rejects.toThrow("Custom provider requires a base URL");
   });
 
-  it("throws for empty URL", () => {
-    expect(() => getCustomUrl({ openaiUrl: "" })).toThrow("Custom provider requires a base URL");
+  it("throws for empty URL", async () => {
+    await expect(getCustomUrl({ openaiUrl: "" })).rejects.toThrow(
+      "Custom provider requires a base URL",
+    );
   });
 
-  it("throws for localhost URL", () => {
-    expect(() => getCustomUrl({ openaiUrl: "http://localhost:8080/v1" })).toThrow(
+  it("throws for localhost URL", async () => {
+    await expect(getCustomUrl({ openaiUrl: "http://localhost:8080/v1" })).rejects.toThrow(
       "cannot point to localhost",
     );
   });
 
-  it("throws for 127.0.0.1", () => {
-    expect(() => getCustomUrl({ openaiUrl: "http://127.0.0.1:8080/v1" })).toThrow(
+  it("throws for 127.0.0.1", async () => {
+    await expect(getCustomUrl({ openaiUrl: "http://127.0.0.1:8080/v1" })).rejects.toThrow(
       "cannot point to localhost",
     );
   });
 
-  it("throws for invalid protocol", () => {
-    expect(() => getCustomUrl({ openaiUrl: "ftp://example.com/v1" })).toThrow(
+  it("throws for invalid protocol", async () => {
+    await expect(getCustomUrl({ openaiUrl: "ftp://example.com/v1" })).rejects.toThrow(
       "URL must use http or https",
     );
   });
 
-  it("strips trailing slashes", () => {
-    expect(getCustomUrl({ openaiUrl: "https://example.com/v1///" })).toBe(
+  it("strips trailing slashes", async () => {
+    await expect(getCustomUrl({ openaiUrl: "https://example.com/v1///" })).resolves.toBe(
       "https://example.com/v1/chat/completions",
     );
   });
 
-  it("handles URL with path that does not end in /v1", () => {
-    expect(getCustomUrl({ openaiUrl: "https://myproxy.example.com" })).toBe(
+  it("handles URL with path that does not end in /v1", async () => {
+    await expect(getCustomUrl({ openaiUrl: "https://myproxy.example.com" })).resolves.toBe(
       "https://myproxy.example.com/chat/completions",
     );
   });
 
-  it("throws for invalid URL format", () => {
-    expect(() => getCustomUrl({ openaiUrl: "not-a-url" })).toThrow("Invalid custom provider URL");
+  it("throws for invalid URL format", async () => {
+    await expect(getCustomUrl({ openaiUrl: "not-a-url" })).rejects.toThrow(
+      "Invalid custom provider URL",
+    );
   });
 });
 
 describe("isOllamaHostAllowed", () => {
-  it("rejects localhost", () => {
-    expect(isOllamaHostAllowed("localhost")).toBe(false);
+  it("rejects localhost", async () => {
+    await expect(isOllamaHostAllowed("localhost")).resolves.toBe(false);
   });
 
-  it("rejects hostnames that resolve to private ranges via DNS rebinding", () => {
-    expect(isOllamaHostAllowed("internal.example.test")).toBe(false);
+  it("rejects hostnames that resolve to private ranges via DNS rebinding", async () => {
+    await expect(isOllamaHostAllowed("internal.example.test")).resolves.toBe(false);
   });
 
-  it("rejects 127.0.0.1", () => {
-    expect(isOllamaHostAllowed("127.0.0.1")).toBe(false);
+  it("rejects 127.0.0.1", async () => {
+    await expect(isOllamaHostAllowed("127.0.0.1")).resolves.toBe(false);
   });
 
-  it("rejects 0.0.0.0", () => {
-    expect(isOllamaHostAllowed("0.0.0.0")).toBe(false);
+  it("rejects 0.0.0.0", async () => {
+    await expect(isOllamaHostAllowed("0.0.0.0")).resolves.toBe(false);
   });
 
-  it("rejects ::1", () => {
-    expect(isOllamaHostAllowed("::1")).toBe(false);
+  it("rejects ::1", async () => {
+    await expect(isOllamaHostAllowed("::1")).resolves.toBe(false);
   });
 
-  it("rejects blocked private IPs (10.x.x.x)", () => {
-    expect(isOllamaHostAllowed("10.0.0.1")).toBe(false);
+  it("rejects blocked private IPs (10.x.x.x)", async () => {
+    await expect(isOllamaHostAllowed("10.0.0.1")).resolves.toBe(false);
   });
 
-  it("rejects blocked private IPs (172.16.x.x)", () => {
-    // isBlockedIp should catch RFC1918 ranges
-    const result = isOllamaHostAllowed("172.16.0.1");
-    // This depends on implementation — accept either true/false but document
+  it("rejects blocked private IPs (172.16.x.x)", async () => {
+    const result = await isOllamaHostAllowed("172.16.0.1");
     expect(typeof result).toBe("boolean");
   });
 
-  it("rejects blocked private IPs (192.168.x.x)", () => {
-    expect(isOllamaHostAllowed("192.168.1.1")).toBe(false);
+  it("rejects blocked private IPs (192.168.x.x)", async () => {
+    await expect(isOllamaHostAllowed("192.168.1.1")).resolves.toBe(false);
   });
 
-  it("allows public IPs", () => {
-    expect(isOllamaHostAllowed("192.30.252.130")).toBe(true);
+  it("allows public IPs", async () => {
+    await expect(isOllamaHostAllowed("192.30.252.130")).resolves.toBe(true);
   });
 
-  it("allows hostnames", () => {
-    expect(isOllamaHostAllowed("ollama.example.com")).toBe(true);
+  it("allows hostnames", async () => {
+    await expect(isOllamaHostAllowed("ollama.example.com")).resolves.toBe(true);
   });
 
-  it("is case-insensitive", () => {
-    expect(isOllamaHostAllowed("LOCALHOST")).toBe(false);
-    expect(isOllamaHostAllowed("LocalHost")).toBe(false);
+  it("is case-insensitive", async () => {
+    await expect(isOllamaHostAllowed("LOCALHOST")).resolves.toBe(false);
+    await expect(isOllamaHostAllowed("LocalHost")).resolves.toBe(false);
   });
 });
 

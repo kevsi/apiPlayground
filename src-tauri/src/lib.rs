@@ -9,6 +9,7 @@ mod capture;
 mod open;
 mod fetch;
 mod store;
+pub mod websocket;
 pub mod git;
 #[cfg(feature = "ts-export")]
 mod ts_bindings;

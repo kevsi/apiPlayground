@@ -16,7 +16,6 @@ import {
   evaluateTextAssertions,
   evaluateSchemaAssertion as evaluateSchemaAssertionShared,
   assertsPassed as assertsPassedShared,
-  runResultToContext,
 } from "@reqly/shared/assertions";
 
 export function evaluateAssertion(
@@ -24,9 +23,18 @@ export function evaluateAssertion(
   result: RunResult,
   vars?: Map<string, string>,
 ): AssertionResult {
-  return evaluateTextAssertion(assertion, runResultToContext(result), {
-    vars,
-  }) as unknown as AssertionResult;
+  return evaluateTextAssertion(
+    assertion,
+    {
+      status: result.status,
+      durationMs: result.durationMs,
+      headers: result.responseHeaders ?? {},
+      body: result.body,
+    },
+    {
+      vars,
+    },
+  ) as unknown as AssertionResult;
 }
 
 export function evaluateAssertions(
@@ -34,9 +42,18 @@ export function evaluateAssertions(
   result: RunResult,
   vars?: Map<string, string>,
 ): AssertionResult[] {
-  return evaluateTextAssertions(assertions, runResultToContext(result), {
-    vars,
-  }) as unknown as AssertionResult[];
+  return evaluateTextAssertions(
+    assertions,
+    {
+      status: result.status,
+      durationMs: result.durationMs,
+      headers: result.responseHeaders ?? {},
+      body: result.body,
+    },
+    {
+      vars,
+    },
+  ) as unknown as AssertionResult[];
 }
 
 export { evaluateSchemaAssertion } from "@reqly/shared/assertions";

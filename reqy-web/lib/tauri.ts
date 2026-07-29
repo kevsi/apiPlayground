@@ -59,6 +59,14 @@ export const isTauriAvailable = (): boolean => {
   return !!window.__TAURI_INTERNALS__ || !!window.__TAURI__;
 };
 
+/**
+ * Native desktop fetch uses the Tauri backend and intentionally does not
+ * enforce the web proxy SSRF guard. This is because the desktop app is a
+ * user-controlled API client that must be able to reach local/private APIs.
+ *
+ * Public or shared deployments should use the web proxy route instead, which
+ * includes explicit SSRF protections for outbound HTTP requests.
+ */
 export async function invokeTauriFetch(
   method: string,
   url: string,

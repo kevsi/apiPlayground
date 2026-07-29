@@ -7,7 +7,7 @@
 // The unified API in @reqly/shared preserves these signatures by delegating
 // to evaluateStructuredAssertions internally.
 
-import { evaluateStructuredAssertions, runResultToContext } from "@reqly/shared/assertions";
+import { evaluateStructuredAssertions } from "@reqly/shared/assertions";
 import type { Assertion, AssertionResult } from "./types.js";
 import type { RunResult } from "./types.js";
 

@@ -22,7 +22,7 @@ export interface ExtraOptions {
   signal?: AbortSignal;
 }
 
-function getEndpoint(provider: string, body: Record<string, unknown>): string {
+function getEndpoint(provider: string, body: Record<string, unknown>): string | Promise<string> {
   switch (provider) {
     case "openai":
       return "https://api.openai.com/v1/chat/completions";
@@ -72,7 +72,12 @@ export async function handleOpenAICompat(
     return structuredError("Missing message", "MISSING_MESSAGE", 400);
   }
 
-  const url = getEndpoint(body.provider, body);
+  let url: string;
+  try {
+    url = await getEndpoint(body.provider, body);
+  } catch (err: any) {
+    return structuredError(err?.message ?? "Invalid provider URL", "INVALID_PROVIDER_URL", 400);
+  }
 
   const res = await fetch(url, {
     method: "POST",

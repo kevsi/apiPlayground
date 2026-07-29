@@ -44,7 +44,7 @@ export async function handleOllama(
   const ollamaPort = port || process.env.OLLAMA_PORT || "11434";
 
   // SSRF check
-  if (!isOllamaHostAllowed(host)) {
+  if (!(await isOllamaHostAllowed(host))) {
     return structuredError(
       "Invalid host: localhost and private IPs are not allowed",
       "SSRF_BLOCKED",

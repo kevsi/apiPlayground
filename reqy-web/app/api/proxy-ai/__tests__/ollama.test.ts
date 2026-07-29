@@ -1,4 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@/lib/security/dns-cache", () => ({
+  resolveCached: vi.fn(async (hostname: string) => {
+    if (
+      hostname === "example.com" ||
+      hostname === "myproxy.example.com" ||
+      hostname === "ollama.example.com"
+    ) {
+      return "93.184.216.34";
+    }
+    return null;
+  }),
+}));
+
 import { handleOllama } from "../handlers/ollama";
 
 const validBody = {

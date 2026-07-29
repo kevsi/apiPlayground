@@ -31,6 +31,8 @@ const PROVIDERS_WITH_API_KEY = new Set([
   "grok",
 ]);
 
+const MAX_PREVIOUS_TURNS = 5;
+
 export async function POST(req: NextRequest) {
   const rateKey = getRateLimitKey(req);
   const rateResult = await rateLimiter.check(rateKey);
@@ -54,6 +56,15 @@ export async function POST(req: NextRequest) {
 
   if (!provider) {
     return structuredError("Missing provider", "MISSING_PROVIDER", 400);
+  }
+
+  const previousTurns = Array.isArray(body.previousTurns) ? body.previousTurns : [];
+  if (previousTurns.length > MAX_PREVIOUS_TURNS) {
+    return structuredError(
+      `Too many previous turns: maximum allowed is ${MAX_PREVIOUS_TURNS}`,
+      "TOO_MANY_PREVIOUS_TURNS",
+      400,
+    );
   }
 
   if (!SUPPORTED_PROVIDERS.has(provider)) {
